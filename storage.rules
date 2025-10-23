@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Licencias almacenadas en licenses/<uid>
+    match /licenses/{uid} {
+      // Permitir escribir Y leer al dueño (necesario para getDownloadURL)
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Otros assets por usuario, si se necesitan en el futuro
+    match /users/{uid}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

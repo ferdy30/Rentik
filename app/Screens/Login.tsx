@@ -1,11 +1,24 @@
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import React from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { Firebaseauth } from '../../FirebaseConfig';
 
 
 
-const Login = () => {
+const Login = ({ navigation }: any) => {
 
     const [email, setEmail] = React.useState('');
     const [password, setPassword] = React.useState('');
@@ -26,50 +39,82 @@ const Login = () => {
   }
   
 
-  const singUp = async () => {
-    setLoading(true);
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-        alert('Usuario registrado con éxito. Ahora puedes iniciar sesión.');
-    }
-    catch (error) {
-        console.error(error);
-        alert('Error al registrar el usuario. Por favor, intenta de nuevo.');
-    } finally {
-        setLoading(false);
-    }
 
-    }
 
 
   return (
-     
-     
-     <View style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={['#FF5A5F', '#FF415E']}
+        style={styles.backgroundGradient}
+      />
       
-       <Text style={{ fontSize: 40, marginBottom: 50, fontWeight: 'bold' }}>Bienvenido</Text>
-
-       <View style={styles.logoContainer}>
-            <Image style={styles.logo} source={require('../../assets/images/Logo.png')} />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.content}
+      >
+        <View style={styles.header}>
+          <Text style={styles.welcomeText}>Bienvenido</Text>
+          <Text style={styles.subText}>Inicia sesión para continuar</Text>
         </View>
-    
-      <TextInput value= {email} style= {styles.input} placeholder='Email' autoCapitalize='none' onChangeText={(text)=> setEmail(text)}></TextInput>
-      <TextInput secureTextEntry ={true} value= {password} style= {styles.input} placeholder='Password' autoCapitalize='none' onChangeText={(text)=> setPassword(text)}></TextInput>
-     
-       { loading ? <ActivityIndicator size="large" color="#0000ff" /> :
-        
 
-    (        
-        <>
-        <TouchableOpacity style={styles.button} onPress={() => { void signIn(); }}  >
-          <Text style={styles.buttonText}>Iniciar sesión</Text>
-        </TouchableOpacity>
+        <View style={styles.logoContainer}>
+          <Image 
+            style={styles.logo} 
+            source={require('../../assets/images/Logo.png')}
+            resizeMode="contain"
+          />
+        </View>
 
-        <TouchableOpacity  onPress={() => { void singUp(); }}>
-          <Text style={styles.buttonTextR}>Registrarse</Text>
-        </TouchableOpacity>
-        </>
-    ) }
+        <View style={styles.formContainer}>
+          <View style={styles.inputContainer}>
+            <Ionicons name="mail-outline" size={24} color="#666" style={styles.inputIcon} />
+            <TextInput
+              value={email}
+              style={styles.input}
+              placeholder="Correo electrónico"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              onChangeText={(text) => setEmail(text)}
+              keyboardType="email-address"
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Ionicons name="lock-closed-outline" size={24} color="#666" style={styles.inputIcon} />
+            <TextInput
+              secureTextEntry={true}
+              value={password}
+              style={styles.input}
+              placeholder="Contraseña"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              onChangeText={(text) => setPassword(text)}
+            />
+          </View>
+
+          {loading ? (
+            <ActivityIndicator size="large" color="#FF5A5F" style={styles.loader} />
+          ) : (
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={styles.signInButton}
+                onPress={() => { void signIn(); }}
+              >
+                <Text style={styles.signInButtonText}>Iniciar sesión</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.signUpButton}
+                onPress={() => navigation.replace('Registro')}
+              >
+                <Text style={styles.signUpButtonText}>Crear cuenta nueva</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </View>
   )
 };
@@ -77,55 +122,111 @@ const Login = () => {
 export default Login;
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,        
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#f5f5f5',
-    },      
-    input: {
-        width: '80%',
-        height: 50,
-        borderColor: '#ccc',
-        borderWidth: 1,
-        borderRadius: 5,
-        paddingHorizontal: 10,
-        marginBottom: 10,
-        backgroundColor: '#fff',
-    }, 
-    button: {
-        width: '80%',
-        height: 50,
-        backgroundColor: '#020202ff', 
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 10,    
-        marginTop: 10,
-    },
-
-    logoContainer:{
-    width: '47%',
-    height: '21.5%',
-    marginBottom: 30,
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
   },
-  logo: {
-    width: '100%',
+  backgroundGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
     height: '100%',
   },
-    buttonText: {                       
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
+  content: {
+    flex: 1,
+    width: '100%',
+    paddingHorizontal: 25,
+    justifyContent: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  welcomeText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 10,
+  },
+  subText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    tintColor: 'white',
+  },
+  formContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
     },
-    buttonTextR: {                       
-        color: '#3a00afff',
-        fontSize: 15,
-        marginTop: 10,
-        fontWeight: 'bold',
-    },    
-    link: {
-        color: '#007bff',
-        marginTop: 10,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    marginBottom: 15,
+    paddingHorizontal: 15,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    height: 50,
+    color: '#333',
+    fontSize: 16,
+  },
+  buttonContainer: {
+    marginTop: 20,
+  },
+  loader: {
+    marginTop: 20,
+  },
+  signInButton: {
+    backgroundColor: '#FF5A5F',
+    borderRadius: 10,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+    shadowColor: '#FF5A5F',
+    shadowOffset: {
+      width: 0,
+      height: 2,
     },
-}
-);
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  signInButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  signUpButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signUpButtonText: {
+    color: '#FF5A5F',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
