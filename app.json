@@ -25,6 +25,9 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.yourcompany.rentik"
-    }
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

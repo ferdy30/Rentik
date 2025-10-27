@@ -1,50 +1,177 @@
-# Welcome to your Expo app 👋
+# Rentik - Car Rental App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Overview
+Rentik is a comprehensive car rental application built with React Native and Expo, designed to connect car owners (arrendadores) with renters (arrendatarios) in El Salvador. The app features role-based navigation, secure authentication, and a professional black-themed design.
 
-## Get started
+## Features
 
-1. Install dependencies
+### For Renters (Arrendatarios)
+- Browse available cars for rent
+- View car details, pricing, and location
+- Secure booking system
+- User profile management
 
+### For Car Owners (Arrendadores)
+- Manage vehicle fleet
+- Add new vehicles with detailed profiles
+- Track earnings and reservations
+- License verification process
+- Vehicle status management
+
+### Core Features
+- **Authentication**: Firebase-based login and registration
+- **Role-based Navigation**: Different flows for renters and owners
+- **License Upload**: Secure document verification for owners
+- **Vehicle Management**: Complete CRUD operations for car listings
+- **Professional UI**: Modern black-themed design
+- **Real-time Updates**: Live data synchronization
+
+## Tech Stack
+- **Frontend**: React Native with Expo
+- **Navigation**: React Navigation (Native Stack)
+- **Authentication**: Firebase Auth
+- **Database**: Firestore
+- **Storage**: Firebase Storage
+- **Styling**: StyleSheet with professional color palette
+
+## Project Structure
+
+```
+rentik/
+├── app/
+│   ├── App.tsx                 # Main app component
+│   ├── navigation/
+│   │   └── index.tsx          # Navigation configuration
+│   ├── Screens/
+│   │   ├── Splash.tsx         # Multi-screen splash sequence
+│   │   ├── Login.tsx          # Authentication screen
+│   │   ├── Registro.tsx       # User registration
+│   │   ├── LicenseUpload.tsx  # Document verification
+│   │   ├── PerfilVehiculo.tsx # Vehicle profile creation
+│   │   ├── Home.tsx           # Renter's car browsing
+│   │   └── HomeArrendador.tsx # Owner's vehicle management
+│   └── types/
+│       └── navigation.ts      # TypeScript navigation types
+├── context/
+│   └── Auth.jsx               # Authentication context
+├── FirebaseConfig.js          # Firebase configuration
+├── assets/                    # Images and static assets
+└── package.json               # Dependencies and scripts
+```
+
+## User Flows
+
+### Renter Flow
+1. **Splash Screens** → 3 sequential intro screens
+2. **Login** → Authenticate existing account
+3. **Home** → Browse available cars
+
+### Owner Flow
+1. **Splash Screens** → 3 sequential intro screens
+2. **Login** → Authenticate existing account
+3. **Registration** → Create new account with role selection
+4. **License Upload** → Verify driving license
+5. **Vehicle Profile** → Add first vehicle
+6. **HomeArrendador** → Manage vehicle fleet
+
+## Installation
+
+1. **Prerequisites**
+   - Node.js (v16 or higher)
+   - npm or yarn
+   - Expo CLI
+   - Android Studio (for Android development)
+   - Xcode (for iOS development, macOS only)
+
+2. **Clone and Install**
    ```bash
+   git clone <repository-url>
+   cd rentik
    npm install
    ```
 
-2. Start the app
+3. **Firebase Setup**
+   - Create a Firebase project
+   - Enable Authentication and Firestore
+   - Configure Firebase config in `FirebaseConfig.js`
+   - Update security rules in `firestore.rules` and `storage.rules`
 
+4. **Environment Variables**
+   - Copy `FirebaseConfig.example.js` to `FirebaseConfig.js`
+   - Fill in your Firebase configuration values
+
+5. **Run the App**
    ```bash
-   npx expo start
+   npm start
+   # or
+   expo start
    ```
 
-In the output, you'll find options to open the app in a
+## Development
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Available Scripts
+- `npm start` - Start the Expo development server
+- `npm run android` - Run on Android emulator/device
+- `npm run ios` - Run on iOS simulator (macOS only)
+- `npm run web` - Run in web browser
+- `npm run lint` - Run ESLint for code quality
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Code Quality
+- TypeScript for type safety
+- ESLint for code linting
+- Prettier for code formatting
+- Professional naming conventions
 
-## Get a fresh project
+## Design System
 
-When you're ready, run:
+### Color Palette
+- **Primary**: `#FF5A5F` (Coral Red)
+- **Background**: `#0f0f0f` (Deep Black)
+- **Secondary Background**: `#1a1a1a` (Dark Gray)
+- **Text**: `#e0e0e0` (Light Gray)
+- **Accent**: `#b0b0b0` (Medium Gray)
 
-```bash
-npm run reset-project
-```
+### Typography
+- **Headings**: Bold, 24-32px
+- **Body**: Regular, 14-16px
+- **Labels**: Medium, 12-14px
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Security Features
+- Firebase Authentication with email/password
+- Secure file upload for license verification
+- Firestore security rules
+- Input validation and sanitization
+- Role-based access control
 
-## Learn more
+## Performance Optimizations
+- Lazy loading of screens
+- Optimized images and assets
+- Efficient state management
+- Minimal re-renders
+- Compressed bundle size
 
-To learn more about developing your project with Expo, look at the following resources:
+## Contributing
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Join the community
+## License
 
-Join our community of developers creating universal apps.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Support
+
+For support, email support@rentik.com or join our Discord community.
+
+## Roadmap
+
+- [ ] Push notifications
+- [ ] In-app messaging
+- [ ] Payment integration
+- [ ] GPS tracking
+- [ ] Multi-language support
+- [ ] Advanced search filters
+- [ ] Rating and review system

@@ -4,7 +4,8 @@ export type RootStackParamList = {
   Splash: undefined;
   Login: undefined;
   Registro: undefined;
-  List: undefined;
+  HomeArrendatario: undefined;
+  HomeArrendador: undefined;
   Details: { id: string };
   PerfilVehiculo: undefined;
   LicenseUpload: undefined;
