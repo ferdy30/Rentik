@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useState } from 'react';
 import {
-  Alert,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+import { useAuth } from '../../context/Auth';
 import { Firebaseauth } from '../../FirebaseConfig';
 
 interface RouterProps {
@@ -40,11 +42,29 @@ const SAMPLE_CARS = [
   },
 ];
 
-export default function HomeArrendador({ navigation }: RouterProps) {
+function MisAutosScreen({ navigation }: RouterProps) {
   const [cars, setCars] = useState(SAMPLE_CARS);
+  const { userData } = useAuth();
+  // Stripe: check chargesEnabled for payment verification
+  const stripeVerified = Boolean(userData?.stripe?.chargesEnabled);
 
   const handleAddCar = () => {
-    navigation.navigate('PerfilVehiculo');
+    if (!stripeVerified) {
+      Alert.alert(
+        'Completa tu verificación de Stripe',
+        'Antes de publicar vehículos, verifica tu cuenta de Stripe para recibir pagos.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Verificar ahora', onPress: () => navigation.navigate('PaymentSetup') },
+        ]
+      );
+      return;
+    }
+    Alert.alert('Próximamente', 'La publicación de vehículos estará disponible pronto.');
+  };
+
+  const handleCompleteStripeVerification = () => {
+    navigation.navigate('PaymentSetup');
   };
 
   const handleEditCar = (carId: string) => {
@@ -86,6 +106,36 @@ export default function HomeArrendador({ navigation }: RouterProps) {
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.subtitle}>HOME ARRENDADOR</Text>
+
+        {!stripeVerified && userData?.stripe?.detailsSubmitted && (
+          <View style={[styles.bannerWarning, { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }]}>
+            <Ionicons name="time-outline" size={22} color="#F59E0B" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bannerTitle, { color: '#92400E' }]}>Verificación en proceso</Text>
+              <Text style={[styles.bannerText, { color: '#78350F' }]}>
+                Stripe está revisando tu información. Esto puede tomar entre unas horas y 1-2 días hábiles. Algunas funciones están limitadas mientras tanto.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {!stripeVerified && !userData?.stripe?.detailsSubmitted && (
+          <View style={styles.bannerWarning}>
+            <Ionicons name="alert-circle-outline" size={22} color="#B45309" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bannerTitle}>Verificación de Stripe pendiente</Text>
+              <Text style={styles.bannerText}>
+                Completa tu verificación de Stripe para comenzar a recibir pagos y publicar vehículos.
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.bannerCta} 
+              onPress={handleCompleteStripeVerification}
+            >
+              <Text style={styles.bannerCtaText}>Verificar</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {cars.length === 0 ? (
           <View style={styles.emptyState}>
@@ -150,10 +200,138 @@ export default function HomeArrendador({ navigation }: RouterProps) {
       </ScrollView>
 
       {/* Floating Action Button */}
-      <TouchableOpacity style={styles.fab} onPress={handleAddCar}>
+      <TouchableOpacity 
+        style={[styles.fab, !stripeVerified && { opacity: 0.5 }]} 
+        onPress={handleAddCar}
+      >
         <Ionicons name="add" size={24} color="white" />
       </TouchableOpacity>
     </View>
+  );
+}
+
+function ReservasScreen() {
+  const reservations = [
+    { id: 'r1', cliente: 'Carlos M.', auto: 'Corolla 2020', fecha: '12-14 Nov', estado: 'Confirmada' },
+    { id: 'r2', cliente: 'Ana P.', auto: 'Civic 2019', fecha: '20-22 Nov', estado: 'Pendiente' },
+  ];
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Reservas</Text>
+      </View>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 24 }}>
+        {reservations.map((r) => (
+          <View key={r.id} style={styles.carCard}>
+            <View style={styles.carHeader}>
+              <Text style={styles.carTitle}>{r.auto}</Text>
+              <View style={[styles.statusBadge, r.estado === 'Confirmada' ? styles.statusAvailable : styles.statusRented]}>
+                <Text style={styles.statusText}>{r.estado}</Text>
+              </View>
+            </View>
+            <Text style={styles.carDetails}>Cliente: {r.cliente}</Text>
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+                <Text style={styles.statText}>{r.fecha}</Text>
+              </View>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function IngresosScreen() {
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Ingresos</Text>
+      </View>
+      <ScrollView style={styles.content} contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <Text style={{ color: '#6B7280', fontSize: 12, fontWeight: '700' }}>Este mes</Text>
+            <Text style={{ color: '#032B3C', fontSize: 20, fontWeight: '800', marginTop: 4 }}>$1,980.00</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <Text style={{ color: '#6B7280', fontSize: 12, fontWeight: '700' }}>Reservas</Text>
+            <Text style={{ color: '#032B3C', fontSize: 20, fontWeight: '800', marginTop: 4 }}>24</Text>
+          </View>
+        </View>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#F3F4F6', padding: 16 }}>
+          <Text style={{ color: '#032B3C', fontSize: 16, fontWeight: '700', marginBottom: 10 }}>Últimos 6 meses</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 140 }}>
+            {[30, 55, 20, 70, 45, 60].map((h, i) => (
+              <View key={i} style={{ alignItems: 'center', gap: 6 }}>
+                <View style={{ width: 22, borderRadius: 8, backgroundColor: '#0B729D', height: 20 + h }} />
+                <Text style={{ fontSize: 10, color: '#6B7280' }}>{['May','Jun','Jul','Ago','Sep','Oct'][i]}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function PerfilScreen() {
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Perfil</Text>
+      </View>
+      <View style={[styles.content, { gap: 12 }]}>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#F3F4F6', padding: 16 }}>
+          <Text style={{ color: '#032B3C', fontSize: 16, fontWeight: '700' }}>Próximamente</Text>
+          <Text style={{ color: '#6B7280', marginTop: 6 }}>Aquí podrás editar tu perfil, preferencias y datos de pago.</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const Tab = createBottomTabNavigator();
+
+export default function HomeArrendador() {
+  return (
+    <Tab.Navigator id={undefined}
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: '#0B729D',
+        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarStyle: {
+          height: 70,
+          paddingTop: 8,
+          paddingBottom: 12,
+          paddingHorizontal: 12,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          position: 'absolute',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E7EB',
+          backgroundColor: '#FFFFFF',
+        },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
+        tabBarIcon: ({ color, focused }) => {
+          let iconName: keyof typeof Ionicons.glyphMap = 'ellipse-outline';
+          if (route.name === 'Mis autos') iconName = focused ? 'car' : 'car-outline';
+          if (route.name === 'Reservas') iconName = focused ? 'calendar' : 'calendar-outline';
+          if (route.name === 'Ingresos') iconName = focused ? 'cash' : 'cash-outline';
+          if (route.name === 'Perfil') iconName = focused ? 'person' : 'person-outline';
+          return <Ionicons name={iconName} size={20} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="Mis autos" component={MisAutosScreen} />
+      <Tab.Screen name="Reservas" component={ReservasScreen} />
+      <Tab.Screen name="Ingresos" component={IngresosScreen} />
+      <Tab.Screen name="Perfil" component={PerfilScreen} />
+    </Tab.Navigator>
   );
 }
 
@@ -186,6 +364,21 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#fff',
   },
+  bannerWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  bannerTitle: { color: '#92400E', fontWeight: '700' },
+  bannerText: { color: '#B45309', fontSize: 12 },
+  bannerCta: { paddingVertical: 6, paddingHorizontal: 10, backgroundColor: '#D97706', borderRadius: 8 },
+  bannerCtaText: { color: '#fff', fontWeight: '700' },
   subtitle: {
     fontSize: 16,
     color: '#6B7280',

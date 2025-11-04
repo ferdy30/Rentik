@@ -1,5 +1,5 @@
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db, Firebaseauth } from '../FirebaseConfig';
 
@@ -25,27 +25,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(Firebaseauth, async (u) => {
+    let unsubscribeSnapshot: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(Firebaseauth, async (u) => {
       try {
-        if (u) {
-          // Fetch user data from Firestore
-          const userDoc = await getDoc(doc(db, 'users', u.uid));
-          if (userDoc.exists()) {
-            setUserData(userDoc.data() as UserData);
-          } else {
-            setUserData(null);
-          }
-        } else {
-          setUserData(null);
+        // Si ya había un snapshot previo, desuscribir antes de continuar
+        if (unsubscribeSnapshot) {
+          unsubscribeSnapshot();
+          unsubscribeSnapshot = null;
         }
+
         setUser(u);
+
+        if (u) {
+          // Usar onSnapshot para escuchar cambios en tiempo real en el documento del usuario
+          unsubscribeSnapshot = onSnapshot(
+            doc(db, 'users', u.uid),
+            (userDoc) => {
+              if (userDoc.exists()) {
+                setUserData(userDoc.data() as UserData);
+              } else {
+                setUserData(null);
+              }
+              setLoading(false);
+            },
+            (error) => {
+              console.error('Error fetching user data:', error);
+              setUserData(null);
+              setLoading(false);
+            }
+          );
+        } else {
+          // Cerrar cualquier listener activo al cerrar sesión
+          if (unsubscribeSnapshot) {
+            unsubscribeSnapshot();
+            unsubscribeSnapshot = null;
+          }
+          setUserData(null);
+          setLoading(false);
+        }
       } catch (error) {
-        console.error('Error fetching user data:', error);
-      } finally {
+        console.error('Error in auth state change:', error);
         setLoading(false);
       }
     });
-    return unsubscribe;
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+    };
   }, []);
 
   const value: AuthContextValue = { user, userData, loading };

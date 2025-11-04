@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Google from 'expo-auth-session/providers/google';
+import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import * as WebBrowser from 'expo-web-browser';
+import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import React, { useState } from 'react';
 import {
@@ -18,8 +21,9 @@ import {
   View
 } from 'react-native';
 import { Firebaseauth, db } from '../../FirebaseConfig';
+import SocialAuthButtons from '../components/SocialAuthButtons';
 import { colors } from '../constants/colors';
-import { getHomeRouteByRole } from '../navigation/role';
+// import { getHomeRouteByRole } from '../navigation/role';
 
 const Login = ({ navigation }: any) => {
     // Estados para manejar el formulario
@@ -27,6 +31,26 @@ const Login = ({ navigation }: any) => {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false); // Para mostrar/ocultar contraseña
+  
+    // Completar sesión en web (Google)
+    WebBrowser.maybeCompleteAuthSession();
+  
+    // Google provider
+    const googleWebClientId = (Constants.expoConfig?.extra as any)?.googleWebClientId;
+    const googleIosClientId = (Constants.expoConfig?.extra as any)?.googleIosClientId;
+    const googleAndroidClientId = (Constants.expoConfig?.extra as any)?.googleAndroidClientId;
+    const rawScheme: any = Constants.expoConfig?.scheme;
+    const scheme = Array.isArray(rawScheme) ? (rawScheme[0] || 'rentik') : (rawScheme || 'rentik');
+    const [ , , promptGoogle] = Google.useAuthRequest(
+      {
+        clientId: googleWebClientId,
+        iosClientId: googleIosClientId,
+        androidClientId: googleAndroidClientId,
+        responseType: 'id_token',
+        scopes: ['profile', 'email'],
+      },
+      { scheme }
+    );
    
   // Función para iniciar sesión con Firebase
   const signIn = async () => {  
@@ -36,23 +60,29 @@ const Login = ({ navigation }: any) => {
       return;
     }
 
+    console.log('[LOGIN] Intentando login con email:', email);
     setLoading(true);
     try {
       // Intento de login con Firebase Auth
+      console.log('[LOGIN] Llamando a signInWithEmailAndPassword...');
       const userCredential = await signInWithEmailAndPassword(Firebaseauth, email, password);
+      console.log('[LOGIN] Login exitoso, UID:', userCredential.user.uid);
       
       // Obtener datos del usuario desde Firestore para determinar el rol
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      console.log('[LOGIN] UserDoc exists:', userDoc.exists());
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        console.log('[LOGIN] UserData:', { role: userData.role, profileComplete: userData.profileComplete });
         
-        // Navegar según el rol del usuario
-        const route = getHomeRouteByRole(userData.role);
-        navigation.replace(route);
+        // NO navegamos manualmente - el AuthContext y AppNavigation se encargan automáticamente
+        // Al cambiar el estado de autenticación, el stack se reconstruye con las rutas correctas
+        // y el usuario será redirigido según su rol y estado (ver AppNavigation)
+        console.log('[LOGIN] Login completado, esperando reconstrucción del stack...');
       } else {
-        // Si no hay datos del usuario en Firestore, ir a Home Arrendatario por defecto
-        navigation.replace('HomeArrendatario');
+        console.log('[LOGIN] UserDoc no existe');
+        Alert.alert('Error', 'No se encontraron datos del usuario.');
       }
     } catch (error: any) {
       console.error('Error en login:', error);
@@ -71,13 +101,65 @@ const Login = ({ navigation }: any) => {
     }
   }
   
-
-
+  // Registro / Login con Google
+  const signInWithGoogle = async () => {
+    try {
+      setLoading(true);
+      if (!googleWebClientId && !googleIosClientId && !googleAndroidClientId) {
+        Alert.alert('Configuración requerida', 'Agrega tus Google Client IDs en app.json (expo.extra.*)');
+        return;
+      }
+      const res = await promptGoogle();
+      if (res.type !== 'success') {
+        if (res.type !== 'dismiss') Alert.alert('Google', 'Inicio de sesión cancelado.');
+        return;
+      }
+      const idToken = (res.params as any)?.id_token || (res as any)?.authentication?.idToken;
+      if (!idToken) {
+        Alert.alert('Google', 'No se recibió idToken. Revisa configuración de OAuth.');
+        return;
+      }
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCred = await signInWithCredential(Firebaseauth, credential);
+      // Asegurar doc de usuario en Firestore
+      const uid = userCred.user.uid;
+      const ref = doc(db, 'users', uid);
+      const snapshot = await getDoc(ref);
+      if (!snapshot.exists()) {
+        const name = userCred.user.displayName || '';
+        const [nombre = '', apellido = ''] = name.split(' ');
+        await (await import('firebase/firestore')).setDoc(ref, {
+          nombre,
+          apellido,
+          email: userCred.user.email || '',
+          telefono: '',
+          fechaNacimiento: '',
+          role: null,
+          profileComplete: false,
+          paymentComplete: false,
+          createdAt: new Date().toISOString(),
+        }, { merge: true });
+      }
+    } catch (e) {
+      console.error('[GOOGLE_LOGIN] error', e);
+      Alert.alert('Error', 'No se pudo iniciar sesión con Google.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const resetOnboarding = async () => {
     try {
       await AsyncStorage.removeItem('hasSeenOnboarding');
-      navigation.replace('Splash');
+      try {
+        const state: any = navigation.getState?.();
+        const routeNames: string[] = state?.routeNames || state?.routes?.map((r: any) => r.name) || [];
+        if (routeNames.includes('Splash')) {
+          navigation.navigate('Splash');
+        }
+      } catch {
+        // ignore
+      }
     } catch (e) {
       console.warn('No se pudo reiniciar el onboarding', e);
     }
@@ -172,10 +254,16 @@ const Login = ({ navigation }: any) => {
               {/* Link para ir a registro */}
               <TouchableOpacity
                 style={styles.signUpButton}
-                onPress={() => navigation.replace('Registro')}
+                onPress={() => navigation.navigate('RegistroStep1')}
               >
                 <Text style={styles.signUpButtonText}>Crear cuenta nueva</Text>
               </TouchableOpacity>
+
+              {/* Social auth */}
+              <SocialAuthButtons
+                onGoogle={() => { void signInWithGoogle(); }}
+                // Apple Sign-In comentado hasta tener Apple Developer Program
+              />
 
               {__DEV__ && (
                 <TouchableOpacity
@@ -311,6 +399,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  
+  
   devButton: {
     marginTop: 12,
     alignItems: 'center',

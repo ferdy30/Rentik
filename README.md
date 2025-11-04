@@ -74,10 +74,61 @@ rentik/
 5. **Vehicle Profile** → Add first vehicle
 6. **HomeArrendador** → Manage vehicle fleet
 
-## Installation
+## 🚀 Quick Start
 
-1. **Prerequisites**
-   - Node.js (v16 or higher)
+### Prerequisites
+- Node.js 20+ 
+- npm or yarn
+- Expo CLI (`npm install -g expo-cli`)
+- Firebase account
+- Stripe account (test mode)
+- Google Cloud Platform account (for Maps API)
+
+### Installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/ferdy30/Rentik.git
+cd Rentik
+
+# 2. Install dependencies
+npm install
+
+# 3. Install Cloud Functions dependencies
+cd functions
+npm install
+cd ..
+
+# 4. Configure environment variables (REQUIRED)
+# See SETUP.md for detailed instructions
+copy FirebaseConfig.example.js FirebaseConfig.js
+# Edit FirebaseConfig.js with your Firebase credentials
+
+cd functions
+copy .env.example .env
+# Edit .env with your Stripe and Google Maps keys
+cd ..
+
+# 5. Start the development server
+npm start
+
+# 6. Deploy Cloud Functions (optional, for Stripe & Places API)
+cd functions
+npm run deploy
+```
+
+### ⚙️ Configuration
+
+**IMPORTANT**: Before running the app, you must configure your environment variables.
+
+👉 **See [SETUP.md](./SETUP.md) for complete configuration instructions**
+
+The app requires:
+- Firebase credentials (`FirebaseConfig.js`)
+- Stripe keys (`functions/.env`)
+- Google Maps API keys (`app.json`)
+
+### Installation (Legacy)
    - npm or yarn
    - Expo CLI
    - Android Studio (for Android development)

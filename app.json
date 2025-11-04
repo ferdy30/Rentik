@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/images/Logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#032B3C"
     },
     "scheme": "rentik",
     "assetBundlePatterns": [
@@ -17,17 +17,38 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.rentik"
+      "bundleIdentifier": "com.yourcompany.rentik",
+      "config": {
+        "googleMapsApiKey": "AIzaSyAXWPplJ3IxwV3N28LvRBemb0GeuIVcC-E"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/CarLogo.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.rentik"
+      "package": "com.yourcompany.rentik",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAXWPplJ3IxwV3N28LvRBemb0GeuIVcC-E"
+        }
+      }
     },
     "plugins": [
-      "expo-router"
-    ]
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Rentik necesita tu ubicación para mostrarte vehículos cercanos y completar tu perfil."
+        }
+      ]
+    ],
+    "extra": {
+      "googleWebClientId": "YOUR_GOOGLE_WEB_CLIENT_ID",
+      "googleIosClientId": "YOUR_GOOGLE_IOS_CLIENT_ID",
+      "googleAndroidClientId": "YOUR_GOOGLE_ANDROID_CLIENT_ID",
+      "stripePublishableKey": "pk_test_51SMxQI7BubzK4SOW5YNfXihD5uqodWx6f4Os0iuDLEAC9YG0GOWZ3mU6fK8RCETk7jeN3zZTfac5CuwPFXUpMfbh00ZH4CDpCj",
+      "googleMapsApiKey": "AIzaSyAXWPplJ3IxwV3N28LvRBemb0GeuIVcC-E"
+    }
   }
 }

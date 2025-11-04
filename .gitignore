@@ -1,4 +1,4 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# Learn more https://docs.github.com/en/get-started/getting-started-with/git/ignoring-files
 
 # dependencies
 node_modules/
@@ -25,23 +25,47 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
 # macOS
 .DS_Store
 *.pem
+Thumbs.db
 
 # local env files
-.env*.local
 .env
+.env*.local
+.env.production
+.env.development
+.env.test
 
 # Firebase config with sensitive keys
 FirebaseConfig.js
 
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+
 # typescript
 *.tsbuildinfo
 
-app-example
+# Example folder from Expo template
+app-example/
 
 # generated native folders
 /ios
 /android
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs
+build/
+dist/
