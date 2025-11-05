@@ -6,9 +6,11 @@ Este proyecto usa Firebase y requiere credenciales sensibles que **NUNCA deben s
 
 ## 📋 Configuración inicial
 
-1. **Copia el archivo de ejemplo:**
+### Opción 1: Variables de Entorno (Recomendado)
+
+1. **Crea un archivo `.env` desde el ejemplo:**
    ```bash
-   copy FirebaseConfig.example.js FirebaseConfig.js
+   copy .env.example .env
    ```
 
 2. **Obtén tus credenciales:**
@@ -17,7 +19,19 @@ Este proyecto usa Firebase y requiere credenciales sensibles que **NUNCA deben s
    - Ve a Configuración del proyecto → Tus apps → SDK setup and configuration
    - Copia la configuración
 
-3. **Reemplaza los valores en `FirebaseConfig.js`:**
+3. **Completa el archivo `.env`:**
+   - Abre `.env`
+   - Reemplaza todos los valores con tus credenciales reales
+   - **NO subas este archivo a GitHub** (ya está en `.gitignore`)
+
+### Opción 2: Archivo de Configuración Local
+
+1. **Copia el archivo de ejemplo:**
+   ```bash
+   copy FirebaseConfig.example.js FirebaseConfig.js
+   ```
+
+2. **Reemplaza los valores en `FirebaseConfig.js`:**
    - Abre `FirebaseConfig.js`
    - Reemplaza todos los valores de ejemplo con tus credenciales reales
    - **NO subas este archivo a GitHub** (ya está en `.gitignore`)
