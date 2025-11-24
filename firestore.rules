@@ -3,8 +3,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Permite a los usuarios autenticados acceder a su propio documento
     match /users/{userId} {
-      // Permitir lectura si el usuario está autenticado y es su propio documento
-      allow read: if request.auth != null && request.auth.uid == userId;
+      // Permitir lectura a cualquier usuario autenticado (para ver perfil del anfitrión)
+      allow read: if request.auth != null;
       
       // Permitir creación Y actualización si el usuario está autenticado y es su propio documento
       // (create + update fusionados para permitir setDoc con merge: true durante registro)
@@ -14,13 +14,14 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Reglas para la colección de vehículos (para futura implementación)
-    match /vehiculos/{vehiculoId} {
+    // Reglas para la colección de vehículos
+    match /vehicles/{vehicleId} {
       // Cualquier usuario autenticado puede leer vehículos (para búsqueda)
       allow read: if request.auth != null;
-      // Solo el dueño puede crear, actualizar o eliminar su vehículo
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Solo el dueño puede crear
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.arrendadorId;
+      // Solo el dueño puede actualizar o eliminar
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.arrendadorId;
     }
   }
 }

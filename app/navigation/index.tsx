@@ -2,7 +2,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/Auth';
 import Details from '../Screens/Details';
-import HomeArrendador from '../Screens/HomeArrendador';
 import HomeArrendatario from '../Screens/HomeArrendatario';
 import Login from '../Screens/Login';
 import PaymentSetup from '../Screens/Registro/PaymentSetupStripe';
@@ -11,6 +10,7 @@ import RegistroStep1 from '../Screens/Registro/RegistroStep1';
 import RegistroStep2 from '../Screens/Registro/RegistroStep2';
 import RegistroStep3 from '../Screens/Registro/RegistroStep3';
 import Splash from '../Screens/Splash';
+import ArrendadorStack from './ArrendadorStack';
 import { getInitialRouteByRoleAndProfile, isArrendador } from './role';
 
 // Tipos para las rutas de navegación - ayuda con TypeScript
@@ -65,9 +65,9 @@ export type RootStackParamList = {
     };
   };
   HomeArrendatario: undefined;
-  HomeArrendador: undefined;
+  ArrendadorStack: undefined;
   PaymentSetup: undefined;
-  Details: { id: string };
+  Details: { vehicle: any };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -152,7 +152,7 @@ export default function AppNavigation() {
             // Stack para arrendadores autenticados
             <Stack.Group>
               <Stack.Screen name="PaymentSetup" component={PaymentSetup} />
-              <Stack.Screen name="HomeArrendador" component={HomeArrendador} />
+              <Stack.Screen name="ArrendadorStack" component={ArrendadorStack} />
               <Stack.Screen name="Details" component={Details} />
               {/* Fallback */}
               <Stack.Screen name="Login" component={Login} />

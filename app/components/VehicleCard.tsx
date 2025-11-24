@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../constants/colors';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Vehicle } from '../constants/vehicles';
 
 interface VehicleCardProps {
@@ -9,6 +8,7 @@ interface VehicleCardProps {
   onPress: () => void;
   onFavoritePress?: (id: string) => void;
   isFavorite?: boolean;
+  style?: any;
 }
 
 const VehicleCard: React.FC<VehicleCardProps> = ({
@@ -16,21 +16,45 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
   onPress,
   onFavoritePress,
   isFavorite = false,
+  style,
 }) => {
-  const [imageIndex] = useState(0);
-  const images = vehicle.imagenes || [vehicle.imagen];
+  const [imageIndex, setImageIndex] = useState(0);
+  const [cardWidth, setCardWidth] = useState(0);
+  const images = vehicle.imagenes && vehicle.imagenes.length > 0 ? vehicle.imagenes : [vehicle.imagen];
 
-  const hasDiscount = Boolean(vehicle.precioOriginal && vehicle.precioOriginal > vehicle.precio);
+  const handleScroll = (event: any) => {
+    const slideSize = event.nativeEvent.layoutMeasurement.width;
+    const index = event.nativeEvent.contentOffset.x / slideSize;
+    const roundIndex = Math.round(index);
+    setImageIndex(roundIndex);
+  };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
+    <TouchableOpacity 
+      style={[styles.card, style]} 
+      onPress={onPress} 
+      activeOpacity={0.9}
+      onLayout={(event) => setCardWidth(event.nativeEvent.layout.width)}
+    >
       {/* Image with carousel */}
       <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: images[imageIndex] }} 
-          style={styles.image}
-          defaultSource={require('../../assets/images/CarLogo.png')}
-        />
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={{ width: '100%', height: '100%' }}
+        >
+          {images.map((img, index) => (
+            <Image 
+              key={index}
+              source={{ uri: img }} 
+              style={[styles.image, { width: cardWidth || '100%' }]}
+              defaultSource={require('../../assets/images/CarLogo.png')}
+            />
+          ))}
+        </ScrollView>
         
         {/* Favorite button */}
         {onFavoritePress && (
@@ -78,7 +102,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
             {vehicle.marca} {vehicle.modelo}
           </Text>
           <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={14} color="#FBBF24" />
+            <Ionicons name="star" size={12} color="#FBBF24" />
             <Text style={styles.ratingText}>{vehicle.rating.toFixed(1)}</Text>
           </View>
         </View>
@@ -86,49 +110,18 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
         {/* Year */}
         <Text style={styles.year}>{vehicle.anio}</Text>
 
-        {/* Features icons */}
-        <View style={styles.featuresRow}>
-          <View style={styles.feature}>
-            <Ionicons name="people-outline" size={14} color="#6B7280" />
-            <Text style={styles.featureText}>{vehicle.pasajeros}</Text>
-          </View>
-          <View style={styles.feature}>
-            <Ionicons
-              name={vehicle.transmision === 'Automático' ? 'settings-outline' : 'git-merge-outline'}
-              size={14}
-              color="#6B7280"
-            />
-            <Text style={styles.featureText}>
-              {vehicle.transmision === 'Automático' ? 'Auto' : 'Manual'}
-            </Text>
-          </View>
-          <View style={styles.feature}>
-            <Ionicons name="speedometer-outline" size={14} color="#6B7280" />
-            <Text style={styles.featureText}>{vehicle.combustible}</Text>
-          </View>
-        </View>
-
-        {/* Location */}
-        <View style={styles.locationRow}>
-          <Ionicons name="location-outline" size={14} color="#6B7280" />
-          <Text style={styles.locationText}>{vehicle.ubicacion}</Text>
-          {vehicle.distancia && (
-            <Text style={styles.distanceText}>• {vehicle.distancia} km</Text>
-          )}
-        </View>
-
-        {/* Price */}
-        <View style={styles.priceRow}>
+        {/* Price and Location */}
+        <View style={styles.footerRow}>
           <View style={styles.priceContainer}>
             <Text style={styles.price}>${vehicle.precio}</Text>
-            <Text style={styles.priceLabel}>/día</Text>
-            {hasDiscount && (
-              <Text style={styles.originalPrice}>${vehicle.precioOriginal}</Text>
-            )}
+            <Text style={styles.priceUnit}>/día</Text>
           </View>
-          <TouchableOpacity style={styles.bookButton} onPress={onPress}>
-            <Text style={styles.bookButtonText}>Ver</Text>
-          </TouchableOpacity>
+          <View style={styles.locationContainer}>
+            <Ionicons name="location-outline" size={12} color="#6B7280" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {vehicle.ubicacion}
+            </Text>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -138,72 +131,65 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
 const getBadgeStyle = (badge: string) => {
   switch (badge) {
     case 'Nuevo':
-      return { backgroundColor: '#DBEAFE' };
+      return { backgroundColor: '#DBEAFE', borderColor: '#93C5FD' };
     case 'Más rentado':
-      return { backgroundColor: '#FEF9C3' };
+      return { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' };
     case 'Descuento':
-      return { backgroundColor: '#DCFCE7' };
-    case 'Disponible hoy':
-      return { backgroundColor: '#E0E7FF' };
-    case 'Verificado':
-      return { backgroundColor: '#D1FAE5' };
+      return { backgroundColor: '#D1FAE5', borderColor: '#6EE7B7' };
     default:
-      return { backgroundColor: '#F3F4F6' };
+      return { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' };
   }
 };
 
-export default VehicleCard;
-
 const styles = StyleSheet.create({
   card: {
-    width: '48%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: 'white',
+    borderRadius: 12,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
   imageContainer: {
-    position: 'relative',
-    width: '100%',
     height: 140,
+    width: '100%',
+    position: 'relative',
+    backgroundColor: '#F3F4F6',
   },
   image: {
-    width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   favoriteButton: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: 8,
+    right: 8,
     backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 6,
+    borderRadius: 16,
   },
   badgesContainer: {
     position: 'absolute',
-    top: 10,
-    left: 10,
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
     gap: 4,
   },
   badge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
   },
   badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#032B3C',
+    fontSize: 8,
+    fontWeight: '600',
+    color: '#374151',
   },
   dotsContainer: {
     position: 'absolute',
@@ -215,13 +201,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.5)',
   },
   dotActive: {
     backgroundColor: '#fff',
+    width: 12,
   },
   content: {
     padding: 12,
@@ -230,24 +217,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   title: {
-    flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#032B3C',
-    marginRight: 8,
+    color: '#111827',
+    flex: 1,
+    marginRight: 4,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
   },
   ratingText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#032B3C',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  reviewCount: {
+    fontSize: 10,
+    color: '#B45309',
   },
   year: {
     fontSize: 12,
@@ -255,70 +250,46 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   featuresRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
+    display: 'none',
   },
   feature: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
   },
   featureText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#6B7280',
-    fontWeight: '500',
   },
-  locationRow: {
+  footerRow: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 10,
+    gap: 2,
   },
   locationText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#6B7280',
-  },
-  distanceText: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    marginLeft: 4,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flex: 1,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 4,
+    gap: 2,
   },
   price: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.primary,
-  },
-  priceLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  originalPrice: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    textDecorationLine: 'line-through',
-    marginLeft: 4,
-  },
-  bookButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-  },
-  bookButtonText: {
-    color: '#fff',
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
+    color: '#0B729D',
+  },
+  priceUnit: {
+    fontSize: 10,
+    color: '#6B7280',
   },
 });
+
+export default VehicleCard;

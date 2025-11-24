@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
+    Image,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -12,41 +15,39 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/Auth';
 import { Firebaseauth } from '../../FirebaseConfig';
+import { deleteVehicle, getVehiclesByOwner, VehicleData } from '../services/vehicles';
 
 interface RouterProps {
   navigation: any;
 }
 
-const SAMPLE_CARS = [
-  {
-    id: '1',
-    marca: 'Toyota',
-    modelo: 'Corolla',
-    anio: '2020',
-    placa: 'ABC-123',
-    precio: '$25/día',
-    status: 'disponible',
-    ganancias: '$1,250',
-    reservas: 50,
-  },
-  {
-    id: '2',
-    marca: 'Honda',
-    modelo: 'Civic',
-    anio: '2019',
-    placa: 'XYZ-789',
-    precio: '$30/día',
-    status: 'rentado',
-    ganancias: '$2,100',
-    reservas: 70,
-  },
-];
-
 function MisAutosScreen({ navigation }: RouterProps) {
-  const [cars, setCars] = useState(SAMPLE_CARS);
-  const { userData } = useAuth();
+  const [cars, setCars] = useState<VehicleData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user, userData } = useAuth();
   // Stripe: check chargesEnabled for payment verification
   const stripeVerified = Boolean(userData?.stripe?.chargesEnabled);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        loadVehicles();
+      }
+    }, [user])
+  );
+
+  const loadVehicles = async () => {
+    try {
+      setLoading(true);
+      const vehicles = await getVehiclesByOwner(user!.uid);
+      setCars(vehicles);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'No se pudieron cargar tus vehículos');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddCar = () => {
     if (!stripeVerified) {
@@ -60,28 +61,36 @@ function MisAutosScreen({ navigation }: RouterProps) {
       );
       return;
     }
-    Alert.alert('Próximamente', 'La publicación de vehículos estará disponible pronto.');
+    navigation.navigate('AddVehicleStep1Basic');
   };
 
   const handleCompleteStripeVerification = () => {
     navigation.navigate('PaymentSetup');
   };
 
-  const handleEditCar = (carId: string) => {
-    Alert.alert('Editar Vehículo', `Editar vehículo ${carId}`);
+  const handleEditCar = (car: VehicleData) => {
+    navigation.navigate('EditVehicle', { vehicle: car });
   };
 
   const handleDeleteCar = (carId: string) => {
     Alert.alert(
       'Eliminar Vehículo',
-      '¿Estás seguro de que quieres eliminar este vehículo?',
+      '¿Estás seguro de que quieres eliminar este vehículo? Esta acción no se puede deshacer.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => {
-            setCars(cars.filter(car => car.id !== carId));
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await deleteVehicle(carId);
+              await loadVehicles();
+            } catch (error) {
+              Alert.alert('Error', 'No se pudo eliminar el vehículo');
+            } finally {
+              setLoading(false);
+            }
           },
         },
       ]
@@ -137,7 +146,9 @@ function MisAutosScreen({ navigation }: RouterProps) {
           </View>
         )}
 
-        {cars.length === 0 ? (
+        {loading ? (
+          <ActivityIndicator size="large" color="#0B729D" style={{ marginTop: 40 }} />
+        ) : cars.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="car-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyText}>No tienes vehículos registrados</Text>
@@ -149,49 +160,50 @@ function MisAutosScreen({ navigation }: RouterProps) {
           <View style={styles.carsList}>
             {cars.map((car) => (
               <View key={car.id} style={styles.carCard}>
-                <View style={styles.carHeader}>
-                  <Text style={styles.carTitle}>
-                    {car.marca} {car.modelo} {car.anio}
-                  </Text>
-                  <View style={[
-                    styles.statusBadge,
-                    car.status === 'disponible' ? styles.statusAvailable : styles.statusRented
-                  ]}>
-                    <Text style={styles.statusText}>
-                      {car.status === 'disponible' ? 'Disponible' : 'Rentado'}
-                    </Text>
+                <Image 
+                  source={{ uri: car.photos?.front || 'https://via.placeholder.com/150' }} 
+                  style={styles.carImage} 
+                />
+                <View style={styles.carInfo}>
+                  <View style={styles.carHeader}>
+                    <Text style={styles.carTitle}>{car.marca} {car.modelo} {car.anio}</Text>
+                    <View style={[styles.statusBadge, car.status === 'active' ? styles.statusActive : styles.statusRented]}>
+                      <Text style={[styles.statusText, car.status === 'active' ? styles.statusTextActive : styles.statusTextRented]}>
+                        {car.status === 'active' ? 'Disponible' : 'Rentado'}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-
-                <Text style={styles.carDetails}>Placa: {car.placa}</Text>
-                <Text style={styles.carPrice}>{car.precio}</Text>
-                <View style={styles.statsContainer}>
-                  <View style={styles.statItem}>
-                    <Ionicons name="cash-outline" size={16} color="#6B7280" />
-                    <Text style={styles.statText}>{car.ganancias}</Text>
+                  <Text style={styles.carPlate}>{car.placa}</Text>
+                  <View style={styles.carStats}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Precio</Text>
+                      <Text style={styles.statValue}>${car.precio}/día</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Viajes</Text>
+                      <Text style={styles.statValue}>{car.trips || 0}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Rating</Text>
+                      <Text style={styles.statValue}>⭐ {car.rating || 0}</Text>
+                    </View>
                   </View>
-                  <View style={styles.statItem}>
-                    <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                    <Text style={styles.statText}>{car.reservas} reservas</Text>
+                  <View style={styles.carActions}>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => handleEditCar(car)}
+                    >
+                      <Ionicons name="create-outline" size={20} color="#4B5563" />
+                      <Text style={styles.actionText}>Editar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => handleDeleteCar(car.id!)}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                      <Text style={[styles.actionText, { color: '#EF4444' }]}>Eliminar</Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
-
-                <View style={styles.carActions}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.editButton]}
-                    onPress={() => handleEditCar(car.id)}
-                  >
-                    <Ionicons name="pencil-outline" size={16} color="#032B3C" />
-                    <Text style={styles.actionButtonText}>Editar</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDeleteCar(car.id)}
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#fff" />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Eliminar</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             ))}
@@ -406,11 +418,11 @@ const styles = StyleSheet.create({
   },
   carsList: {
     gap: 15,
+    paddingBottom: 100,
   },
   carCard: {
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 20,
     borderWidth: 1,
     borderColor: '#F3F4F6',
     shadowColor: '#0B729D',
@@ -418,25 +430,37 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
+    overflow: 'hidden',
+  },
+  carImage: {
+    width: '100%',
+    height: 150,
+    resizeMode: 'cover',
+  },
+  carInfo: {
+    padding: 16,
   },
   carHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 4,
   },
   carTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#032B3C',
     flex: 1,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  statusAvailable: {
+  statusActive: {
+    backgroundColor: '#D1FAE5',
+  },
+  statusAvailable: { // Kept for other screens if needed
     backgroundColor: '#D1FAE5',
   },
   statusRented: {
@@ -445,8 +469,40 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  statusTextActive: {
+    color: '#065F46',
+  },
+  statusTextRented: {
+    color: '#991B1B',
+  },
+  carPlate: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  carStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '700',
     color: '#032B3C',
   },
+  // Kept for compatibility with other screens
   carDetails: {
     fontSize: 14,
     color: '#6B7280',
@@ -463,16 +519,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 15,
   },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
   statText: {
     fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
   },
+  // End compatibility
   carActions: {
     flexDirection: 'row',
     gap: 10,
@@ -486,6 +538,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 10,
     gap: 5,
+    backgroundColor: '#F3F4F6',
   },
   editButton: {
     backgroundColor: '#F3F4F6',
@@ -493,18 +546,23 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: '#EF4444',
   },
-  actionButtonText: {
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  actionButtonText: { // Compatibility
     fontSize: 14,
     fontWeight: '600',
     color: '#032B3C',
   },
-  deleteButtonText: {
+  deleteButtonText: { // Compatibility
     color: '#fff',
   },
   fab: {
     position: 'absolute',
-    bottom: 30,
-    right: 30,
+    bottom: 90, // Adjusted for tab bar
+    right: 20,
     backgroundColor: '#0B729D',
     width: 56,
     height: 56,
@@ -514,7 +572,7 @@ const styles = StyleSheet.create({
     elevation: 4,
     shadowColor: '#0B729D',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
   },
 });

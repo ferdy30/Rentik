@@ -1,9 +1,9 @@
 export type AppRole = 'arrendador' | 'arrendatario' | string | null | undefined;
 
-export type AppRouteName = 'HomeArrendador' | 'HomeArrendatario' | 'Splash';
+export type AppRouteName = 'ArrendadorStack' | 'HomeArrendatario' | 'Splash';
 
-export function getHomeRouteByRole(role: AppRole): 'HomeArrendador' | 'HomeArrendatario' {
-  return role === 'arrendador' ? 'HomeArrendador' : 'HomeArrendatario';
+export function getHomeRouteByRole(role: AppRole): 'ArrendadorStack' | 'HomeArrendatario' {
+  return role === 'arrendador' ? 'ArrendadorStack' : 'HomeArrendatario';
 }
 
 export function getInitialRouteByRoleAndProfile(
