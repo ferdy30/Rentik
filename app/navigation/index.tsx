@@ -1,6 +1,10 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/Auth';
+import BookingStep1Dates from '../Screens/Booking/BookingStep1Dates';
+import BookingStep2Location from '../Screens/Booking/BookingStep2Location';
+import BookingStep3Time from '../Screens/Booking/BookingStep3Time';
+import BookingStep4Confirmation from '../Screens/Booking/BookingStep4Confirmation';
 import Details from '../Screens/Details';
 import HomeArrendatario from '../Screens/HomeArrendatario';
 import Login from '../Screens/Login';
@@ -10,65 +14,11 @@ import RegistroStep1 from '../Screens/Registro/RegistroStep1';
 import RegistroStep2 from '../Screens/Registro/RegistroStep2';
 import RegistroStep3 from '../Screens/Registro/RegistroStep3';
 import Splash from '../Screens/Splash';
+import { RootStackParamList } from '../types/navigation';
 import ArrendadorStack from './ArrendadorStack';
 import { getInitialRouteByRoleAndProfile, isArrendador } from './role';
 
-// Tipos para las rutas de navegación - ayuda con TypeScript
-export type RootStackParamList = {
-  Splash: undefined;
-  Login: undefined;
-  RegistroStep1: undefined;
-  RegistroStep2: {
-    nombre: string;
-    apellido: string;
-    email: string;
-    password: string;
-    countryCode: string;
-    telefono: string;
-    fechaNacimiento: string;
-  };
-  RegistroStep3: {
-    nombre: string;
-    apellido: string;
-    email: string;
-    password: string;
-    countryCode: string;
-    telefono: string;
-    fechaNacimiento: string;
-    licensePhotos: {
-      front: string;
-      back: string;
-    };
-    address?: {
-      formatted?: string;
-      placeId?: string | null;
-      line1?: string;
-      line2?: string;
-      city?: string;
-      state?: string;
-      postalCode?: string;
-      country?: string;
-      location?: { latitude: number; longitude: number };
-    };
-  };
-  RegistroAddress: {
-    nombre: string;
-    apellido: string;
-    email: string;
-    password: string;
-    countryCode: string;
-    telefono: string;
-    fechaNacimiento: string;
-    licensePhotos: {
-      front: string;
-      back: string;
-    };
-  };
-  HomeArrendatario: undefined;
-  ArrendadorStack: undefined;
-  PaymentSetup: undefined;
-  Details: { vehicle: any };
-};
+
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -76,11 +26,11 @@ export default function AppNavigation() {
   // Obtenemos el usuario y sus datos del contexto de Auth
   const { user, userData, loading } = useAuth();
 
-  console.log('[NAV] Auth state:', { 
-    hasUser: !!user, 
+  console.log('[NAV] Auth state:', {
+    hasUser: !!user,
     uid: user?.uid,
     userData: userData ? { role: userData.role, profileComplete: userData.profileComplete } : null,
-    loading 
+    loading
   });
 
   // Mientras carga O si hay usuario pero sin datos aún (evita flash de Login)
@@ -97,24 +47,24 @@ export default function AppNavigation() {
     isArrendador(userData?.role) &&
     !stripeOkEnough
   );
-  const roleKnown = user ? (userData && (userData.role === 'arrendador' || userData.role === 'arrendatario')) : false;
+  const roleKnown = user ? (userData && (userData.role === 'arrendador' || userData.role === 'arrendatario')) : false; 
   const isIncompleteProfile = Boolean(user && userData && userData.profileComplete === false);
   const initialRouteName = user
     ? (isIncompleteProfile
         ? 'RegistroStep1'
-        : (shouldCompletePayment ? 'PaymentSetup' : getInitialRouteByRoleAndProfile(userData?.role, profileComplete)))
+        : (shouldCompletePayment ? 'PaymentSetup' : getInitialRouteByRoleAndProfile(userData?.role, profileComplete))) 
     : 'Splash';
-  
-  console.log('[NAV] Routing decision:', { 
-    roleKnown, 
-    isIncompleteProfile, 
-    shouldCompletePayment, 
-    initialRouteName 
+
+  console.log('[NAV] Routing decision:', {
+    roleKnown,
+    isIncompleteProfile,
+    shouldCompletePayment,
+    initialRouteName
   });
 
   // Key único para forzar remount del stack cuando cambia el estado de autenticación crítico
-  const navigationKey = user 
-    ? `authenticated-${userData?.role}-${userData?.profileComplete}-${userData?.stripe?.detailsSubmitted}` 
+  const navigationKey = user
+    ? `authenticated-${userData?.role}-${userData?.profileComplete}-${userData?.stripe?.detailsSubmitted}`
     : 'unauthenticated';
 
   return (
@@ -146,7 +96,7 @@ export default function AppNavigation() {
               {/* Fallback */}
               <Stack.Screen name="Login" component={Login} />
             </Stack.Group>
-          ) : 
+          ) :
           // Stack para usuarios autenticados con guard por rol (arrendador/arrendatario)
           isArrendador(userData?.role) ? (
             // Stack para arrendadores autenticados
@@ -154,6 +104,10 @@ export default function AppNavigation() {
               <Stack.Screen name="PaymentSetup" component={PaymentSetup} />
               <Stack.Screen name="ArrendadorStack" component={ArrendadorStack} />
               <Stack.Screen name="Details" component={Details} />
+              <Stack.Screen name="BookingStep1Dates" component={BookingStep1Dates} />
+              <Stack.Screen name="BookingStep2Location" component={BookingStep2Location} />
+              <Stack.Screen name="BookingStep3Time" component={BookingStep3Time} />
+              <Stack.Screen name="BookingStep4Confirmation" component={BookingStep4Confirmation} />
               {/* Fallback */}
               <Stack.Screen name="Login" component={Login} />
             </Stack.Group>
@@ -161,8 +115,10 @@ export default function AppNavigation() {
             <Stack.Group>
               <Stack.Screen name="HomeArrendatario" component={HomeArrendatario} />
               <Stack.Screen name="Details" component={Details} />
-              {/* Fallback */}
-              <Stack.Screen name="Login" component={Login} />
+              <Stack.Screen name="BookingStep1Dates" component={BookingStep1Dates} />
+              <Stack.Screen name="BookingStep2Location" component={BookingStep2Location} />
+              <Stack.Screen name="BookingStep3Time" component={BookingStep3Time} />
+              <Stack.Screen name="BookingStep4Confirmation" component={BookingStep4Confirmation} />
             </Stack.Group>
           )
         ) : (

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
@@ -15,9 +16,12 @@ import {
     View,
 } from 'react-native';
 import { colors } from '../../constants/colors';
+import { RootStackParamList } from '../../types/navigation';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'RegistroStep1'>;
 
 // Paso 1: Información Personal
-export default function RegistroStep1({ navigation }: any) {
+export default function RegistroStep1({ navigation }: Props) {
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [email, setEmail] = useState('');

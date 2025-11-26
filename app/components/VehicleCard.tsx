@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import React, { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Vehicle } from '../constants/vehicles';
 
 interface VehicleCardProps {
@@ -51,7 +52,8 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
               key={index}
               source={{ uri: img }} 
               style={[styles.image, { width: cardWidth || '100%' }]}
-              defaultSource={require('../../assets/images/CarLogo.png')}
+              contentFit="cover"
+              transition={500}
             />
           ))}
         </ScrollView>

@@ -63,7 +63,7 @@ export default function Step2Specs() {
 			return;
 		}
 
-		navigation.navigate('AddVehicleStep3Photos', {
+		navigation.navigate('AddVehicleStep2Features', {
 			vehicleData: { ...vehicleData, ...formData }
 		});
 	};

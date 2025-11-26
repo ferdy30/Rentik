@@ -1,6 +1,7 @@
 import React from 'react';
 import { LogBox } from 'react-native';
 import { AuthProvider } from '../context/Auth';
+import { ToastProvider } from '../context/ToastContext';
 import AppNavigation from './navigation';
 
 // Ignore specific warnings that we can't fix
@@ -12,7 +13,9 @@ LogBox.ignoreLogs([
 export default function App() {
   return (
     <AuthProvider>
-      <AppNavigation />
+      <ToastProvider>
+        <AppNavigation />
+      </ToastProvider>
     </AuthProvider>
   );
 }

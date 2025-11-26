@@ -1,9 +1,13 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
-const VehicleCardSkeleton: React.FC = () => {
+interface Props {
+  style?: StyleProp<ViewStyle>;
+}
+
+const VehicleCardSkeleton: React.FC<Props> = ({ style }) => {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, style]}>
       {/* Image skeleton */}
       <View style={styles.imageSkeleton} />
       

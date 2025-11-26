@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '../../FirebaseConfig';
 
@@ -15,6 +15,7 @@ export interface VehicleData {
   pasajeros: number;
   puertas: number;
   color: string;
+  caracteristicas: string[];
   precio: number;
   descripcion: string;
   ubicacion: string;
@@ -51,16 +52,25 @@ export const uploadImage = async (uri: string, path: string): Promise<string> =>
  */
 export const addVehicle = async (vehicleData: Omit<VehicleData, 'id' | 'createdAt' | 'rating' | 'trips' | 'status'>, userId: string) => {
   try {
-    // 1. Subir fotos
-    const photoUrls: any = {};
+    // 1. Subir fotos en paralelo
     const timestamp = Date.now();
-    
-    for (const [key, uri] of Object.entries(vehicleData.photos)) {
+    const photoPromises = Object.entries(vehicleData.photos).map(async ([key, uri]) => {
       if (uri) {
         const path = `vehicles/${userId}/${timestamp}/${key}.jpg`;
-        photoUrls[key] = await uploadImage(uri, path);
+        const url = await uploadImage(uri, path);
+        return { key, url };
       }
-    }
+      return null;
+    });
+
+    const results = await Promise.all(photoPromises);
+    
+    const photoUrls: any = {};
+    results.forEach(result => {
+      if (result) {
+        photoUrls[result.key] = result.url;
+      }
+    });
 
     // 2. Guardar datos en Firestore
     const newVehicle = {
@@ -132,4 +142,15 @@ export const updateVehicle = async (vehicleId: string, data: Partial<VehicleData
     console.error('Error updating vehicle:', error);
     throw error;
   }
+};
+
+/**
+ * Suscribe a los cambios en los vehículos de un arrendador
+ */
+export const subscribeToOwnerVehicles = (userId: string, onUpdate: (vehicles: VehicleData[]) => void, onError: (error: any) => void) => {
+  const q = query(collection(db, 'vehicles'), where('arrendadorId', '==', userId));
+  return onSnapshot(q, (snapshot) => {
+    const vehicles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VehicleData));
+    onUpdate(vehicles);
+  }, onError);
 };

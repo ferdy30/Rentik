@@ -16,12 +16,37 @@ service cloud.firestore {
     
     // Reglas para la colección de vehículos
     match /vehicles/{vehicleId} {
-      // Cualquier usuario autenticado puede leer vehículos (para búsqueda)
-      allow read: if request.auth != null;
+      // Permitir lectura pública (para búsqueda y detalles)
+      allow read: if true;
       // Solo el dueño puede crear
       allow create: if request.auth != null && request.auth.uid == request.resource.data.arrendadorId;
       // Solo el dueño puede actualizar o eliminar
       allow update, delete: if request.auth != null && request.auth.uid == resource.data.arrendadorId;
+    }
+
+    // Reglas para reservaciones
+    match /reservations/{reservationId} {
+      // Permitir lectura solo a los involucrados (arrendatario o arrendador)
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.arrendadorId == request.auth.uid
+      );
+      
+      // Permitir crear si el usuario está autenticado y el userId coincide
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      
+      // Permitir actualizar si es el dueño de la reserva (arrendatario) O el arrendador
+      allow update: if request.auth != null && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.arrendadorId == request.auth.uid
+      );
+    }
+    
+    // Reglas para disponibilidad (pública)
+    match /availability/{availabilityId} {
+      allow read: if true;
+      // Solo permitir crear/borrar si el usuario está autenticado (idealmente debería ser solo cloud function o el dueño)
+      allow create, delete: if request.auth != null;
     }
   }
 }

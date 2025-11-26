@@ -51,9 +51,13 @@ export type RootStackParamList = {
     };
   };
   HomeArrendatario: undefined;
-  HomeArrendador: undefined;
+  ArrendadorStack: undefined;
   PaymentSetup: undefined;
-  Details: { id: string };
+  Details: { vehicle: any };
+  BookingStep1Dates: { vehicle: any };
+  BookingStep2Location: { vehicle: any; startDate: string; endDate: string };
+  BookingStep3Time: { vehicle: any; startDate: string; endDate: string; pickupLocation: string; returnLocation: string };
+  BookingStep4Confirmation: { vehicle: any; startDate: string; endDate: string; pickupLocation: string; returnLocation: string; pickupTime: string; returnTime: string };
 };
 
 export type NavigationProps = NavigationProp<RootStackParamList>;
