@@ -188,13 +188,15 @@ export const loadOlderMessages = async (
 
 export const subscribeToUserChats = (
   userId: string, 
-  callback: (chats: Chat[]) => void,
+  limitCount: number,
+  callback: (chats: Chat[], lastDoc: QueryDocumentSnapshot | null) => void,
   errorCallback?: (error: any) => void
 ) => {
-  // Simplified query without orderBy to avoid index requirement while it builds
+  // Query with limit for pagination
   const q = query(
     collection(db, 'chats'),
-    where('participants', 'array-contains', userId)
+    where('participants', 'array-contains', userId),
+    limit(limitCount)
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -209,13 +211,50 @@ export const subscribeToUserChats = (
       return bTime - aTime;
     });
     
-    callback(chats);
+    const lastDoc = snapshot.docs.length > 0 
+      ? snapshot.docs[snapshot.docs.length - 1] 
+      : null;
+    
+    callback(chats, lastDoc);
   }, (error) => {
     console.error("Error subscribing to user chats:", error);
     if (errorCallback) {
       errorCallback(error);
     }
   });
+};
+
+// Load older chats for pagination
+export const loadOlderChats = async (
+  userId: string,
+  lastVisible: QueryDocumentSnapshot,
+  limitCount: number
+): Promise<Chat[]> => {
+  try {
+    const q = query(
+      collection(db, 'chats'),
+      where('participants', 'array-contains', userId),
+      startAfter(lastVisible),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    
+    const chats = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Chat))
+    .sort((a, b) => {
+      const aTime = a.updatedAt?.toMillis() || 0;
+      const bTime = b.updatedAt?.toMillis() || 0;
+      return bTime - aTime;
+    });
+
+    return chats;
+  } catch (error) {
+    console.error('Error loading older chats:', error);
+    throw error;
+  }
 };
 
 export const markChatAsRead = async (chatId: string, userId: string) => {

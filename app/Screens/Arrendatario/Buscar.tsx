@@ -53,6 +53,10 @@ export default function BuscarScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const VEHICLES_PER_PAGE = 10;
 
   useFocusEffect(
     useCallback(() => {
@@ -60,9 +64,13 @@ export default function BuscarScreen() {
     }, [])
   );
 
-  const loadVehicles = async () => {
+  const loadVehicles = async (reset: boolean = false) => {
     try {
-      setLoading(true);
+      if (reset) {
+        setLoading(true);
+        setCurrentPage(1);
+      }
+      
       const data = await getAllVehicles();
       const mappedVehicles: Vehicle[] = data.map(v => ({
         id: v.id!,
@@ -85,7 +93,13 @@ export default function BuscarScreen() {
         disponible: v.status === 'active',
         propietarioId: v.arrendadorId,
       }));
-      setVehicles(mappedVehicles);
+      if (reset) {
+        setVehicles(mappedVehicles);
+      } else {
+        setVehicles(mappedVehicles);
+      }
+      
+      setHasMore(mappedVehicles.length >= VEHICLES_PER_PAGE);
     } catch (error) {
       console.error('Error loading vehicles:', error);
     } finally {
@@ -149,9 +163,24 @@ export default function BuscarScreen() {
     (v) => v.badges?.includes('Más rentado') || v.rating >= 4.8
   ).slice(0, 4);
 
+  const loadMoreVehicles = async () => {
+    if (loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    try {
+      // In a real implementation, this would fetch the next page
+      // For now, we'll just simulate it since getAllVehicles doesn't support pagination yet
+      setHasMore(false); // Mark as no more to prevent infinite loading
+    } catch (error) {
+      console.error('Error loading more vehicles:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    loadVehicles();
+    loadVehicles(true);
   }, []);
 
   const handleFavoritePress = (id: string) => {

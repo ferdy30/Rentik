@@ -11,7 +11,7 @@ import {
     View
 } from 'react-native';
 import { useAuth } from '../../../context/Auth';
-import { Chat, subscribeToUserChats } from '../../services/chat';
+import { Chat, loadOlderChats, subscribeToUserChats } from '../../services/chat';
 
 export default function ChatScreen() {
   const navigation = useNavigation<any>();
@@ -19,6 +19,9 @@ export default function ChatScreen() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastVisible, setLastVisible] = useState<any>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -26,17 +29,45 @@ export default function ChatScreen() {
     setLoading(true);
     setError(null);
     
-    const unsubscribe = subscribeToUserChats(user.uid, (newChats) => {
-      setChats(newChats);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error loading chats:', error);
-      setLoading(false);
-      setError('Error al cargar los chats');
-    });
+    const unsubscribe = subscribeToUserChats(
+      user.uid,
+      15, // Load 15 chats initially
+      (newChats, lastDoc) => {
+        setChats(newChats);
+        setLastVisible(lastDoc);
+        setHasMore(newChats.length === 15);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error loading chats:', error);
+        setLoading(false);
+        setError('Error al cargar los chats');
+      }
+    );
     
     return () => unsubscribe();
   }, [user]);
+
+  const loadMoreChats = async () => {
+    if (loadingMore || !hasMore || !lastVisible || !user) return;
+
+    setLoadingMore(true);
+    try {
+      const olderChats = await loadOlderChats(user.uid, lastVisible, 15);
+      
+      if (olderChats.length > 0) {
+        setChats(prev => [...prev, ...olderChats]);
+        setLastVisible(olderChats[olderChats.length - 1]);
+        setHasMore(olderChats.length === 15);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading more chats:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const renderItem = ({ item }: { item: Chat }) => {
     const otherUserId = item.participants.find(p => p !== user?.uid);
@@ -109,6 +140,16 @@ export default function ChatScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          onEndReached={loadMoreChats}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.loadingMoreContainer}>
+                <ActivityIndicator size="small" color="#0B729D" />
+                <Text style={styles.loadingMoreText}>Cargando más...</Text>
+              </View>
+            ) : null
+          }
         />
       )}
     </View>
@@ -260,5 +301,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#EF4444',
     textAlign: 'center',
+  },
+  loadingMoreContainer: {
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadingMoreText: {
+    fontSize: 14,
+    color: '#6B7280',
   },
 });
