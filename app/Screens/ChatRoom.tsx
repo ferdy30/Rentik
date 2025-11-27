@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     FlatList,
     KeyboardAvoidingView,
     Platform,
@@ -24,6 +26,9 @@ export default function ChatRoom() {
     
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [sendingMessage, setSendingMessage] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
@@ -32,6 +37,9 @@ export default function ChatRoom() {
         const initChat = async () => {
             if (reservationId && participants && user) {
                 try {
+                    setLoading(true);
+                    setError(null);
+                    
                     await createChatIfNotExists(reservationId, participants, vehicleInfo);
                     
                     // Mark chat as read when user opens it
@@ -39,9 +47,19 @@ export default function ChatRoom() {
                     
                     unsubscribe = subscribeToMessages(reservationId, (newMessages) => {
                         setMessages(newMessages);
+                        setLoading(false);
                     });
-                } catch (error) {
+                } catch (error: any) {
                     console.error("Error initializing chat:", error);
+                    setLoading(false);
+                    
+                    if (error.code === 'permission-denied') {
+                        setError('No tienes permiso para acceder a este chat');
+                    } else if (error.code === 'unavailable') {
+                        setError('Sin conexión. Verifica tu internet.');
+                    } else {
+                        setError('Error al cargar el chat. Intenta de nuevo.');
+                    }
                 }
             }
         };
@@ -56,16 +74,27 @@ export default function ChatRoom() {
     }, [reservationId]);
 
     const handleSend = async () => {
-        if (inputText.trim().length === 0 || !user) return;
+        if (inputText.trim().length === 0 || !user || sendingMessage) return;
         
         const text = inputText.trim();
         setInputText('');
+        setSendingMessage(true);
         
         try {
             await sendMessage(reservationId, text, user.uid);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error sending message:', error);
             setInputText(text); // Restore text on error
+            
+            if (error.code === 'permission-denied') {
+                Alert.alert('Error', 'No tienes permiso para enviar mensajes en este chat');
+            } else if (error.code === 'unavailable') {
+                Alert.alert('Sin conexión', 'Verifica tu conexión a internet');
+            } else {
+                Alert.alert('Error', 'No se pudo enviar el mensaje. Intenta de nuevo.');
+            }
+        } finally {
+            setSendingMessage(false);
         }
     };
 
@@ -120,14 +149,39 @@ export default function ChatRoom() {
                 style={{ flex: 1 }}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
-                <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    renderItem={renderMessage}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.listContent}
-                    inverted
-                />
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#0B729D" />
+                        <Text style={styles.loadingText}>Cargando mensajes...</Text>
+                    </View>
+                ) : error ? (
+                    <View style={styles.errorContainer}>
+                        <Ionicons name="alert-circle" size={48} color="#EF4444" />
+                        <Text style={styles.errorText}>{error}</Text>
+                        <TouchableOpacity 
+                            style={styles.retryButton}
+                            onPress={() => window.location.reload()}
+                        >
+                            <Text style={styles.retryButtonText}>Reintentar</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <FlatList
+                        ref={flatListRef}
+                        data={messages}
+                        renderItem={renderMessage}
+                        keyExtractor={item => item.id}
+                        contentContainerStyle={styles.listContent}
+                        inverted
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Ionicons name="chatbubbles-outline" size={64} color="#D1D5DB" />
+                                <Text style={styles.emptyText}>No hay mensajes aún</Text>
+                                <Text style={styles.emptySubtext}>Inicia la conversación</Text>
+                            </View>
+                        }
+                    />
+                )}
 
                 <View style={styles.inputContainer}>
                     <TextInput
@@ -139,11 +193,15 @@ export default function ChatRoom() {
                         maxLength={500}
                     />
                     <TouchableOpacity 
-                        style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
+                        style={[styles.sendButton, (!inputText.trim() || sendingMessage) && styles.sendButtonDisabled]} 
                         onPress={handleSend}
-                        disabled={!inputText.trim()}
+                        disabled={!inputText.trim() || sendingMessage}
                     >
-                        <Ionicons name="send" size={20} color="#fff" />
+                        {sendingMessage ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <Ionicons name="send" size={20} color="#fff" />
+                        )}
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -257,5 +315,58 @@ const styles = StyleSheet.create({
     },
     sendButtonDisabled: {
         backgroundColor: '#E5E7EB',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#6B7280',
+    },
+    errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    errorText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#EF4444',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    retryButton: {
+        backgroundColor: '#0B729D',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 16,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+        minHeight: 400,
+    },
+    emptyText: {
+        marginTop: 16,
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#111827',
+    },
+    emptySubtext: {
+        marginTop: 4,
+        fontSize: 14,
+        color: '#6B7280',
     },
 });

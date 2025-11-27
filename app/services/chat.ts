@@ -128,7 +128,11 @@ export const subscribeToMessages = (chatId: string, callback: (messages: Message
   });
 };
 
-export const subscribeToUserChats = (userId: string, callback: (chats: Chat[]) => void) => {
+export const subscribeToUserChats = (
+  userId: string, 
+  callback: (chats: Chat[]) => void,
+  errorCallback?: (error: any) => void
+) => {
   // Simplified query without orderBy to avoid index requirement while it builds
   const q = query(
     collection(db, 'chats'),
@@ -150,6 +154,9 @@ export const subscribeToUserChats = (userId: string, callback: (chats: Chat[]) =
     callback(chats);
   }, (error) => {
     console.error("Error subscribing to user chats:", error);
+    if (errorCallback) {
+      errorCallback(error);
+    }
   });
 };
 

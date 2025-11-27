@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { doc, getDoc } from 'firebase/firestore';
-import React from 'react';
+import React, { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Linking,
     Platform,
@@ -25,6 +26,7 @@ export default function TripDetails() {
     const route = useRoute<any>();
     const { user } = useAuth();
     const { reservation } = route.params as { reservation: Reservation };
+    const [loadingChat, setLoadingChat] = useState(false);
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -44,13 +46,14 @@ export default function TripDetails() {
     };
 
     const handleChat = async () => {
-        if (!user) return;
+        if (!user || loadingChat) return;
         
         if (!reservation.arrendadorId) {
             Alert.alert('Error', 'No se pudo identificar al anfitrión de esta reserva.');
             return;
         }
 
+        setLoadingChat(true);
         try {
             // Fetch user names from Firestore
             const renterDoc = await getDoc(doc(db, 'users', user.uid));
@@ -84,9 +87,18 @@ export default function TripDetails() {
                     imagen: reservation.vehicleSnapshot?.imagen || ''
                 }
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error opening chat:', error);
-            Alert.alert('Error', 'No se pudo abrir el chat. Verifica tu conexión.');
+            
+            if (error.code === 'permission-denied') {
+                Alert.alert('Acceso denegado', 'No tienes permiso para acceder a este chat.');
+            } else if (error.code === 'unavailable') {
+                Alert.alert('Sin conexión', 'Verifica tu conexión a internet e intenta de nuevo.');
+            } else {
+                Alert.alert('Error', 'No se pudo abrir el chat. Intenta de nuevo.');
+            }
+        } finally {
+            setLoadingChat(false);
         }
     };
 
@@ -142,9 +154,19 @@ export default function TripDetails() {
                             <Ionicons name="qr-code-outline" size={20} color="#fff" />
                             <Text style={styles.primaryButtonText}>Iniciar Check-in</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.secondaryButton} onPress={handleChat}>
-                            <Ionicons name="chatbubble-outline" size={20} color="#0B729D" />
-                            <Text style={styles.secondaryButtonText}>Chat con anfitrión</Text>
+                        <TouchableOpacity 
+                            style={[styles.secondaryButton, loadingChat && styles.buttonDisabled]} 
+                            onPress={handleChat}
+                            disabled={loadingChat}
+                        >
+                            {loadingChat ? (
+                                <ActivityIndicator size="small" color="#0B729D" />
+                            ) : (
+                                <>
+                                    <Ionicons name="chatbubble-outline" size={20} color="#0B729D" />
+                                    <Text style={styles.secondaryButtonText}>Chat con anfitrión</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </View>
                 )}
@@ -417,5 +439,8 @@ const styles = StyleSheet.create({
         color: '#EF4444',
         fontWeight: '700',
         fontSize: 16,
+    },
+    buttonDisabled: {
+        opacity: 0.6,
     },
 });

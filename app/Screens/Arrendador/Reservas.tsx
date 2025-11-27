@@ -32,10 +32,12 @@ export default function ReservasScreen() {
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [denialReason, setDenialReason] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [loadingChat, setLoadingChat] = useState<string | null>(null);
 
   const handleChat = async (reservation: Reservation) => {
-    if (!user) return;
+    if (!user || loadingChat === reservation.id) return;
 
+    setLoadingChat(reservation.id);
     try {
         // Fetch user names from Firestore
         const hostDoc = await getDoc(doc(db, 'users', user.uid));
@@ -68,9 +70,18 @@ export default function ReservasScreen() {
                 imagen: reservation.vehicleSnapshot?.imagen || ''
             }
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error opening chat:', error);
-        Alert.alert('Error', 'No se pudo abrir el chat');
+        
+        if (error.code === 'permission-denied') {
+            Alert.alert('Acceso denegado', 'No tienes permiso para acceder a este chat.');
+        } else if (error.code === 'unavailable') {
+            Alert.alert('Sin conexión', 'Verifica tu conexión a internet e intenta de nuevo.');
+        } else {
+            Alert.alert('Error', 'No se pudo abrir el chat. Intenta de nuevo.');
+        }
+    } finally {
+        setLoadingChat(null);
     }
   };
 
@@ -227,8 +238,13 @@ export default function ReservasScreen() {
                     <TouchableOpacity 
                       style={[styles.button, { backgroundColor: '#0B729D', width: 40, paddingHorizontal: 0 }]}
                       onPress={() => handleChat(r)}
+                      disabled={loadingChat === r.id}
                     >
-                      <Ionicons name="chatbubble-outline" size={20} color="#fff" />
+                      {loadingChat === r.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Ionicons name="chatbubble-outline" size={20} color="#fff" />
+                      )}
                     </TouchableOpacity>
                   </View>
                 )}
@@ -238,17 +254,29 @@ export default function ReservasScreen() {
                     <TouchableOpacity 
                       style={[styles.button, { backgroundColor: '#0B729D', flex: 1 }]}
                       onPress={() => handleChat(r)}
+                      disabled={loadingChat === r.id}
                     >
-                      <Ionicons name="chatbubble-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
-                      <Text style={styles.buttonText}>Chat con cliente</Text>
+                      {loadingChat === r.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <Ionicons name="chatbubble-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
+                          <Text style={styles.buttonText}>Chat con cliente</Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   </View>
                 )}
                 <TouchableOpacity 
                   style={[styles.button, { backgroundColor: '#2196F3', marginTop: 12 }]}
                   onPress={() => handleChat(r)}
+                  disabled={loadingChat === r.id}
                 >
-                  <Text style={styles.buttonText}>Chatear</Text>
+                  {loadingChat === r.id ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Chatear</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             );

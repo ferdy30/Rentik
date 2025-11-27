@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     FlatList,
     StatusBar,
     StyleSheet,
@@ -16,12 +17,24 @@ export default function ChatScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
+    
+    setLoading(true);
+    setError(null);
+    
     const unsubscribe = subscribeToUserChats(user.uid, (newChats) => {
       setChats(newChats);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error loading chats:', error);
+      setLoading(false);
+      setError('Error al cargar los chats');
     });
+    
     return () => unsubscribe();
   }, [user]);
 
@@ -74,7 +87,17 @@ export default function ChatScreen() {
         <Text style={styles.headerTitle}>Mensajes</Text>
       </View>
       
-      {chats.length === 0 ? (
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0B729D" />
+          <Text style={styles.loadingText}>Cargando chats...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color="#EF4444" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : chats.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="chatbubbles-outline" size={64} color="#D1D5DB" />
           <Text style={styles.emptyText}>No tienes mensajes aún</Text>
@@ -214,5 +237,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
     marginTop: 2,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
   },
 });
