@@ -44,23 +44,42 @@ service cloud.firestore {
       allow create, delete: if isAuthenticated();
     }
 
-    // Chats collection - Simplified for debugging
+    // Chats collection - Secure participant validation
     match /chats/{chatId} {
-      // Allow read operations if authenticated
-      allow read: if isAuthenticated();
+      // Helper to check if user is a participant
+      function isParticipant() {
+        return isAuthenticated() && request.auth.uid in resource.data.participants;
+      }
       
-      // Allow create if authenticated
-      allow create: if isAuthenticated();
+      function isParticipantInRequest() {
+        return isAuthenticated() && request.auth.uid in request.resource.data.participants;
+      }
       
-      // Allow update if authenticated
-      allow update: if isAuthenticated();
+      // Allow read only to participants
+      allow read: if isParticipant();
+      
+      // Allow create only if user is in participants array
+      allow create: if isParticipantInRequest();
+      
+      // Allow update only to participants
+      allow update: if isParticipant();
       
       match /messages/{messageId} {
-        // Allow read if authenticated
-        allow read: if isAuthenticated();
+        // Get parent chat document to validate participant
+        function getChatData() {
+          return get(/databases/$(database)/documents/chats/$(chatId)).data;
+        }
+        
+        function isChatParticipant() {
+          return isAuthenticated() && request.auth.uid in getChatData().participants;
+        }
+        
+        // Allow read messages only to chat participants
+        allow read: if isChatParticipant();
           
-        // Allow create if authenticated
-        allow create: if isAuthenticated();
+        // Allow create messages only to chat participants and if senderId matches auth uid
+        allow create: if isChatParticipant() && 
+                        request.resource.data.senderId == request.auth.uid;
       }
     }
   }
