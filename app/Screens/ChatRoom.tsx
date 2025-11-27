@@ -16,13 +16,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/Auth';
-import { 
-    createChatIfNotExists, 
-    loadOlderMessages, 
-    markChatAsRead, 
-    Message, 
-    sendMessage, 
-    subscribeToRecentMessages 
+import {
+    createChatIfNotExists,
+    loadOlderMessages,
+    markChatAsRead,
+    Message,
+    sendMessage,
+    subscribeToRecentMessages
 } from '../services/chat';
 
 export default function ChatRoom() {

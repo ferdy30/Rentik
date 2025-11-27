@@ -27,7 +27,7 @@ export interface Message {
   read: boolean;
 }
 
-export type { QueryDocumentSnapshot, DocumentSnapshot };
+export type { DocumentSnapshot, QueryDocumentSnapshot };
 
 export interface Chat {
   id: string;
@@ -46,6 +46,7 @@ export interface Chat {
   };
 }
 
+// Use reservation ID directly as chat ID for unique chat per reservation
 export const getChatId = (reservationId: string) => reservationId;
 
 export const createChatIfNotExists = async (reservationId: string, participants: string[], vehicleInfo: any, participantNames: { [userId: string]: string }) => {
@@ -53,29 +54,50 @@ export const createChatIfNotExists = async (reservationId: string, participants:
   const chatRef = doc(db, 'chats', chatId);
   
   try {
+    // First try to read the chat - if it exists, return early
     const chatSnap = await getDoc(chatRef);
 
-    if (!chatSnap.exists()) {
-      const unreadCount: { [userId: string]: number } = {};
-      participants.forEach(p => unreadCount[p] = 0);
-      
-      await setDoc(chatRef, {
-        id: chatId,
-        reservationId,
-        participants,
-        participantNames,
-        lastMessage: '',
-        lastMessageTimestamp: serverTimestamp(),
-        lastMessageSenderId: '',
-        updatedAt: serverTimestamp(),
-        unreadCount,
-        vehicleInfo
-      });
+    if (chatSnap.exists()) {
+      console.log('Chat already exists:', chatId);
+      return chatId;
     }
+
+    // Chat doesn't exist, create it
+    console.log('Creating new chat:', chatId, 'with participants:', participants);
+    
+    const unreadCount: { [userId: string]: number } = {};
+    participants.forEach(p => unreadCount[p] = 0);
+    
+    const chatData = {
+      id: chatId,
+      reservationId,
+      participants,
+      participantNames,
+      lastMessage: '',
+      lastMessageTimestamp: serverTimestamp(),
+      lastMessageSenderId: '',
+      updatedAt: serverTimestamp(),
+      unreadCount,
+      vehicleInfo
+    };
+
+    await setDoc(chatRef, chatData);
+    console.log('Chat created successfully:', chatId);
+    
     return chatId;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in createChatIfNotExists:', error);
-    throw error;
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Attempted participants:', participants);
+    
+    if (error.code === 'permission-denied') {
+      throw new Error('No tienes permiso para crear este chat. Verifica que eres parte de la reserva.');
+    } else if (error.code === 'unavailable') {
+      throw new Error('Sin conexión. Verifica tu internet');
+    } else {
+      throw new Error('No se pudo crear el chat. Intenta de nuevo');
+    }
   }
 };
 

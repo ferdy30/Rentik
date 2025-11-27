@@ -121,7 +121,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
           <View style={styles.locationContainer}>
             <Ionicons name="location-outline" size={12} color="#6B7280" />
             <Text style={styles.locationText} numberOfLines={1}>
-              {vehicle.ubicacion}
+              {vehicle.distanceText ? `${vehicle.distanceText} • ` : ''}{vehicle.ubicacion}
             </Text>
           </View>
         </View>

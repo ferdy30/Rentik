@@ -6,7 +6,9 @@ export interface Vehicle {
   precio: number; // precio por día en USD
   precioOriginal?: number; // si hay descuento
   ubicacion: string;
-  distancia?: number; // km desde el usuario
+  coordinates?: { latitude: number; longitude: number }; // Coordenadas GPS
+  distancia?: number; // km desde el usuario (calculado dinámicamente)
+  distanceText?: string; // Texto formateado de distancia
   imagen: string;
   imagenes?: string[]; // para carousel
   rating: number; // 0-5

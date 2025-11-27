@@ -31,12 +31,17 @@ export default function Step3Photos() {
 		interior: null,
 	});
 
+	// Use hook-based permissions to avoid deprecated flows and improve UX
+	const [mediaPermission, requestMediaPermission] = ImagePicker.useMediaLibraryPermissions();
+
 	const pickImage = async (type: PhotoType) => {
-		// Solicitar permisos (aunque en versiones recientes de Expo/iOS/Android a veces no es necesario explícitamente para la galería)
-		const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-		if (status !== 'granted') {
-			Alert.alert('Permiso denegado', 'Necesitamos acceso a tu galería para subir las fotos.');
-			return;
+		// If permission is undetermined or denied, request it via hook
+		if (!mediaPermission || mediaPermission.status !== 'granted') {
+			const perm = await requestMediaPermission();
+			if (!perm || perm.status !== 'granted') {
+				Alert.alert('Permiso denegado', 'Necesitamos acceso a tu galería para subir las fotos.');
+				return;
+			}
 		}
 
 		const result = await ImagePicker.launchImageLibraryAsync({

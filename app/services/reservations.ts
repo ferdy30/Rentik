@@ -1,4 +1,4 @@
-import { Timestamp, collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { Timestamp, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../FirebaseConfig';
 
 export interface AvailabilityData {
@@ -24,7 +24,13 @@ export interface Reservation {
   pickupTime?: string;
   returnTime?: string;
   denialReason?: string;
+    cancellationReason?: string;
   messageToHost?: string;
+    updatedAt?: Timestamp;
+    deniedAt?: Timestamp;
+    cancelledAt?: Timestamp;
+    archived?: boolean;
+    archivedAt?: Timestamp;
   vehicleSnapshot?: {
     marca: string;
     modelo: string;
@@ -157,19 +163,51 @@ export const checkAvailability = (
 export const updateReservationStatus = async (
   reservationId: string,
   status: 'confirmed' | 'denied' | 'cancelled' | 'completed',
-  denialReason?: string
+  reason?: string
 ) => {
   try {
     const reservationRef = doc(db, 'reservations', reservationId);
-    const updateData: any = { status };
+    const updateData: any = { 
+      status,
+      updatedAt: serverTimestamp()
+    };
     
-    if (status === 'denied' && denialReason) {
-      updateData.denialReason = denialReason;
+    if (status === 'denied' && reason) {
+      updateData.denialReason = reason;
+      updateData.deniedAt = serverTimestamp();
+    }
+    
+    if (status === 'cancelled' && reason) {
+      updateData.cancellationReason = reason;
+      updateData.cancelledAt = serverTimestamp();
     }
 
     await updateDoc(reservationRef, updateData);
   } catch (error) {
     console.error('Error updating reservation status:', error);
+    throw error;
+  }
+};
+
+export const deleteReservation = async (reservationId: string) => {
+  try {
+    const reservationRef = doc(db, 'reservations', reservationId);
+    await deleteDoc(reservationRef);
+  } catch (error) {
+    console.error('Error deleting reservation:', error);
+    throw error;
+  }
+};
+
+export const archiveReservation = async (reservationId: string) => {
+  try {
+    const reservationRef = doc(db, 'reservations', reservationId);
+    await updateDoc(reservationRef, {
+      archived: true,
+      archivedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error archiving reservation:', error);
     throw error;
   }
 };

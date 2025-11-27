@@ -19,6 +19,11 @@ export interface VehicleData {
   precio: number;
   descripcion: string;
   ubicacion: string;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  placeId?: string;
   photos: {
     front: string;
     sideLeft: string;
@@ -36,14 +41,35 @@ export interface VehicleData {
  */
 export const uploadImage = async (uri: string, path: string): Promise<string> => {
   try {
+    // Validar que la URI no esté vacía
+    if (!uri || uri.trim() === '') {
+      throw new Error('URI de imagen inválida');
+    }
+
     const response = await fetch(uri);
+    
+    if (!response.ok) {
+      throw new Error(`Error al cargar imagen: ${response.status}`);
+    }
+
     const blob = await response.blob();
+    
+    // Validar tamaño de imagen (máximo 5MB)
+    if (blob.size > 5 * 1024 * 1024) {
+      throw new Error('La imagen es muy grande. El tamaño máximo es 5MB');
+    }
+
+    // Validar tipo de archivo
+    if (!blob.type.startsWith('image/')) {
+      throw new Error('El archivo debe ser una imagen');
+    }
+
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, blob);
     return await getDownloadURL(storageRef);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error uploading image:', error);
-    throw error;
+    throw new Error(error.message || 'Error al subir la imagen');
   }
 };
 
@@ -52,6 +78,19 @@ export const uploadImage = async (uri: string, path: string): Promise<string> =>
  */
 export const addVehicle = async (vehicleData: Omit<VehicleData, 'id' | 'createdAt' | 'rating' | 'trips' | 'status'>, userId: string) => {
   try {
+    // Validaciones básicas
+    if (!userId || userId.trim() === '') {
+      throw new Error('Usuario inválido');
+    }
+
+    if (!vehicleData.precio || vehicleData.precio < 5 || vehicleData.precio > 500) {
+      throw new Error('Precio inválido (debe estar entre $5 y $500)');
+    }
+
+    if (!vehicleData.descripcion || vehicleData.descripcion.length < 20) {
+      throw new Error('La descripción es muy corta');
+    }
+
     // 1. Subir fotos en paralelo
     const timestamp = Date.now();
     const photoPromises = Object.entries(vehicleData.photos).map(async ([key, uri]) => {
@@ -106,11 +145,16 @@ export const getVehiclesByOwner = async (userId: string): Promise<VehicleData[]>
 };
 
 /**
- * Obtiene todos los vehículos disponibles (para arrendatarios)
+ * Obtiene todos los vehículos disponibles con paginación (para arrendatarios)
  */
-export const getAllVehicles = async (): Promise<VehicleData[]> => {
+export const getAllVehicles = async (limitCount: number = 20): Promise<VehicleData[]> => {
   try {
-    const q = query(collection(db, 'vehicles'), where('status', '==', 'active'));
+    const q = query(
+      collection(db, 'vehicles'), 
+      where('status', '==', 'active'),
+      // orderBy('createdAt', 'desc'), // Agregar cuando se cree el índice en Firestore
+      // limit(limitCount)
+    );
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VehicleData));
   } catch (error) {

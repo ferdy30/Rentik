@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useState } from 'react';
+import * as Linking from 'expo-linking';
+import * as Location from 'expo-location';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Image,
   Modal,
@@ -20,6 +22,8 @@ import VehicleCard from '../../components/VehicleCard';
 import VehicleCardSkeleton from '../../components/VehicleCardSkeleton';
 import { Vehicle } from '../../constants/vehicles';
 import { getAllVehicles } from '../../services/vehicles';
+import type { Coordinates } from '../../utils/distance';
+import { addDistanceToItems, filterByRadius, sortByDistance } from '../../utils/distance';
 import { styles } from './styles';
 
 const CATEGORIES = [
@@ -31,7 +35,7 @@ const CATEGORIES = [
 
 const PROMOTIONS = [
   { id: '1', title: '20% OFF', subtitle: 'En tu primera renta', image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=800&q=80' },
-  { id: '2', title: 'Viaja Seguro', subtitle: 'Seguro incluido', image: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' },
+  { id: '2', title: 'Viaja Seguro', subtitle: 'Atención 24/7', image: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' },
   { id: '3', title: 'Fin de Semana', subtitle: 'Ofertas especiales', image: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&q=80' },
 ];
 
@@ -53,10 +57,38 @@ export default function BuscarScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const VEHICLES_PER_PAGE = 10;
+  // Pagination placeholders removed to avoid warnings; add when implementing
+  // Pagination placeholders removed to avoid warnings; add when implementing
+  // const VEHICLES_PER_PAGE = 10; // Pagination constant reserved for future use
+  
+  // Estados para ubicación GPS
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'pending'>('pending');
+  // Loading indicator for GPS omitted to avoid warnings
+  const [selectedRadius, setSelectedRadius] = useState<number | null>(null); // null = sin filtro
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const requestLocationPermission = useCallback(async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(status === 'granted' ? 'granted' : 'denied');
+      
+      if (status === 'granted') {
+        getUserLocation();
+      } else {
+        setLocationError('Necesitas activar los permisos de ubicación para ver resultados cercanos.');
+      }
+    } catch (error) {
+      console.error('Error requesting location permission:', error);
+      setLocationPermission('denied');
+      setLocationError('Ocurrió un problema al solicitar permisos de ubicación.');
+    }
+  }, []);
+
+  // Solicitar permiso de ubicación al cargar
+  useEffect(() => {
+    requestLocationPermission();
+  }, [requestLocationPermission]);
 
   useFocusEffect(
     useCallback(() => {
@@ -64,11 +96,30 @@ export default function BuscarScreen() {
     }, [])
   );
 
+  const getUserLocation = async () => {
+    try {
+      // start loading indicator
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+      setLocationError(null);
+    } catch (error) {
+      console.error('Error getting user location:', error);
+      setLocationError('No pudimos obtener tu ubicación. Activa los servicios de ubicación para ver resultados cercanos.');
+    } finally {
+      // stop loading indicator
+    }
+  };
+
   const loadVehicles = async (reset: boolean = false) => {
     try {
       if (reset) {
         setLoading(true);
-        setCurrentPage(1);
+        // Reset pagination when implemented
       }
       
       const data = await getAllVehicles();
@@ -79,6 +130,7 @@ export default function BuscarScreen() {
         anio: v.anio,
         precio: v.precio,
         ubicacion: v.ubicacion,
+        coordinates: v.coordinates, // Agregar coordenadas
         imagen: v.photos?.front || 'https://via.placeholder.com/400',
         imagenes: v.photos ? [v.photos.front, v.photos.sideLeft, v.photos.sideRight, v.photos.interior].filter(Boolean) : [],
         rating: v.rating || 0,
@@ -99,7 +151,7 @@ export default function BuscarScreen() {
         setVehicles(mappedVehicles);
       }
       
-      setHasMore(mappedVehicles.length >= VEHICLES_PER_PAGE);
+      // hasMore handling removed until pagination is implemented
     } catch (error) {
       console.error('Error loading vehicles:', error);
     } finally {
@@ -126,9 +178,10 @@ export default function BuscarScreen() {
         if (!vehicle.ubicacion.toLowerCase().includes('aeropuerto')) return false;
       }
       if (selectedCategory === 'near_me') {
-        // Mock logic: In a real app, calculate distance from user location
-        // For demo, we'll show vehicles in 'San Salvador'
-        if (!vehicle.ubicacion.toLowerCase().includes('san salvador')) return false;
+        // Filtrar solo vehículos que tengan coordenadas
+        if (!vehicle.coordinates) return false;
+        // Si no hay ubicación del usuario, no filtrar
+        if (!userLocation) return true;
       }
       if (selectedCategory === 'top_rated') {
         if (vehicle.rating < 4.5) return false;
@@ -159,24 +212,42 @@ export default function BuscarScreen() {
     return true;
   });
 
-  const recommended = filteredVehicles.filter(
+  // Agregar distancias y ordenar si hay ubicación del usuario
+  let vehiclesWithDistance = filteredVehicles;
+  
+  if (userLocation) {
+    // Aplicar filtro de radio si está seleccionado
+    if (selectedRadius !== null) {
+      vehiclesWithDistance = filterByRadius(
+        vehiclesWithDistance,
+        userLocation,
+        selectedRadius,
+        (vehicle) => vehicle.coordinates || null
+      );
+    }
+    
+    // Agregar información de distancia a cada vehículo
+    vehiclesWithDistance = addDistanceToItems(
+      vehiclesWithDistance,
+      userLocation,
+      (vehicle) => vehicle.coordinates || null
+    );
+    
+    // Si está en modo "Cerca de mí", ordenar por distancia
+    if (selectedCategory === 'near_me') {
+      vehiclesWithDistance = sortByDistance(
+        vehiclesWithDistance,
+        userLocation,
+        (vehicle) => vehicle.coordinates || null
+      );
+    }
+  }
+
+  const recommended = vehiclesWithDistance.filter(
     (v) => v.badges?.includes('Más rentado') || v.rating >= 4.8
   ).slice(0, 4);
 
-  const loadMoreVehicles = async () => {
-    if (loadingMore || !hasMore) return;
-    
-    setLoadingMore(true);
-    try {
-      // In a real implementation, this would fetch the next page
-      // For now, we'll just simulate it since getAllVehicles doesn't support pagination yet
-      setHasMore(false); // Mark as no more to prevent infinite loading
-    } catch (error) {
-      console.error('Error loading more vehicles:', error);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  // loadMoreVehicles placeholder removed until pagination is implemented
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -207,16 +278,28 @@ export default function BuscarScreen() {
           <Text style={styles.headerTitle}>Rentik</Text>
           <Text style={styles.appName}>Buscar</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.viewToggle} 
-          onPress={() => setViewMode(prev => prev === 'list' ? 'map' : 'list')}
-        >
-          <Ionicons 
-            name={viewMode === 'list' ? 'map-outline' : 'list-outline'} 
-            size={24} 
-            color="#0B729D" 
-          />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity
+            style={[styles.viewToggle, { paddingHorizontal: 10, paddingVertical: 8 }]}
+            onPress={requestLocationPermission}
+          >
+            <Ionicons
+              name={locationPermission === 'granted' ? 'navigate' : 'location-outline'}
+              size={22}
+              color={locationPermission === 'granted' ? '#0B729D' : '#6B7280'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.viewToggle} 
+            onPress={() => setViewMode(prev => prev === 'list' ? 'map' : 'list')}
+          >
+            <Ionicons 
+              name={viewMode === 'list' ? 'map-outline' : 'list-outline'} 
+              size={24} 
+              color="#0B729D" 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <SearchBar
@@ -226,6 +309,34 @@ export default function BuscarScreen() {
         filterChips={[]} // Removed old chips
         onChipPress={() => {}}
       />
+
+      {locationError && (
+        <View style={{
+          marginHorizontal: 16,
+          marginTop: 8,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderRadius: 8,
+          backgroundColor: '#FEF9C3',
+          borderWidth: 1,
+          borderColor: '#FDE68A',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <Ionicons name="warning-outline" size={16} color="#92400E" />
+          <Text style={{ color: '#92400E', fontSize: 13, flex: 1 }}>{locationError}</Text>
+          {locationPermission === 'denied' ? (
+            <TouchableOpacity onPress={() => Linking.openSettings()}>
+              <Text style={{ color: '#92400E', fontWeight: '700' }}>Abrir ajustes</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={getUserLocation}>
+              <Text style={{ color: '#92400E', fontWeight: '700' }}>Reintentar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Categories - Chips */}
       <View style={styles.categoryContainer}>
@@ -252,6 +363,35 @@ export default function BuscarScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+          
+          {/* Filtros de radio - solo visible si hay ubicación */}
+          {userLocation && viewMode === 'list' && (
+            <>
+              <View style={{ width: 1, height: 30, backgroundColor: '#E5E7EB', marginHorizontal: 8 }} />
+              {[5, 10, 20, 50].map((radius) => (
+                <TouchableOpacity
+                  key={radius}
+                  style={[
+                    styles.categoryChip,
+                    selectedRadius === radius && styles.categoryChipActive
+                  ]}
+                  onPress={() => setSelectedRadius(selectedRadius === radius ? null : radius)}
+                >
+                  <Ionicons 
+                    name="location" 
+                    size={16} 
+                    color={selectedRadius === radius ? '#fff' : '#6B7280'} 
+                  />
+                  <Text style={[
+                    styles.categoryLabel,
+                    selectedRadius === radius && styles.categoryLabelActive
+                  ]}>
+                    {radius}km
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
         </ScrollView>
       </View>
 
@@ -287,7 +427,7 @@ export default function BuscarScreen() {
                 <VehicleCardSkeleton key={i} />
               ))}
             </View>
-          ) : filteredVehicles.length === 0 ? (
+          ) : vehiclesWithDistance.length === 0 ? (
             <EmptyState
               icon="search-outline"
               title="No encontramos resultados"
@@ -331,10 +471,10 @@ export default function BuscarScreen() {
 
               {/* All Vehicles Section */}
               <Text style={styles.sectionTitle}>
-                {searchQuery || selectedCategory !== 'all' ? `Resultados (${filteredVehicles.length})` : 'Vehículos disponibles'}
+                {searchQuery || selectedCategory !== 'all' ? `Resultados (${vehiclesWithDistance.length})` : 'Vehículos disponibles'}
               </Text>
               <View style={styles.grid}>
-                {filteredVehicles.map((vehicle) => (
+                {vehiclesWithDistance.map((vehicle) => (
                   <VehicleCard
                     key={vehicle.id}
                     vehicle={vehicle}
@@ -357,39 +497,132 @@ export default function BuscarScreen() {
             provider={PROVIDER_GOOGLE}
             style={styles.map}
             initialRegion={{
-              latitude: 13.6929,
-              longitude: -89.2182,
+              latitude: userLocation?.latitude || 13.6929,
+              longitude: userLocation?.longitude || -89.2182,
               latitudeDelta: 0.0922,
               longitudeDelta: 0.0421,
             }}
+            showsUserLocation={locationPermission === 'granted'}
+            showsMyLocationButton={locationPermission === 'granted'}
           >
-            {filteredVehicles.map((vehicle) => (
-              <Marker
-                key={vehicle.id}
-                coordinate={{
-                  latitude: 13.6929 + (Math.random() * 0.02 - 0.01), // Mock coords if missing
-                  longitude: -89.2182 + (Math.random() * 0.02 - 0.01),
-                }}
-                onCalloutPress={() => navigation.getParent()?.navigate('Details', { vehicle })}
-              >
-                <View style={{
-                  backgroundColor: '#fff',
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                  borderRadius: 20,
-                  borderWidth: 1,
-                  borderColor: '#E5E7EB',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.15,
-                  shadowRadius: 3,
-                  elevation: 4,
-                }}>
-                  <Text style={{ fontWeight: '700', fontSize: 13, color: '#032B3C' }}>${vehicle.precio}</Text>
-                </View>
-              </Marker>
-            ))}
+            {vehiclesWithDistance
+              .filter(vehicle => vehicle.coordinates) // Solo vehículos con coordenadas
+              .map((vehicle) => (
+                <Marker
+                  key={vehicle.id}
+                  coordinate={{
+                    latitude: vehicle.coordinates!.latitude,
+                    longitude: vehicle.coordinates!.longitude,
+                  }}
+                  onPress={() => navigation.getParent()?.navigate('Details', { vehicle })}
+                >
+                  <View style={{
+                    backgroundColor: '#0B729D',
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 4,
+                    elevation: 5,
+                  }}>
+                    <Text style={{ fontWeight: '700', fontSize: 14, color: '#fff' }}>${vehicle.precio}</Text>
+                    {vehicle.distanceText && (
+                      <Text style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{vehicle.distanceText}</Text>
+                    )}
+                  </View>
+                </Marker>
+              ))}
           </MapView>
+          {locationPermission !== 'granted' && (
+            <View style={{
+              position: 'absolute',
+              top: 20,
+              left: 20,
+              right: 20,
+              backgroundColor: '#FEF9C3',
+              borderColor: '#FDE68A',
+              borderWidth: 1,
+              borderRadius: 12,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+            }}>
+              <Ionicons name="warning-outline" size={18} color="#92400E" />
+              <Text style={{ color: '#92400E', fontSize: 13, flex: 1 }}>
+                Activa los permisos de ubicación para ver tu posición en el mapa.
+              </Text>
+              <TouchableOpacity onPress={() => Linking.openSettings()}>
+                <Text style={{ color: '#92400E', fontWeight: '700' }}>Abrir ajustes</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {/* Filtros de radio */}
+          {userLocation && (
+            <View style={{
+              position: 'absolute',
+              top: 60,
+              left: 20,
+              right: 20,
+              flexDirection: 'row',
+              gap: 8,
+              flexWrap: 'wrap',
+            }}>
+              {[5, 10, 20, 50].map((radius) => (
+                <TouchableOpacity
+                  key={radius}
+                  style={{
+                    backgroundColor: selectedRadius === radius ? '#0B729D' : '#fff',
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: selectedRadius === radius ? '#0B729D' : '#E5E7EB',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 3,
+                    elevation: 3,
+                  }}
+                  onPress={() => setSelectedRadius(selectedRadius === radius ? null : radius)}
+                >
+                  <Text style={{
+                    fontSize: 13,
+                    fontWeight: '600',
+                    color: selectedRadius === radius ? '#fff' : '#374151',
+                  }}>
+                    {radius}km
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          
+          {/* Info badge */}
+          <View style={{
+            position: 'absolute',
+            top: 60,
+            right: 20,
+            backgroundColor: '#fff',
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 20,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 3,
+            elevation: 3,
+          }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#032B3C' }}>
+              {vehiclesWithDistance.filter(v => v.coordinates).length} vehículos
+            </Text>
+          </View>
           
           <TouchableOpacity 
             style={{

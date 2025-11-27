@@ -34,32 +34,72 @@ export default function Step2Specs() {
 		color: '',
 	});
 
+	const [errors, setErrors] = useState({
+		pasajeros: '',
+		puertas: '',
+	});
+
+	const [touched, setTouched] = useState({
+		pasajeros: false,
+		puertas: false,
+	});
+
+	const validateField = (field: string, value: string) => {
+		switch (field) {
+			case 'pasajeros':
+				if (!value) return 'Requerido';
+				const pasajeros = parseInt(value);
+				if (isNaN(pasajeros)) return 'Debe ser un número';
+				if (pasajeros < 1) return 'Mínimo 1';
+				if (pasajeros > 20) return 'Máximo 20';
+				return '';
+			case 'puertas':
+				if (!value) return 'Requerido';
+				const puertas = parseInt(value);
+				if (isNaN(puertas)) return 'Debe ser un número';
+				if (puertas < 2) return 'Mínimo 2';
+				if (puertas > 5) return 'Máximo 5';
+				return '';
+			default:
+				return '';
+		}
+	};
+
+	const handleFieldChange = (field: string, value: string) => {
+		setFormData({ ...formData, [field]: value });
+		
+		if (touched[field as keyof typeof touched]) {
+			const error = validateField(field, value);
+			setErrors({ ...errors, [field]: error });
+		}
+	};
+
+	const handleFieldBlur = (field: string) => {
+		setTouched({ ...touched, [field]: true });
+		const error = validateField(field, formData[field as keyof typeof formData]);
+		setErrors({ ...errors, [field]: error });
+	};
+
 	const isFormValid = () => {
 		return (
 			formData.tipo &&
 			formData.transmision &&
 			formData.combustible &&
 			formData.pasajeros &&
-			formData.puertas
+			formData.puertas &&
+			!errors.pasajeros &&
+			!errors.puertas
 		);
 	};
 
 	const handleNext = () => {
-		if (!isFormValid()) {
+		const pasajerosError = validateField('pasajeros', formData.pasajeros);
+		const puertasError = validateField('puertas', formData.puertas);
+
+		if (pasajerosError || puertasError || !formData.tipo || !formData.transmision || !formData.combustible) {
+			setTouched({ pasajeros: true, puertas: true });
+			setErrors({ pasajeros: pasajerosError, puertas: puertasError });
 			Alert.alert('Campos incompletos', 'Por favor completa todos los campos obligatorios');
-			return;
-		}
-
-		const pasajeros = parseInt(formData.pasajeros);
-		const puertas = parseInt(formData.puertas);
-
-		if (isNaN(pasajeros) || pasajeros < 1 || pasajeros > 20) {
-			Alert.alert('Pasajeros inválido', 'El número de pasajeros debe estar entre 1 y 20');
-			return;
-		}
-
-		if (isNaN(puertas) || puertas < 2 || puertas > 5) {
-			Alert.alert('Puertas inválido', 'El número de puertas debe estar entre 2 y 5');
 			return;
 		}
 
@@ -91,6 +131,47 @@ export default function Step2Specs() {
 
 			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 				<Text style={styles.sectionTitle}>Características del Vehículo</Text>
+
+				{/* Vista Previa Acumulativa */}
+				{vehicleData && (
+					<View style={styles.previewCard}>
+						<View style={styles.previewHeader}>
+							<Ionicons name="eye-outline" size={18} color="#0B729D" />
+							<Text style={styles.previewTitle}>Vista Previa</Text>
+						</View>
+						<View style={styles.previewContent}>
+							<Text style={styles.previewVehicleName}>
+								{vehicleData.marca} {vehicleData.modelo} {vehicleData.anio}
+							</Text>
+							<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+								{formData.tipo && (
+									<View style={styles.previewBadge}>
+										<Ionicons name="car-sport" size={12} color="#6B7280" />
+										<Text style={styles.previewPlate}>{formData.tipo}</Text>
+									</View>
+								)}
+								{formData.transmision && (
+									<View style={styles.previewBadge}>
+										<Ionicons name="settings" size={12} color="#6B7280" />
+										<Text style={styles.previewPlate}>{formData.transmision}</Text>
+									</View>
+								)}
+								{formData.combustible && (
+									<View style={styles.previewBadge}>
+										<Ionicons name="flash" size={12} color="#6B7280" />
+										<Text style={styles.previewPlate}>{formData.combustible}</Text>
+									</View>
+								)}
+								{formData.pasajeros && (
+									<View style={styles.previewBadge}>
+										<Ionicons name="people" size={12} color="#6B7280" />
+										<Text style={styles.previewPlate}>{formData.pasajeros} pasajeros</Text>
+									</View>
+								)}
+							</View>
+						</View>
+					</View>
+				)}
 
 				{/* Tipo */}
 				<View style={styles.inputGroup}>
@@ -156,26 +237,34 @@ export default function Step2Specs() {
 					<View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
 						<Text style={styles.label}>Pasajeros *</Text>
 						<TextInput
-							style={styles.input}
+							style={[styles.input, touched.pasajeros && errors.pasajeros ? styles.inputError : formData.pasajeros && !errors.pasajeros ? styles.inputSuccess : {}]}
 							placeholder="Ej: 5"
 							value={formData.pasajeros}
-							onChangeText={(pasajeros) => setFormData({ ...formData, pasajeros })}
+							onChangeText={(pasajeros) => handleFieldChange('pasajeros', pasajeros)}
+							onBlur={() => handleFieldBlur('pasajeros')}
 							keyboardType="numeric"
 							maxLength={2}
 							placeholderTextColor="#9CA3AF"
 						/>
+						{touched.pasajeros && errors.pasajeros ? (
+							<Text style={styles.errorTextSmall}>{errors.pasajeros}</Text>
+						) : null}
 					</View>
 					<View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
 						<Text style={styles.label}>Puertas *</Text>
 						<TextInput
-							style={styles.input}
+							style={[styles.input, touched.puertas && errors.puertas ? styles.inputError : formData.puertas && !errors.puertas ? styles.inputSuccess : {}]}
 							placeholder="Ej: 4"
 							value={formData.puertas}
-							onChangeText={(puertas) => setFormData({ ...formData, puertas })}
+							onChangeText={(puertas) => handleFieldChange('puertas', puertas)}
+							onBlur={() => handleFieldBlur('puertas')}
 							keyboardType="numeric"
 							maxLength={1}
 							placeholderTextColor="#9CA3AF"
 						/>
+						{touched.puertas && errors.puertas ? (
+							<Text style={styles.errorTextSmall}>{errors.puertas}</Text>
+						) : null}
 					</View>
 				</View>
 

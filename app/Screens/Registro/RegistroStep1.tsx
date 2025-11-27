@@ -53,19 +53,81 @@ export default function RegistroStep1({ navigation }: Props) {
     return regex.test(email);
   };
 
+  const validatePassword = (password: string) => {
+    // Al menos 8 caracteres, una mayúscula, una minúscula y un número
+    const minLength = password.length >= 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    return minLength && hasUpperCase && hasLowerCase && hasNumber;
+  };
+
+  const validateAge = (birthDate: Date) => {
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      return age - 1 >= 18;
+    }
+    return age >= 18;
+  };
+
   const handleContinue = () => {
     let errors = [];
 
-    if (!nombre.trim()) errors.push('Nombre es obligatorio');
-    if (!apellido.trim()) errors.push('Apellido es obligatorio');
-    if (!email.trim()) errors.push('Correo electrónico es obligatorio');
-    else if (!validateEmail(email)) errors.push('Correo electrónico no válido');
-    if (!password) errors.push('Contraseña es obligatoria');
-    else if (password.length < 6) errors.push('La contraseña debe tener al menos 6 caracteres');
-    if (!confirmPassword) errors.push('Confirmar contraseña es obligatorio');
-    else if (password !== confirmPassword) errors.push('Las contraseñas no coinciden');
-    if (!phoneNumber.trim()) errors.push('Número de teléfono es obligatorio');
-    if (!birthday) errors.push('Fecha de cumpleaños es obligatoria');
+    // Validación de nombre y apellido
+    if (!nombre.trim()) {
+      errors.push('Nombre es obligatorio');
+    } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre.trim())) {
+      errors.push('El nombre solo puede contener letras');
+    } else if (nombre.trim().length < 2) {
+      errors.push('El nombre debe tener al menos 2 caracteres');
+    }
+
+    if (!apellido.trim()) {
+      errors.push('Apellido es obligatorio');
+    } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(apellido.trim())) {
+      errors.push('El apellido solo puede contener letras');
+    } else if (apellido.trim().length < 2) {
+      errors.push('El apellido debe tener al menos 2 caracteres');
+    }
+
+    // Validación de email
+    if (!email.trim()) {
+      errors.push('Correo electrónico es obligatorio');
+    } else if (!validateEmail(email)) {
+      errors.push('Correo electrónico no válido');
+    }
+
+    // Validación de contraseña
+    if (!password) {
+      errors.push('Contraseña es obligatoria');
+    } else if (!validatePassword(password)) {
+      errors.push('La contraseña debe tener: mínimo 8 caracteres, una mayúscula, una minúscula y un número');
+    }
+
+    if (!confirmPassword) {
+      errors.push('Confirmar contraseña es obligatorio');
+    } else if (password !== confirmPassword) {
+      errors.push('Las contraseñas no coinciden');
+    }
+
+    // Validación de teléfono
+    if (!phoneNumber.trim()) {
+      errors.push('Número de teléfono es obligatorio');
+    } else {
+      const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+      if (cleanPhone.length < 8) {
+        errors.push('El teléfono debe tener al menos 8 dígitos');
+      }
+    }
+
+    // Validación de fecha de nacimiento
+    if (!birthday) {
+      errors.push('Fecha de cumpleaños es obligatoria');
+    } else if (!validateAge(birthday)) {
+      errors.push('Debes ser mayor de 18 años para registrarte');
+    }
 
     if (errors.length > 0) {
       setError(errors.join('\n• '));

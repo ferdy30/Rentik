@@ -1,27 +1,178 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import React from 'react';
-import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../../context/Auth';
+import { getOwnerReservations } from '../../services/reservations';
+import { getAllVehicles } from '../../services/vehicles';
 
 export default function DashboardScreen() {
-  const { userData } = useAuth();
+  const { userData, user } = useAuth();
   const navigation = useNavigation<any>();
 
-  // Datos simulados para el dashboard
-  const stats = {
-    earnings: 1250.00,
-    activeRentals: 2,
-    pendingRequests: 1,
-    totalVehicles: 3,
-    rating: 4.8
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState({
+    monthEarnings: 0,
+    totalEarnings: 0,
+    activeRentals: 0,
+    pendingRequests: 0,
+    totalVehicles: 0,
+    rating: 4.8,
+    monthlyData: [] as { month: string; amount: number; height: number }[]
+  });
+
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!user) return;
+    try {
+      // Fetch reservations
+      const reservations = await getOwnerReservations(user.uid);
+      
+      // Fetch vehicles
+      const vehicles = await getAllVehicles();
+      const myVehicles = vehicles.filter(v => v.arrendadorId === user.uid);
+
+      // Filter valid reservations for income
+      const validReservations = reservations.filter(r => r.status === 'confirmed' || r.status === 'completed');
+      
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      let totalEarnings = 0;
+      let monthEarnings = 0;
+      let activeRentals = 0;
+      let pendingRequests = 0;
+
+      reservations.forEach(r => {
+        if (r.status === 'confirmed' || r.status === 'completed') {
+          totalEarnings += r.totalPrice;
+          const rDate = r.startDate.toDate();
+          if (rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear) {
+            monthEarnings += r.totalPrice;
+          }
+        }
+        if (r.status === 'confirmed') activeRentals++;
+        if (r.status === 'pending') pendingRequests++;
+      });
+
+      // Calculate last 6 months data for chart
+      const monthlyData = [];
+      let maxAmount = 0;
+
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthLabel = d.toLocaleDateString('es-ES', { month: 'short' });
+        const monthIdx = d.getMonth();
+        const year = d.getFullYear();
+
+        const monthAmount = validReservations
+          .filter(r => {
+            const rd = r.startDate.toDate();
+            return rd.getMonth() === monthIdx && rd.getFullYear() === year;
+          })
+          .reduce((sum, r) => sum + r.totalPrice, 0);
+
+        if (monthAmount > maxAmount) maxAmount = monthAmount;
+
+        monthlyData.push({
+          month: monthLabel,
+          amount: monthAmount,
+          height: 0
+        });
+      }
+
+      // Normalize heights for chart
+      monthlyData.forEach(d => {
+        d.height = maxAmount > 0 ? (d.amount / maxAmount) * 100 : 0;
+      });
+
+      // Build recent activity
+      const activity = [];
+      const sortedReservations = [...reservations]
+        .sort((a, b) => {
+          const aDate = a.createdAt?.toDate?.() || new Date(0);
+          const bDate = b.createdAt?.toDate?.() || new Date(0);
+          return bDate.getTime() - aDate.getTime();
+        })
+        .slice(0, 5);
+
+      sortedReservations.forEach(r => {
+        const createdTime = r.createdAt?.toDate?.() || new Date();
+        const timeAgo = getTimeAgo(createdTime);
+        
+        if (r.status === 'pending') {
+          activity.push({
+            id: r.id,
+            type: 'booking',
+            title: 'Nueva solicitud',
+            subtitle: r.vehicleId || 'Vehículo',
+            time: timeAgo,
+            icon: 'calendar'
+          });
+        } else if (r.status === 'confirmed' || r.status === 'completed') {
+          activity.push({
+            id: r.id,
+            type: 'earning',
+            title: 'Reserva confirmada',
+            subtitle: `+$${r.totalPrice.toFixed(2)}`,
+            time: timeAgo,
+            icon: 'cash'
+          });
+        }
+      });
+
+      setStats({
+        monthEarnings,
+        totalEarnings,
+        activeRentals,
+        pendingRequests,
+        totalVehicles: myVehicles.length,
+        rating: 4.8, // TODO: Calculate from reviews
+        monthlyData
+      });
+      setRecentActivity(activity);
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  const getTimeAgo = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (hours < 1) return 'Hace un momento';
+    if (hours < 24) return `Hace ${hours}h`;
+    if (days === 1) return 'Ayer';
+    return `Hace ${days} días`;
   };
 
-  const recentActivity = [
-    { id: '1', type: 'booking', title: 'Nueva reserva', subtitle: 'Toyota Corolla 2020', time: 'Hace 2h', icon: 'calendar' },
-    { id: '2', type: 'earning', title: 'Pago recibido', subtitle: '+$150.00', time: 'Hace 5h', icon: 'cash' },
-    { id: '3', type: 'review', title: 'Nueva calificación', subtitle: '5 estrellas - Juan P.', time: 'Ayer', icon: 'star' },
-  ];
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
+    }, [fetchDashboardData])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDashboardData();
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#0B729D" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -38,28 +189,20 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Earnings Card */}
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Earnings Card - Principal */}
         <View style={styles.earningsCard}>
-          <View style={styles.earningsContent}>
-            <View>
-              <Text style={styles.earningsLabel}>Ganancias este mes</Text>
-              <Text style={styles.earningsAmount}>${stats.earnings.toFixed(2)}</Text>
-            </View>
-            <View style={styles.earningsIcon}>
-              <Ionicons name="trending-up" size={24} color="#FFFFFF" />
-            </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.earningsLabel}>Ganancias este mes</Text>
+            <Text style={styles.earningsAmount}>${stats.monthEarnings.toFixed(2)}</Text>
+            <Text style={styles.earningsSubtext}>Total histórico: ${stats.totalEarnings.toFixed(2)}</Text>
           </View>
-          
-          {/* Monthly Goal Progress */}
-          <View style={styles.goalContainer}>
-            <View style={styles.goalHeader}>
-              <Text style={styles.goalLabel}>Meta mensual: $2,000</Text>
-              <Text style={styles.goalPercent}>62%</Text>
-            </View>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: '62%' }]} />
-            </View>
+          <View style={styles.earningsIcon}>
+            <Ionicons name="trending-up" size={24} color="#0B729D" />
           </View>
         </View>
 
@@ -123,22 +266,49 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </ScrollView>
 
+        {/* Earnings Chart */}
+        <Text style={styles.sectionTitle}>Ingresos últimos 6 meses</Text>
+        <View style={styles.chartCard}>
+          <View style={styles.chartContainer}>
+            {stats.monthlyData.map((d, i) => (
+              <View key={i} style={styles.barContainer}>
+                <Text style={styles.barValue}>
+                  ${d.amount > 999 ? (d.amount/1000).toFixed(1)+'k' : d.amount.toFixed(0)}
+                </Text>
+                <View style={[styles.bar, { height: Math.max(d.height, 4) }]} />
+                <Text style={styles.barLabel}>{d.month}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
         {/* Recent Activity */}
         <Text style={styles.sectionTitle}>Actividad Reciente</Text>
-        <View style={styles.activityList}>
-          {recentActivity.map((item) => (
-            <View key={item.id} style={styles.activityItem}>
-              <View style={styles.activityIconContainer}>
-                <Ionicons name={item.icon as any} size={20} color="#6B7280" />
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>{item.title}</Text>
-                <Text style={styles.activitySubtitle}>{item.subtitle}</Text>
-              </View>
-              <Text style={styles.activityTime}>{item.time}</Text>
-            </View>
-          ))}
-        </View>
+        {recentActivity.length > 0 ? (
+          <View style={styles.activityList}>
+            {recentActivity.map((item) => (
+              <TouchableOpacity 
+                key={item.id} 
+                style={styles.activityItem}
+                onPress={() => navigation.navigate('Reservas')}
+              >
+                <View style={styles.activityIconContainer}>
+                  <Ionicons name={item.icon as any} size={20} color="#6B7280" />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>{item.title}</Text>
+                  <Text style={styles.activitySubtitle}>{item.subtitle}</Text>
+                </View>
+                <Text style={styles.activityTime}>{item.time}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="time-outline" size={48} color="#D1D5DB" />
+            <Text style={styles.emptyStateText}>No hay actividad reciente</Text>
+          </View>
+        )}
         
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -188,71 +358,41 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   earningsCard: {
-    backgroundColor: '#0B729D',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 24,
-    shadowColor: '#0B729D',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  earningsContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   earningsLabel: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    color: '#6B7280',
     marginBottom: 4,
-    fontWeight: '500',
   },
   earningsAmount: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  earningsSubtext: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
   },
   earningsIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F0F9FF',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  goalContainer: {
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 12,
-    padding: 12,
-  },
-  goalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  goalLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
-  },
-  goalPercent: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  progressBarBg: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#4ADE80',
-    borderRadius: 3,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -358,5 +498,60 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  chartCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  chartContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 120,
+    paddingBottom: 10,
+  },
+  barContainer: {
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  bar: {
+    width: 12,
+    borderRadius: 6,
+    backgroundColor: '#0B729D',
+    minHeight: 4,
+  },
+  barLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+    textTransform: 'capitalize',
+  },
+  barValue: {
+    fontSize: 9,
+    color: '#9CA3AF',
+    marginBottom: 2,
+  },
+  emptyState: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 12,
   },
 });

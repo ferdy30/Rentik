@@ -27,13 +27,31 @@ const functions = getFunctions(Firebaseapp);
  */
 export async function createConnectedAccount(email: string, country: string = 'US'): Promise<string> {
   try {
+    if (!email || email.trim() === '') {
+      throw new Error('Email es requerido');
+    }
+
     const createAccount = httpsCallable(functions, 'createConnectedAccount');
     const result = await createAccount({ email, country });
     const data = result.data as { accountId: string };
+    
+    if (!data.accountId) {
+      throw new Error('No se pudo crear la cuenta de Stripe');
+    }
+    
     return data.accountId;
-  } catch (error) {
+  } catch (error: any) {
     console.error('[STRIPE] Create account error:', error);
-    throw error;
+    
+    if (error.code === 'unavailable') {
+      throw new Error('Servicio no disponible. Verifica tu conexión');
+    } else if (error.message?.includes('already')) {
+      throw new Error('Ya tienes una cuenta de Stripe configurada');
+    } else if (error.message) {
+      throw error;
+    } else {
+      throw new Error('No se pudo crear la cuenta. Intenta de nuevo');
+    }
   }
 }
 
