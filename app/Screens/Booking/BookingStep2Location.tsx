@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React from 'react';
 import {
+    Platform,
     StatusBar,
     StyleSheet,
     Text,
@@ -27,18 +28,22 @@ export default function BookingStep2Location() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" />
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
             
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#111827" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Ubicación</Text>
+                <View style={styles.progressBarContainer}>
+                    <View style={[styles.progressBar, { width: '50%' }]} />
+                </View>
                 <View style={{ width: 40 }} />
             </View>
 
             <View style={styles.content}>
-                <Text style={styles.subtitle}>Confirma los puntos de encuentro</Text>
+                <Text style={styles.stepTitle}>Paso 2 de 4</Text>
+                <Text style={styles.title}>Ubicación</Text>
+                <Text style={styles.subtitle}>Confirma dónde recogerás y devolverás el auto</Text>
 
                 <View style={styles.mapContainer}>
                     <MapView
@@ -57,6 +62,7 @@ export default function BookingStep2Location() {
                             title={vehicle.ubicacion}
                         />
                     </MapView>
+                    <View style={styles.mapOverlay} />
                 </View>
 
                 <View style={styles.locationCard}>
@@ -69,7 +75,11 @@ export default function BookingStep2Location() {
                             <Text style={styles.locationValue}>{vehicle.ubicacion}</Text>
                         </View>
                     </View>
-                    <View style={styles.divider} />
+                    
+                    <View style={styles.dividerContainer}>
+                        <View style={styles.dashedLine} />
+                    </View>
+
                     <View style={styles.locationRow}>
                         <View style={styles.iconContainer}>
                             <Ionicons name="flag" size={24} color="#0B729D" />
@@ -84,7 +94,8 @@ export default function BookingStep2Location() {
 
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-                    <Text style={styles.nextButtonText}>Siguiente</Text>
+                    <Text style={styles.nextButtonText}>Continuar</Text>
+                    <Ionicons name="arrow-forward" size={20} color="#fff" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -101,57 +112,90 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 50,
-        paddingBottom: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 10 : 60,
+        paddingBottom: 20,
     },
     backButton: {
         padding: 8,
+        borderRadius: 12,
+        backgroundColor: '#F3F4F6',
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#111827',
+    progressBarContainer: {
+        flex: 1,
+        height: 6,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
+        marginHorizontal: 20,
+        overflow: 'hidden',
+    },
+    progressBar: {
+        height: '100%',
+        backgroundColor: '#0B729D',
+        borderRadius: 3,
     },
     content: {
         flex: 1,
-        padding: 20,
+        paddingHorizontal: 24,
+    },
+    stepTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0B729D',
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    title: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#111827',
+        marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#4B5563',
+        color: '#6B7280',
         marginBottom: 24,
     },
     mapContainer: {
         height: 200,
-        borderRadius: 12,
+        borderRadius: 24,
         overflow: 'hidden',
         marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
     map: {
         width: '100%',
         height: '100%',
     },
+    mapOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'transparent', // Allow interaction if needed, or add gradient
+    },
     locationCard: {
-        backgroundColor: '#F9FAFB',
-        borderRadius: 12,
-        padding: 16,
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        padding: 20,
         borderWidth: 1,
         borderColor: '#E5E7EB',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 4,
     },
     locationRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
     },
     iconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#E0F2FE',
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        backgroundColor: '#F0F9FF',
         alignItems: 'center',
         justifyContent: 'center',
+        marginRight: 16,
     },
     locationInfo: {
         flex: 1,
@@ -159,34 +203,51 @@ const styles = StyleSheet.create({
     locationLabel: {
         fontSize: 12,
         color: '#6B7280',
-        marginBottom: 2,
+        marginBottom: 4,
+        fontWeight: '500',
     },
     locationValue: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 16,
+        fontWeight: '700',
         color: '#111827',
     },
-    divider: {
-        height: 1,
+    dividerContainer: {
+        paddingLeft: 24,
+        height: 32,
+        justifyContent: 'center',
+    },
+    dashedLine: {
+        width: 2,
+        height: '100%',
         backgroundColor: '#E5E7EB',
-        marginVertical: 16,
+        borderStyle: 'dashed',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
     footer: {
-        padding: 20,
+        padding: 24,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
         borderTopWidth: 1,
         borderTopColor: '#F3F4F6',
-        backgroundColor: '#fff',
-        paddingBottom: 34,
+        marginTop: 'auto',
     },
     nextButton: {
         backgroundColor: '#0B729D',
-        paddingVertical: 16,
-        borderRadius: 12,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: 16,
+        shadowColor: '#0B729D',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+        gap: 8,
     },
     nextButtonText: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '700',
     },
 });

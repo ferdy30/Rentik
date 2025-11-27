@@ -1,8 +1,15 @@
 import { NavigationProp } from '@react-navigation/native';
+import { Reservation } from '../services/reservations';
 
 export type RootStackParamList = {
   Splash: undefined;
   Login: undefined;
+  TripDetails: { reservation: Reservation };
+  ChatRoom: { 
+    reservationId: string; 
+    participants: string[]; 
+    vehicleInfo?: { marca: string; modelo: string; imagen: string };
+  };
   RegistroStep1: undefined;
   RegistroStep2: {
     nombre: string;

@@ -1,52 +1,67 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Permite a los usuarios autenticados acceder a su propio documento
-    match /users/{userId} {
-      // Permitir lectura a cualquier usuario autenticado (para ver perfil del anfitrión)
-      allow read: if request.auth != null;
-      
-      // Permitir creación Y actualización si el usuario está autenticado y es su propio documento
-      // (create + update fusionados para permitir setDoc con merge: true durante registro)
-      allow create, update: if request.auth != null && request.auth.uid == userId;
-      
-      // Permitir eliminación solo de su propio documento
-      allow delete: if request.auth != null && request.auth.uid == userId;
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
     }
     
-    // Reglas para la colección de vehículos
-    match /vehicles/{vehicleId} {
-      // Permitir lectura pública (para búsqueda y detalles)
-      allow read: if true;
-      // Solo el dueño puede crear
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.arrendadorId;
-      // Solo el dueño puede actualizar o eliminar
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.arrendadorId;
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Reglas para reservaciones
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+    
+    // Vehicles collection
+    match /vehicles/{vehicleId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.arrendadorId;
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.arrendadorId;
+    }
+
+    // Reservations collection
     match /reservations/{reservationId} {
-      // Permitir lectura solo a los involucrados (arrendatario o arrendador)
-      allow read: if request.auth != null && (
+      allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
         resource.data.arrendadorId == request.auth.uid
       );
-      
-      // Permitir crear si el usuario está autenticado y el userId coincide
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      
-      // Permitir actualizar si es el dueño de la reserva (arrendatario) O el arrendador
-      allow update: if request.auth != null && (
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
         resource.data.arrendadorId == request.auth.uid
       );
     }
     
-    // Reglas para disponibilidad (pública)
+    // Availability collection (Public read access)
     match /availability/{availabilityId} {
       allow read: if true;
-      // Solo permitir crear/borrar si el usuario está autenticado (idealmente debería ser solo cloud function o el dueño)
-      allow create, delete: if request.auth != null;
+      allow create, delete: if isAuthenticated();
+    }
+
+    // Chats collection - Simplified for debugging
+    match /chats/{chatId} {
+      // Allow read operations if authenticated
+      allow read: if isAuthenticated();
+      
+      // Allow create if authenticated
+      allow create: if isAuthenticated();
+      
+      // Allow update if authenticated
+      allow update: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        // Allow read if authenticated
+        allow read: if isAuthenticated();
+          
+        // Allow create if authenticated
+        allow create: if isAuthenticated();
+      }
     }
   }
 }

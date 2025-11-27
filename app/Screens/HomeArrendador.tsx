@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
-import IngresosScreen from './Arrendador/Ingresos';
+import ChatScreen from './Arrendador/Chat';
+import DashboardScreen from './Arrendador/Dashboard';
 import MisAutosScreen from './Arrendador/MisAutos';
 import PerfilScreen from './Arrendador/Perfil';
 import ReservasScreen from './Arrendador/Reservas';
@@ -30,17 +31,19 @@ export default function HomeArrendador() {
         tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
         tabBarIcon: ({ color, focused }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'ellipse-outline';
+          if (route.name === 'Inicio') iconName = focused ? 'home' : 'home-outline';
           if (route.name === 'Mis autos') iconName = focused ? 'car' : 'car-outline';
           if (route.name === 'Reservas') iconName = focused ? 'calendar' : 'calendar-outline';
-          if (route.name === 'Ingresos') iconName = focused ? 'cash' : 'cash-outline';
+          if (route.name === 'Mensajes') iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           if (route.name === 'Perfil') iconName = focused ? 'person' : 'person-outline';
           return <Ionicons name={iconName} size={20} color={color} />;
         },
       })}
     >
+      <Tab.Screen name="Inicio" component={DashboardScreen} />
       <Tab.Screen name="Mis autos" component={MisAutosScreen} />
       <Tab.Screen name="Reservas" component={ReservasScreen} />
-      <Tab.Screen name="Ingresos" component={IngresosScreen} />
+      <Tab.Screen name="Mensajes" component={ChatScreen} />
       <Tab.Screen name="Perfil" component={PerfilScreen} />
     </Tab.Navigator>
   );

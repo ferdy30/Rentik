@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { doc, getDoc } from 'firebase/firestore';
 import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
@@ -14,10 +15,13 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { db } from '../../../FirebaseConfig';
 import { useAuth } from '../../../context/Auth';
+import { createChatIfNotExists } from '../../services/chat';
 import { getOwnerReservations, Reservation, updateReservationStatus } from '../../services/reservations';
 
 export default function ReservasScreen() {
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +32,47 @@ export default function ReservasScreen() {
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [denialReason, setDenialReason] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const handleChat = async (reservation: Reservation) => {
+    if (!user) return;
+
+    try {
+        // Fetch user names from Firestore
+        const hostDoc = await getDoc(doc(db, 'users', user.uid));
+        const renterDoc = await getDoc(doc(db, 'users', reservation.userId));
+        
+        const hostName = hostDoc.exists() ? (hostDoc.data().nombre || 'Anfitrión') : 'Anfitrión';
+        const renterName = renterDoc.exists() ? (renterDoc.data().nombre || 'Cliente') : 'Cliente';
+        
+        const participantNames = {
+            [user.uid]: hostName,
+            [reservation.userId]: renterName
+        };
+
+        await createChatIfNotExists(
+            reservation.id,
+            [user.uid, reservation.userId],
+            {
+                marca: reservation.vehicleSnapshot?.marca || '',
+                modelo: reservation.vehicleSnapshot?.modelo || '',
+                imagen: reservation.vehicleSnapshot?.imagen || ''
+            },
+            participantNames
+        );
+        navigation.navigate('ChatRoom', {
+            reservationId: reservation.id,
+            participants: [user.uid, reservation.userId],
+            vehicleInfo: {
+                marca: reservation.vehicleSnapshot?.marca || '',
+                modelo: reservation.vehicleSnapshot?.modelo || '',
+                imagen: reservation.vehicleSnapshot?.imagen || ''
+            }
+        });
+    } catch (error) {
+        console.error('Error opening chat:', error);
+        Alert.alert('Error', 'No se pudo abrir el chat');
+    }
+  };
 
   const fetchReservations = async () => {
     if (!user) return;
@@ -179,8 +224,32 @@ export default function ReservasScreen() {
                     >
                       <Text style={styles.buttonText}>Rechazar</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.button, { backgroundColor: '#0B729D', width: 40, paddingHorizontal: 0 }]}
+                      onPress={() => handleChat(r)}
+                    >
+                      <Ionicons name="chatbubble-outline" size={20} color="#fff" />
+                    </TouchableOpacity>
                   </View>
                 )}
+                
+                {r.status === 'confirmed' && (
+                  <View style={styles.actions}>
+                    <TouchableOpacity 
+                      style={[styles.button, { backgroundColor: '#0B729D', flex: 1 }]}
+                      onPress={() => handleChat(r)}
+                    >
+                      <Ionicons name="chatbubble-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
+                      <Text style={styles.buttonText}>Chat con cliente</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <TouchableOpacity 
+                  style={[styles.button, { backgroundColor: '#2196F3', marginTop: 12 }]}
+                  onPress={() => handleChat(r)}
+                >
+                  <Text style={styles.buttonText}>Chatear</Text>
+                </TouchableOpacity>
               </View>
             );
           })

@@ -1,10 +1,12 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/Auth';
+import TripDetails from '../Screens/Arrendatario/TripDetails';
 import BookingStep1Dates from '../Screens/Booking/BookingStep1Dates';
 import BookingStep2Location from '../Screens/Booking/BookingStep2Location';
 import BookingStep3Time from '../Screens/Booking/BookingStep3Time';
 import BookingStep4Confirmation from '../Screens/Booking/BookingStep4Confirmation';
+import ChatRoom from '../Screens/ChatRoom';
 import Details from '../Screens/Details';
 import HomeArrendatario from '../Screens/HomeArrendatario';
 import Login from '../Screens/Login';
@@ -98,29 +100,25 @@ export default function AppNavigation() {
             </Stack.Group>
           ) :
           // Stack para usuarios autenticados con guard por rol (arrendador/arrendatario)
-          isArrendador(userData?.role) ? (
-            // Stack para arrendadores autenticados
-            <Stack.Group>
-              <Stack.Screen name="PaymentSetup" component={PaymentSetup} />
-              <Stack.Screen name="ArrendadorStack" component={ArrendadorStack} />
-              <Stack.Screen name="Details" component={Details} />
-              <Stack.Screen name="BookingStep1Dates" component={BookingStep1Dates} />
-              <Stack.Screen name="BookingStep2Location" component={BookingStep2Location} />
-              <Stack.Screen name="BookingStep3Time" component={BookingStep3Time} />
-              <Stack.Screen name="BookingStep4Confirmation" component={BookingStep4Confirmation} />
-              {/* Fallback */}
-              <Stack.Screen name="Login" component={Login} />
-            </Stack.Group>
-          ) : (
-            <Stack.Group>
-              <Stack.Screen name="HomeArrendatario" component={HomeArrendatario} />
-              <Stack.Screen name="Details" component={Details} />
-              <Stack.Screen name="BookingStep1Dates" component={BookingStep1Dates} />
-              <Stack.Screen name="BookingStep2Location" component={BookingStep2Location} />
-              <Stack.Screen name="BookingStep3Time" component={BookingStep3Time} />
-              <Stack.Screen name="BookingStep4Confirmation" component={BookingStep4Confirmation} />
-            </Stack.Group>
-          )
+          <Stack.Group>
+            {/* Pantallas principales según rol */}
+            <Stack.Screen name="HomeArrendatario" component={HomeArrendatario} />
+            <Stack.Screen name="ArrendadorStack" component={ArrendadorStack} />
+            <Stack.Screen name="PaymentSetup" component={PaymentSetup} />
+            <Stack.Screen name="Details" component={Details} />
+
+            {/* Pantallas comunes para ambos roles */}
+            <Stack.Screen name="TripDetails" component={TripDetails} />
+            <Stack.Screen name="ChatRoom" component={ChatRoom} />
+            
+            {/* Flujo de Booking (Común o específico de arrendatario, pero accesible) */}
+            <Stack.Screen name="BookingStep1Dates" component={BookingStep1Dates} />
+            <Stack.Screen name="BookingStep2Location" component={BookingStep2Location} />
+            <Stack.Screen name="BookingStep3Time" component={BookingStep3Time} />
+            <Stack.Screen name="BookingStep4Confirmation" component={BookingStep4Confirmation} />
+            {/* Fallback */}
+            <Stack.Screen name="Login" component={Login} />
+          </Stack.Group>
         ) : (
           // Stack para usuarios no autenticados (auth flow)
           <Stack.Group>

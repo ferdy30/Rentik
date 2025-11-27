@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { colors } from '../constants/colors';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -29,16 +28,17 @@ const SearchBar: React.FC<SearchBarProps> = ({
     <View style={styles.container}>
       {/* Hero search input */}
       <View style={styles.searchInputContainer}>
-        <Ionicons name="search-outline" size={20} color="#6B7280" />
+        <Ionicons name="search" size={22} color="#0B729D" />
         <TextInput
           style={styles.searchInput}
-          placeholder="¿Dónde quieres ir?"
+          placeholder="Busca por marca, modelo..."
           placeholderTextColor="#9CA3AF"
           value={query}
           onChangeText={handleSearch}
         />
+        <View style={styles.divider} />
         <TouchableOpacity style={styles.filterButton} onPress={onFilterPress}>
-          <Ionicons name="options-outline" size={20} color={colors.primary} />
+          <Ionicons name="options-outline" size={22} color="#0B729D" />
           {selectedFilters.length > 0 && (
             <View style={styles.filterBadge}>
               <Text style={styles.filterBadgeText}>{selectedFilters.length}</Text>
@@ -79,25 +79,23 @@ export default SearchBar;
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingBottom: 16,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#0B729D',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   searchInput: {
     flex: 1,
@@ -106,15 +104,20 @@ const styles = StyleSheet.create({
     color: '#032B3C',
     fontWeight: '500',
   },
+  divider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 12,
+  },
   filterButton: {
     position: 'relative',
-    padding: 8,
-    marginLeft: 8,
+    padding: 4,
   },
   filterBadge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: 0,
+    right: 0,
     backgroundColor: '#EF4444',
     borderRadius: 8,
     minWidth: 16,
@@ -122,6 +125,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#fff',
   },
   filterBadgeText: {
     color: '#fff',
@@ -129,38 +134,30 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   chipsScrollView: {
-    marginTop: 12,
-    marginHorizontal: -20, // Extend to edges of parent container
+    marginTop: 16,
+    marginHorizontal: -20, 
     paddingHorizontal: 20,
   },
   chipsContainer: {
     flexDirection: 'row',
     gap: 10,
-    paddingRight: 20, // Extra padding at end for smooth scroll
+    paddingRight: 20, 
   },
   chip: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 24,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
     borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   chipSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.2,
-    elevation: 2,
+    backgroundColor: '#0B729D',
+    borderColor: '#0B729D',
   },
   chipText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#6B7280',
   },
   chipTextSelected: {

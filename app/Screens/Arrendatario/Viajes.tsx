@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
@@ -7,6 +7,7 @@ import {
     ScrollView,
     StatusBar,
     Text,
+    TouchableOpacity,
     View
 } from 'react-native';
 import { useAuth } from '../../../context/Auth';
@@ -14,6 +15,7 @@ import { getUserReservations, type Reservation } from '../../services/reservatio
 import { styles } from './styles';
 
 export default function ViajesScreen() {
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,33 +94,33 @@ export default function ViajesScreen() {
               : 'Vehículo';
 
             return (
-              <View key={res.id} style={styles.card}>
+              <TouchableOpacity 
+                key={res.id} 
+                style={styles.card}
+                onPress={() => navigation.navigate('TripDetails', { reservation: res })}
+                activeOpacity={0.7}
+              >
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={styles.cardTitle}>{vehicleName}</Text>
                   <View style={[{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, backgroundColor: statusInfo.color }]}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: statusInfo.textColor }}>{statusInfo.label}</Text>
                   </View>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                
+                <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                  <Text style={{ fontSize: 13, color: '#6B7280', marginLeft: 6 }}>
+                  <Text style={styles.cardDate}>
                     {formatDate(res.startDate)} - {formatDate(res.endDate)}
                   </Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                  <Ionicons name="pricetag-outline" size={16} color="#6B7280" />
-                  <Text style={{ fontSize: 13, color: '#6B7280', marginLeft: 6 }}>
-                    ${res.totalPrice.toFixed(2)}
+
+                <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="location-outline" size={16} color="#6B7280" />
+                  <Text style={styles.cardLocation} numberOfLines={1}>
+                    {res.pickupLocation || 'Ubicación por definir'}
                   </Text>
                 </View>
-                
-                {res.status === 'denied' && res.denialReason && (
-                  <View style={{ marginTop: 12, padding: 10, backgroundColor: '#FEF2F2', borderRadius: 8, borderWidth: 1, borderColor: '#FECACA' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#991B1B', marginBottom: 4 }}>Motivo del rechazo:</Text>
-                    <Text style={{ fontSize: 13, color: '#7F1D1D' }}>{res.denialReason}</Text>
-                  </View>
-                )}
-              </View>
+              </TouchableOpacity>
             );
           })
         )}

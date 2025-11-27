@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useState } from 'react';
 import {
-    Image,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    Text,
-    TouchableOpacity,
-    View
+  Image,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import EmptyState from '../../components/EmptyState';
@@ -23,16 +24,15 @@ import { styles } from './styles';
 
 const CATEGORIES = [
   { id: 'all', label: 'Todos', icon: 'grid-outline' },
-  { id: 'SUV', label: 'SUV', icon: 'car-sport-outline' },
-  { id: 'Sedán', label: 'Sedán', icon: 'car-outline' },
-  { id: 'Pickup', label: 'Pickup', icon: 'hammer-outline' },
-  { id: 'Hatchback', label: 'Hatchback', icon: 'car-sport-outline' },
-  { id: 'Minivan', label: 'Minivan', icon: 'bus-outline' },
+  { id: 'airport', label: 'Aeropuerto', icon: 'airplane-outline' },
+  { id: 'near_me', label: 'Cerca de mí', icon: 'location-outline' },
+  { id: 'top_rated', label: 'Más buscados', icon: 'star-outline' },
 ];
 
 const PROMOTIONS = [
-  { id: '1', title: '20% Descuento', subtitle: 'En tu primera renta', color: '#0B729D', image: 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=800&q=80' },
-  { id: '2', title: 'Viaja Seguro', subtitle: 'Seguro incluido', color: '#10B981', image: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=800&q=80' },
+  { id: '1', title: '20% OFF', subtitle: 'En tu primera renta', image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=800&q=80' },
+  { id: '2', title: 'Viaja Seguro', subtitle: 'Seguro incluido', image: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' },
+  { id: '3', title: 'Fin de Semana', subtitle: 'Ofertas especiales', image: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&q=80' },
 ];
 
 export default function BuscarScreen() {
@@ -108,7 +108,17 @@ export default function BuscarScreen() {
 
     // Category filter
     if (selectedCategory !== 'all') {
-      if (vehicle.tipo !== selectedCategory) return false;
+      if (selectedCategory === 'airport') {
+        if (!vehicle.ubicacion.toLowerCase().includes('aeropuerto')) return false;
+      }
+      if (selectedCategory === 'near_me') {
+        // Mock logic: In a real app, calculate distance from user location
+        // For demo, we'll show vehicles in 'San Salvador'
+        if (!vehicle.ubicacion.toLowerCase().includes('san salvador')) return false;
+      }
+      if (selectedCategory === 'top_rated') {
+        if (vehicle.rating < 4.5) return false;
+      }
     }
 
     // Advanced filters
@@ -188,22 +198,22 @@ export default function BuscarScreen() {
         onChipPress={() => {}}
       />
 
-      {/* Category Slider - Sticky */}
+      {/* Categories - Chips */}
       <View style={styles.categoryContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat.id}
               style={[
-                styles.categoryItem,
-                selectedCategory === cat.id && styles.categoryItemActive
+                styles.categoryChip,
+                selectedCategory === cat.id && styles.categoryChipActive
               ]}
               onPress={() => setSelectedCategory(cat.id)}
             >
               <Ionicons 
                 name={cat.icon as any} 
-                size={24} 
-                color={selectedCategory === cat.id ? '#0B729D' : '#6B7280'} 
+                size={18} 
+                color={selectedCategory === cat.id ? '#fff' : '#6B7280'} 
               />
               <Text style={[
                 styles.categoryLabel,
@@ -211,7 +221,6 @@ export default function BuscarScreen() {
               ]}>
                 {cat.label}
               </Text>
-              {selectedCategory === cat.id && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -227,12 +236,16 @@ export default function BuscarScreen() {
             <View style={styles.promoContainer}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promoList}>
                 {PROMOTIONS.map((promo) => (
-                  <TouchableOpacity key={promo.id} style={[styles.promoCard, { backgroundColor: promo.color }]}>
+                  <TouchableOpacity key={promo.id} style={styles.promoCard} activeOpacity={0.9}>
+                    <Image source={{ uri: promo.image }} style={styles.promoImage} />
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.8)']}
+                      style={styles.promoGradient}
+                    />
                     <View style={styles.promoContent}>
                       <Text style={styles.promoTitle}>{promo.title}</Text>
                       <Text style={styles.promoSubtitle}>{promo.subtitle}</Text>
                     </View>
-                    <Image source={{ uri: promo.image }} style={styles.promoImage} />
                   </TouchableOpacity>
                 ))}
               </ScrollView>

@@ -75,6 +75,10 @@ export const getOwnerReservations = async (arrendadorId: string): Promise<Reserv
 
 export const getVehicleReservations = async (vehicleId: string): Promise<Reservation[]> => {
   try {
+    if (!vehicleId) {
+      console.warn('getVehicleReservations called with empty vehicleId');
+      return [];
+    }
     // Query the public availability collection instead of restricted reservations
     const q = query(
       collection(db, 'availability'),
