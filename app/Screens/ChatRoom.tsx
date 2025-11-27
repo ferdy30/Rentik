@@ -16,7 +16,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/Auth';
-import { createChatIfNotExists, markChatAsRead, Message, sendMessage, subscribeToMessages } from '../services/chat';
+import { 
+    createChatIfNotExists, 
+    loadOlderMessages, 
+    markChatAsRead, 
+    Message, 
+    sendMessage, 
+    subscribeToRecentMessages 
+} from '../services/chat';
 
 export default function ChatRoom() {
     const navigation = useNavigation();
@@ -29,26 +36,41 @@ export default function ChatRoom() {
     const [loading, setLoading] = useState(true);
     const [sendingMessage, setSendingMessage] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const [lastVisible, setLastVisible] = useState<any>(null);
     const flatListRef = useRef<FlatList>(null);
+    const unsubscribeRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
-        let unsubscribe: (() => void) | undefined;
-
         const initChat = async () => {
             if (reservationId && participants && user) {
                 try {
                     setLoading(true);
                     setError(null);
                     
-                    await createChatIfNotExists(reservationId, participants, vehicleInfo);
+                    // Create participant names object (using basic names for now)
+                    const participantNames: { [key: string]: string } = {};
+                    participants.forEach(pid => {
+                        participantNames[pid] = 'Usuario';
+                    });
+                    
+                    await createChatIfNotExists(reservationId, participants, vehicleInfo, participantNames);
                     
                     // Mark chat as read when user opens it
                     await markChatAsRead(reservationId, user.uid);
                     
-                    unsubscribe = subscribeToMessages(reservationId, (newMessages) => {
-                        setMessages(newMessages);
-                        setLoading(false);
-                    });
+                    // Subscribe to recent messages with pagination
+                    unsubscribeRef.current = subscribeToRecentMessages(
+                        reservationId,
+                        20, // Initial load: 20 messages
+                        (newMessages, lastDoc) => {
+                            setMessages(newMessages);
+                            setLastVisible(lastDoc);
+                            setHasMore(newMessages.length === 20);
+                            setLoading(false);
+                        }
+                    );
                 } catch (error: any) {
                     console.error("Error initializing chat:", error);
                     setLoading(false);
@@ -67,11 +89,33 @@ export default function ChatRoom() {
         initChat();
 
         return () => {
-            if (unsubscribe) {
-                unsubscribe();
+            if (unsubscribeRef.current) {
+                unsubscribeRef.current();
             }
         };
-    }, [reservationId]);
+    }, [reservationId, participants, user, vehicleInfo]);
+
+    const loadMoreMessages = async () => {
+        if (loadingMore || !hasMore || !lastVisible) return;
+
+        setLoadingMore(true);
+        try {
+            const olderMessages = await loadOlderMessages(reservationId, lastVisible, 20);
+            
+            if (olderMessages.length > 0) {
+                setMessages(prev => [...prev, ...olderMessages]);
+                setLastVisible(olderMessages[olderMessages.length - 1]);
+                setHasMore(olderMessages.length === 20);
+            } else {
+                setHasMore(false);
+            }
+        } catch (error) {
+            console.error('Error loading more messages:', error);
+            Alert.alert('Error', 'No se pudieron cargar más mensajes');
+        } finally {
+            setLoadingMore(false);
+        }
+    };
 
     const handleSend = async () => {
         if (inputText.trim().length === 0 || !user || sendingMessage) return;
@@ -173,6 +217,20 @@ export default function ChatRoom() {
                         keyExtractor={item => item.id}
                         contentContainerStyle={styles.listContent}
                         inverted
+                        onEndReached={loadMoreMessages}
+                        onEndReachedThreshold={0.5}
+                        ListFooterComponent={
+                            loadingMore ? (
+                                <View style={styles.loadingMoreContainer}>
+                                    <ActivityIndicator size="small" color="#0B729D" />
+                                    <Text style={styles.loadingMoreText}>Cargando más mensajes...</Text>
+                                </View>
+                            ) : !hasMore && messages.length > 0 ? (
+                                <View style={styles.endContainer}>
+                                    <Text style={styles.endText}>Inicio de la conversación</Text>
+                                </View>
+                            ) : null
+                        }
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
                                 <Ionicons name="chatbubbles-outline" size={64} color="#D1D5DB" />
@@ -368,5 +426,25 @@ const styles = StyleSheet.create({
         marginTop: 4,
         fontSize: 14,
         color: '#6B7280',
+    },
+    loadingMoreContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 16,
+        gap: 8,
+    },
+    loadingMoreText: {
+        fontSize: 14,
+        color: '#6B7280',
+    },
+    endContainer: {
+        paddingVertical: 20,
+        alignItems: 'center',
+    },
+    endText: {
+        fontSize: 12,
+        color: '#9CA3AF',
+        fontStyle: 'italic',
     },
 });

@@ -2,13 +2,17 @@ import {
     addDoc,
     collection,
     doc,
+    DocumentSnapshot,
     getDoc,
+    getDocs,
     limit,
     onSnapshot,
     orderBy,
     query,
+    QueryDocumentSnapshot,
     serverTimestamp,
     setDoc,
+    startAfter,
     Timestamp,
     updateDoc,
     where
@@ -22,6 +26,8 @@ export interface Message {
   createdAt: Timestamp;
   read: boolean;
 }
+
+export type { QueryDocumentSnapshot, DocumentSnapshot };
 
 export interface Chat {
   id: string;
@@ -126,6 +132,58 @@ export const subscribeToMessages = (chatId: string, callback: (messages: Message
     } as Message));
     callback(messages);
   });
+};
+
+// New function: Subscribe to recent messages with pagination support
+export const subscribeToRecentMessages = (
+  chatId: string,
+  limitCount: number,
+  callback: (messages: Message[], lastDoc: QueryDocumentSnapshot | null) => void
+) => {
+  const q = query(
+    collection(db, 'chats', chatId, 'messages'),
+    orderBy('createdAt', 'desc'),
+    limit(limitCount)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const messages = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Message));
+    
+    const lastDoc = snapshot.docs.length > 0 
+      ? snapshot.docs[snapshot.docs.length - 1] 
+      : null;
+    
+    callback(messages, lastDoc);
+  });
+};
+
+// New function: Load older messages (pagination)
+export const loadOlderMessages = async (
+  chatId: string,
+  lastVisible: QueryDocumentSnapshot,
+  limitCount: number
+): Promise<Message[]> => {
+  try {
+    const q = query(
+      collection(db, 'chats', chatId, 'messages'),
+      orderBy('createdAt', 'desc'),
+      startAfter(lastVisible),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Message));
+  } catch (error) {
+    console.error('Error loading older messages:', error);
+    throw error;
+  }
 };
 
 export const subscribeToUserChats = (
