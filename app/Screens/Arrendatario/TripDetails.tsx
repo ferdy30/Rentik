@@ -103,8 +103,13 @@ export default function TripDetails() {
     };
 
     const handleCheckIn = () => {
-        Alert.alert('Check-in', 'Iniciando inspección del vehículo...');
-        // navigation.navigate('CheckInInspection', { reservationId: reservation.id });
+        // Verificar que la reserva esté confirmada
+        if (reservation.status !== 'confirmed') {
+            Alert.alert('Error', 'Solo puedes hacer check-in en reservas confirmadas.');
+            return;
+        }
+        
+        navigation.navigate('CheckInStart', { reservation });
     };
 
     return (
@@ -202,14 +207,98 @@ export default function TripDetails() {
 
                     <View style={styles.infoRow}>
                         <View style={styles.iconBox}>
-                            <Ionicons name="location-outline" size={20} color="#0B729D" />
+                            <Ionicons 
+                                name={reservation.isDelivery ? "car-sport-outline" : "location-outline"} 
+                                size={20} 
+                                color="#0B729D" 
+                            />
                         </View>
                         <View style={styles.infoContent}>
-                            <Text style={styles.infoLabel}>Ubicación de recogida</Text>
-                            <Text style={styles.infoValue}>{reservation.pickupLocation || 'Ubicación no disponible'}</Text>
+                            <Text style={styles.infoLabel}>
+                                {reservation.isDelivery ? 'Dirección de entrega' : 'Ubicación de recogida'}
+                            </Text>
+                            <Text style={styles.infoValue}>
+                                {reservation.isDelivery 
+                                    ? reservation.deliveryAddress 
+                                    : (reservation.pickupLocation || 'Ubicación no disponible')}
+                            </Text>
                         </View>
                     </View>
                 </View>
+
+                {/* Extras */}
+                {reservation.extras && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Extras contratados</Text>
+                        {reservation.extras.insurance && (
+                            <View style={styles.infoRow}>
+                                <View style={styles.iconBox}>
+                                    <Ionicons name="shield-checkmark-outline" size={20} color="#0B729D" />
+                                </View>
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Seguro</Text>
+                                    <Text style={styles.infoValue}>Seguro Premium</Text>
+                                </View>
+                            </View>
+                        )}
+                        {reservation.extras.babySeat && (
+                            <View style={styles.infoRow}>
+                                <View style={styles.iconBox}>
+                                    <Ionicons name="happy-outline" size={20} color="#0B729D" />
+                                </View>
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Accesorio</Text>
+                                    <Text style={styles.infoValue}>Silla de bebé</Text>
+                                </View>
+                            </View>
+                        )}
+                        {reservation.extras.gps && (
+                            <View style={styles.infoRow}>
+                                <View style={styles.iconBox}>
+                                    <Ionicons name="navigate-outline" size={20} color="#0B729D" />
+                                </View>
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Accesorio</Text>
+                                    <Text style={styles.infoValue}>GPS Navegador</Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {/* Price Breakdown */}
+                {reservation.priceBreakdown && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Resumen de pago</Text>
+                        <View style={{ gap: 8 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ color: '#4B5563' }}>Renta ({reservation.priceBreakdown.days} días)</Text>
+                                <Text style={{ fontWeight: '600' }}>${(reservation.priceBreakdown.pricePerDay * reservation.priceBreakdown.days).toFixed(2)}</Text>
+                            </View>
+                            {reservation.priceBreakdown.extrasTotal > 0 && (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text style={{ color: '#4B5563' }}>Extras</Text>
+                                    <Text style={{ fontWeight: '600' }}>${reservation.priceBreakdown.extrasTotal.toFixed(2)}</Text>
+                                </View>
+                            )}
+                            {reservation.priceBreakdown.deliveryFee > 0 && (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text style={{ color: '#4B5563' }}>Delivery</Text>
+                                    <Text style={{ fontWeight: '600' }}>${reservation.priceBreakdown.deliveryFee.toFixed(2)}</Text>
+                                </View>
+                            )}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ color: '#4B5563' }}>Tarifa de servicio</Text>
+                                <Text style={{ fontWeight: '600' }}>${reservation.priceBreakdown.serviceFee.toFixed(2)}</Text>
+                            </View>
+                            <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 4 }} />
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontWeight: '700', fontSize: 16 }}>Total</Text>
+                                <Text style={{ fontWeight: '700', fontSize: 16, color: '#0B729D' }}>${reservation.priceBreakdown.total.toFixed(2)}</Text>
+                            </View>
+                        </View>
+                    </View>
+                )}
 
                 {/* Map */}
                 <View style={styles.mapSection}>

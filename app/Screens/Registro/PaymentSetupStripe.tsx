@@ -1,24 +1,23 @@
 import {
-  createAccountLink,
-  createConnectedAccount,
-  getAccountStatus,
-  type StripeAccountData,
+    createAccountLink,
+    createConnectedAccount,
+    getAccountStatus,
+    type StripeAccountData,
 } from '@/app/services/stripe';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { doc, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Linking,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useAuth } from '../../../context/Auth';
@@ -44,7 +43,7 @@ export default function PaymentSetup({ navigation }: any) {
     }
     // Si ya completó Stripe onboarding y está verificado, ir al home
     if (userData?.stripe?.chargesEnabled) {
-      navigation.navigate('HomeArrendador');
+      navigation.navigate('ArrendadorStack');
     }
   }, [user, userData?.role, userData?.stripe?.chargesEnabled, navigation]);
 
@@ -292,9 +291,9 @@ export default function PaymentSetup({ navigation }: any) {
     <>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Ionicons name="card-outline" size={48} color="#fff" style={{ marginBottom: 8 }} />
+        <Ionicons name="card-outline" size={48} color={colors.primary} style={{ marginBottom: 8 }} />
         <Text style={styles.title}>Configura tu cuenta de pagos</Text>
         <Text style={styles.subtitle}>Necesario para recibir tus ganancias</Text>
       </View>
@@ -385,9 +384,10 @@ export default function PaymentSetup({ navigation }: any) {
 
       {/* CTA Button */}
       <TouchableOpacity
-        style={styles.connectButton}
-        onPress={() => void handleConnectStripe()}
+        style={[styles.connectButton, state !== 'initial' && styles.connectButtonDisabled]}
+        onPress={handleConnectStripe}
         disabled={state !== 'initial'}
+        activeOpacity={0.7}
       >
         {state === 'creating' ? (
           <ActivityIndicator color="#fff" />
@@ -505,7 +505,7 @@ export default function PaymentSetup({ navigation }: any) {
         style={[styles.connectButton, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', marginTop: 8 }]}
         onPress={() => {
           if (userData?.role === 'arrendador') {
-            navigation.navigate('HomeArrendador');
+            navigation.navigate('ArrendadorStack');
           } else {
             navigation.navigate('HomeArrendatario');
           }
@@ -560,7 +560,7 @@ export default function PaymentSetup({ navigation }: any) {
 
       <TouchableOpacity
         style={styles.connectButton}
-        onPress={() => navigation.navigate('HomeArrendador')}
+        onPress={() => navigation.navigate('ArrendadorStack')}
       >
         <Ionicons name="home" size={24} color="#fff" style={{ marginRight: 8 }} />
         <Text style={styles.connectButtonText}>Ir al inicio</Text>
@@ -574,13 +574,7 @@ export default function PaymentSetup({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-
-      <LinearGradient
-        colors={[colors.background.gradientStart, colors.background.gradientEnd]}
-        locations={[0.05, 0.82]}
-        style={styles.backgroundGradient}
-      />
+      <StatusBar barStyle="dark-content" />
 
       {onboardingUrl ? (
         <View style={{ flex: 1 }}>
@@ -635,14 +629,7 @@ export default function PaymentSetup({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  backgroundGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: '100%',
+    backgroundColor: '#fff',
   },
   scroll: {
     paddingHorizontal: 24,
@@ -662,13 +649,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#fff',
+    color: '#111827',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.85)',
+    color: '#6B7280',
     textAlign: 'center',
   },
   card: {
@@ -678,9 +665,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   infoIconWrap: {
     width: 40,
@@ -749,6 +738,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  connectButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   connectButtonText: {
     color: '#fff',
     fontSize: 17,
@@ -771,7 +766,7 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
+    color: '#9CA3AF',
     textAlign: 'center',
     lineHeight: 18,
   },

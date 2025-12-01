@@ -21,10 +21,23 @@ import { checkAvailability, createReservation, getVehicleReservations } from '..
 export default function BookingStep4Confirmation() {
     const navigation = useNavigation();
     const route = useRoute<any>();
-    const { vehicle, startDate, endDate, pickupLocation, returnLocation, pickupTime, returnTime } = route.params;
+    const { vehicle, startDate, endDate, pickupLocation, returnLocation, pickupTime, returnTime, isDelivery, deliveryAddress } = route.params;
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [extras, setExtras] = useState({
+        babySeat: false,
+        insurance: false,
+        gps: false
+    });
+
+    const EXTRAS_PRICES = {
+        babySeat: 10, // Flat fee
+        insurance: 15, // Per day
+        gps: 5 // Per day
+    };
+
+    const DELIVERY_FEE = 5;
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -36,14 +49,23 @@ export default function BookingStep4Confirmation() {
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         const days = diffDays > 0 ? diffDays : 1;
         
-        const subtotal = days * vehicle.precio;
+        const rentalCost = days * vehicle.precio;
+        
+        let extrasTotal = 0;
+        if (extras.babySeat) extrasTotal += EXTRAS_PRICES.babySeat;
+        if (extras.insurance) extrasTotal += EXTRAS_PRICES.insurance * days;
+        if (extras.gps) extrasTotal += EXTRAS_PRICES.gps * days;
+
+        const deliveryFee = isDelivery ? DELIVERY_FEE : 0;
+
+        const subtotal = rentalCost + extrasTotal + deliveryFee;
         const serviceFee = subtotal * 0.10; // 10% fee
         const total = subtotal + serviceFee;
 
-        return { days, subtotal, serviceFee, total };
+        return { days, rentalCost, extrasTotal, deliveryFee, serviceFee, total };
     };
 
-    const { days, subtotal, serviceFee, total } = calculateTotal();
+    const { days, rentalCost, extrasTotal, deliveryFee, serviceFee, total } = calculateTotal();
 
     const handleConfirm = async () => {
         if (!user) {
@@ -78,12 +100,24 @@ export default function BookingStep4Confirmation() {
                 returnLocation,
                 pickupTime: pTime.toISOString(),
                 returnTime: rTime.toISOString(),
+                isDelivery,
+                deliveryAddress,
                 messageToHost: message,
                 vehicleSnapshot: {
                     marca: vehicle.marca,
                     modelo: vehicle.modelo,
                     anio: vehicle.anio,
                     imagen: vehicle.imagenes?.[0] || vehicle.imagen
+                },
+                extras,
+                priceBreakdown: {
+                    days,
+                    pricePerDay: vehicle.precio,
+                    deliveryFee,
+                    extrasTotal,
+                    serviceFee,
+                    subtotal: rentalCost + extrasTotal + deliveryFee,
+                    total
                 }
             });
 
@@ -121,7 +155,7 @@ export default function BookingStep4Confirmation() {
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 <Text style={styles.stepTitle}>Paso 4 de 4</Text>
-                <Text style={styles.title}>Confirmar y pagar</Text>
+                <Text style={styles.title}>Confirmar y enviar</Text>
                 <Text style={styles.subtitle}>Revisa los detalles de tu reserva</Text>
 
                 {/* Vehicle Summary Card */}
@@ -176,13 +210,71 @@ export default function BookingStep4Confirmation() {
 
                     <View style={styles.detailRow}>
                         <View style={styles.detailIcon}>
-                            <Ionicons name="location-outline" size={20} color="#0B729D" />
+                            <Ionicons name={isDelivery ? "car-outline" : "location-outline"} size={20} color="#0B729D" />
                         </View>
                         <View style={styles.detailContent}>
-                            <Text style={styles.detailLabel}>Ubicación</Text>
-                            <Text style={styles.detailValue} numberOfLines={1}>{pickupLocation}</Text>
+                            <Text style={styles.detailLabel}>{isDelivery ? 'Entrega (Delivery)' : 'Ubicación de recogida'}</Text>
+                            <Text style={styles.detailValue} numberOfLines={2}>
+                                {isDelivery ? deliveryAddress : pickupLocation}
+                            </Text>
                         </View>
                     </View>
+                </View>
+
+                {/* Extras */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Extras opcionales</Text>
+                    
+                    <TouchableOpacity 
+                        style={styles.extraRow} 
+                        onPress={() => setExtras({...extras, insurance: !extras.insurance})}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.extraInfo}>
+                            <Text style={styles.extraTitle}>Seguro Premium</Text>
+                            <Text style={styles.extraDesc}>Cobertura total contra daños y robo.</Text>
+                            <Text style={styles.extraPrice}>${EXTRAS_PRICES.insurance}/día</Text>
+                        </View>
+                        <Ionicons 
+                            name={extras.insurance ? "checkbox" : "square-outline"} 
+                            size={24} 
+                            color={extras.insurance ? "#0B729D" : "#D1D5DB"} 
+                        />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={styles.extraRow} 
+                        onPress={() => setExtras({...extras, babySeat: !extras.babySeat})}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.extraInfo}>
+                            <Text style={styles.extraTitle}>Silla de bebé</Text>
+                            <Text style={styles.extraDesc}>Para niños de 0 a 4 años.</Text>
+                            <Text style={styles.extraPrice}>${EXTRAS_PRICES.babySeat} (pago único)</Text>
+                        </View>
+                        <Ionicons 
+                            name={extras.babySeat ? "checkbox" : "square-outline"} 
+                            size={24} 
+                            color={extras.babySeat ? "#0B729D" : "#D1D5DB"} 
+                        />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={styles.extraRow} 
+                        onPress={() => setExtras({...extras, gps: !extras.gps})}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.extraInfo}>
+                            <Text style={styles.extraTitle}>GPS Navegador</Text>
+                            <Text style={styles.extraDesc}>Mapas actualizados y tráfico en tiempo real.</Text>
+                            <Text style={styles.extraPrice}>${EXTRAS_PRICES.gps}/día</Text>
+                        </View>
+                        <Ionicons 
+                            name={extras.gps ? "checkbox" : "square-outline"} 
+                            size={24} 
+                            color={extras.gps ? "#0B729D" : "#D1D5DB"} 
+                        />
+                    </TouchableOpacity>
                 </View>
 
                 {/* Message to Host */}
@@ -206,8 +298,22 @@ export default function BookingStep4Confirmation() {
                     
                     <View style={styles.priceRow}>
                         <Text style={styles.priceLabel}>${vehicle.precio} x {days} días</Text>
-                        <Text style={styles.priceValue}>${subtotal.toFixed(2)}</Text>
+                        <Text style={styles.priceValue}>${rentalCost.toFixed(2)}</Text>
                     </View>
+
+                    {extrasTotal > 0 && (
+                        <View style={styles.priceRow}>
+                            <Text style={styles.priceLabel}>Extras seleccionados</Text>
+                            <Text style={styles.priceValue}>${extrasTotal.toFixed(2)}</Text>
+                        </View>
+                    )}
+
+                    {isDelivery && (
+                        <View style={styles.priceRow}>
+                            <Text style={styles.priceLabel}>Tarifa de entrega</Text>
+                            <Text style={styles.priceValue}>${deliveryFee.toFixed(2)}</Text>
+                        </View>
+                    )}
                     
                     <View style={styles.priceRow}>
                         <Text style={styles.priceLabel}>Tarifa de servicio Rentik</Text>
@@ -235,7 +341,7 @@ export default function BookingStep4Confirmation() {
                         <ActivityIndicator color="#fff" />
                     ) : (
                         <>
-                            <Text style={styles.confirmButtonText}>Confirmar y pagar</Text>
+                            <Text style={styles.confirmButtonText}>Confirmar y enviar</Text>
                             <Ionicons name="checkmark-circle" size={20} color="#fff" />
                         </>
                     )}
@@ -476,5 +582,36 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 18,
         fontWeight: '700',
+    },
+    extraRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        marginBottom: 12,
+    },
+    extraInfo: {
+        flex: 1,
+        marginRight: 16,
+    },
+    extraTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#111827',
+        marginBottom: 4,
+    },
+    extraDesc: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginBottom: 4,
+    },
+    extraPrice: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0B729D',
     },
 });

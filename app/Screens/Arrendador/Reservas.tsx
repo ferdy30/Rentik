@@ -37,6 +37,7 @@ export default function ReservasScreen() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'requests' | 'upcoming' | 'history'>('requests');
   
   // Modal state for denial
   const [modalVisible, setModalVisible] = useState(false);
@@ -246,6 +247,18 @@ export default function ReservasScreen() {
     );
   };
 
+  const getFilteredReservations = () => {
+    return reservations.filter(r => {
+      if (r.archived) return false;
+      if (activeTab === 'requests') return r.status === 'pending';
+      if (activeTab === 'upcoming') return r.status === 'confirmed';
+      if (activeTab === 'history') return ['completed', 'cancelled', 'denied'].includes(r.status);
+      return false;
+    });
+  };
+
+  const filteredReservations = getFilteredReservations();
+
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -260,18 +273,59 @@ export default function ReservasScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Reservas</Text>
       </View>
+
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'requests' && styles.activeTab]} 
+          onPress={() => setActiveTab('requests')}
+        >
+          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Solicitudes</Text>
+          {reservations.filter(r => r.status === 'pending' && !r.archived).length > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {reservations.filter(r => r.status === 'pending' && !r.archived).length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]} 
+          onPress={() => setActiveTab('upcoming')}
+        >
+          <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>Próximas</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'history' && styles.activeTab]} 
+          onPress={() => setActiveTab('history')}
+        >
+          <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>Historial</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView 
         style={styles.content} 
         contentContainerStyle={{ paddingBottom: 24, gap: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {reservations.length === 0 ? (
+        {filteredReservations.length === 0 ? (
           <View style={{ alignItems: 'center', marginTop: 50 }}>
-            <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-            <Text style={{ marginTop: 16, fontSize: 16, color: '#6B7280' }}>No tienes reservas aún.</Text>
+            <Ionicons 
+              name={
+                activeTab === 'requests' ? "notifications-outline" : 
+                activeTab === 'upcoming' ? "calendar-outline" : "time-outline"
+              } 
+              size={64} 
+              color="#D1D5DB" 
+            />
+            <Text style={{ marginTop: 16, fontSize: 16, color: '#6B7280' }}>
+              {activeTab === 'requests' ? 'No tienes solicitudes pendientes.' :
+               activeTab === 'upcoming' ? 'No tienes reservas próximas.' :
+               'No tienes historial de reservas.'}
+            </Text>
           </View>
         ) : (
-          reservations.filter(r => !r.archived).map((r) => {
+          filteredReservations.map((r) => {
             const statusInfo = getStatusInfo(r.status);
             const vehicleName = r.vehicleSnapshot 
               ? `${r.vehicleSnapshot.marca} ${r.vehicleSnapshot.modelo}`
@@ -360,9 +414,18 @@ export default function ReservasScreen() {
                 {/* Detalles de la reserva */}
                 <View style={styles.detailsSection}>
                   <View style={styles.detailRow}>
-                    <Ionicons name="location-outline" size={16} color="#6B7280" />
-                    <Text style={styles.detailText}>
-                      {r.pickupLocation || 'Por confirmar'}
+                    <Ionicons 
+                      name={r.isDelivery ? "car-sport-outline" : "location-outline"} 
+                      size={16} 
+                      color={r.isDelivery ? "#0B729D" : "#6B7280"} 
+                    />
+                    <Text style={[
+                      styles.detailText, 
+                      r.isDelivery && { color: '#0B729D', fontWeight: '600' }
+                    ]}>
+                      {r.isDelivery 
+                        ? `Entrega a domicilio: ${r.deliveryAddress}`
+                        : (r.pickupLocation || 'Por confirmar')}
                     </Text>
                   </View>
                   {r.pickupTime && (
@@ -421,20 +484,29 @@ export default function ReservasScreen() {
                 )}
                 
                 {r.status === 'confirmed' && (
-                  <TouchableOpacity 
-                    style={[styles.actionButton, styles.chatButtonFull]}
-                    onPress={() => handleChat(r)}
-                    disabled={loadingChat === r.id}
-                  >
-                    {loadingChat === r.id ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <Ionicons name="chatbubble" size={18} color="#fff" />
-                        <Text style={styles.buttonText}>Chatear con {renterProfile?.nombre || 'cliente'}</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                  <View style={{ gap: 8 }}>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: '#16A34A', width: '100%' }]}
+                      onPress={() => navigation.navigate('CheckInStart', { reservation: r })}
+                    >
+                      <Ionicons name="clipboard-outline" size={18} color="#fff" />
+                      <Text style={styles.buttonText}>Iniciar Check-in</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, styles.chatButtonFull]}
+                      onPress={() => handleChat(r)}
+                      disabled={loadingChat === r.id}
+                    >
+                      {loadingChat === r.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <Ionicons name="chatbubble" size={18} color="#fff" />
+                          <Text style={styles.buttonText}>Chatear con {renterProfile?.nombre || 'cliente'}</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 )}
                 
                 {(r.status === 'completed' || r.status === 'cancelled' || r.status === 'denied') && (
@@ -561,15 +633,52 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 10,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
     color: '#032B3C',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    gap: 16,
+  },
+  tab: {
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#0B729D',
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  activeTabText: {
+    color: '#0B729D',
+  },
+  badge: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   content: {
     flex: 1,

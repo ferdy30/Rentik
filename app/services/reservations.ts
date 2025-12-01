@@ -23,6 +23,8 @@ export interface Reservation {
   returnLocation?: string;
   pickupTime?: string;
   returnTime?: string;
+  isDelivery?: boolean;
+  deliveryAddress?: string;
   denialReason?: string;
     cancellationReason?: string;
   messageToHost?: string;
@@ -36,6 +38,20 @@ export interface Reservation {
     modelo: string;
     anio: number;
     imagen: string;
+  };
+  extras?: {
+    babySeat?: boolean;
+    insurance?: boolean;
+    gps?: boolean;
+  };
+  priceBreakdown?: {
+    days: number;
+    pricePerDay: number;
+    deliveryFee: number;
+    extrasTotal: number;
+    serviceFee: number;
+    subtotal: number;
+    total: number;
   };
 }
 

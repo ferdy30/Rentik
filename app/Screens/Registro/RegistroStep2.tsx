@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
     Alert,
@@ -119,13 +118,7 @@ export default function RegistroStep2({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-
-      <LinearGradient
-        colors={[colors.background.gradientStart, colors.background.gradientEnd]}
-        locations={[0.05, 0.82]}
-        style={styles.backgroundGradient}
-      />
+      <StatusBar barStyle="dark-content" />
 
       <KeyboardAvoidingView
         style={styles.content}
@@ -135,17 +128,17 @@ export default function RegistroStep2({ route, navigation }: any) {
           {/* Header con progreso */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#fff" />
+              <Ionicons name="arrow-back" size={24} color={colors.primary} />
             </TouchableOpacity>
             <View style={styles.progressContainer}>
-              <View style={styles.progressDot} />
+              <View style={[styles.progressDot, styles.progressDotDone]} />
               <View style={[styles.progressLine, styles.progressLineDone]} />
               <View style={[styles.progressDot, styles.progressDotActive]} />
               <View style={styles.progressLine} />
               <View style={styles.progressDot} />
             </View>
             <Text style={styles.stepText}>Paso 2 de 3</Text>
-            <Ionicons name="card-outline" size={48} color="#fff" style={{ marginVertical: 8 }} />
+            <Ionicons name="card-outline" size={48} color={colors.primary} style={{ marginVertical: 8 }} />
             <Text style={styles.title}>Verifica tu Licencia</Text>
             <Text style={styles.subtitle}>Necesitamos ambos lados de tu licencia</Text>
           </View>
@@ -154,44 +147,43 @@ export default function RegistroStep2({ route, navigation }: any) {
           <View style={styles.formContainer}>
             {/* Instrucciones */}
             <View style={styles.instructionsCard}>
-              <Text style={styles.instructionsTitle}>📋 Instrucciones</Text>
+              <View style={styles.instructionsHeader}>
+                <Text style={styles.instructionsTitle}>📋 Instrucciones para la foto</Text>
+              </View>
               <View style={styles.instructionsList}>
                 <View style={styles.instructionItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.instructionText}>Coloca tu licencia sobre una superficie plana</Text>
+                  <Ionicons name="sunny-outline" size={20} color={colors.primary} />
+                  <Text style={styles.instructionText}>Buena iluminación, sin flash</Text>
                 </View>
                 <View style={styles.instructionItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.instructionText}>Asegúrate de que haya buena iluminación</Text>
+                  <Ionicons name="scan-outline" size={20} color={colors.primary} />
+                  <Text style={styles.instructionText}>Enfoca bien el texto</Text>
                 </View>
                 <View style={styles.instructionItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.instructionText}>Evita reflejos y que se vea completa</Text>
-                </View>
-                <View style={styles.instructionItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.instructionText}>Verifica que el texto sea legible</Text>
+                  <Ionicons name="crop-outline" size={20} color={colors.primary} />
+                  <Text style={styles.instructionText}>Que se vea toda la tarjeta</Text>
                 </View>
               </View>
             </View>
 
             {/* Frente de la licencia */}
             <View style={styles.photoSection}>
-              <Text style={styles.photoLabel}>📸 Frente de la Licencia</Text>
+              <Text style={styles.photoLabel}>Frente de la Licencia</Text>
               {photoFront ? (
                 <View style={styles.photoPreviewContainer}>
                   <Image source={{ uri: photoFront }} style={styles.photoPreview} />
-                  <View style={styles.successBadge}>
-                    <Ionicons name="checkmark-circle" size={24} color={colors.status.success} />
-                    <Text style={styles.successText}>Foto capturada</Text>
+                  <View style={styles.photoOverlay}>
+                    <View style={styles.successBadge}>
+                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                      <Text style={styles.successText}>Listo</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.retakeButton}
+                      onPress={() => showImageOptions('front')}
+                    >
+                      <Ionicons name="refresh" size={20} color="#fff" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={styles.changePhotoButton}
-                    onPress={() => showImageOptions('front')}
-                  >
-                    <Ionicons name="camera" size={20} color="#fff" />
-                    <Text style={styles.changePhotoText}>Cambiar foto</Text>
-                  </TouchableOpacity>
                 </View>
               ) : (
                 <TouchableOpacity
@@ -199,30 +191,33 @@ export default function RegistroStep2({ route, navigation }: any) {
                   onPress={() => showImageOptions('front')}
                   disabled={isCapturing}
                 >
-                  <Ionicons name="camera-outline" size={48} color={colors.primary} />
+                  <View style={styles.addPhotoIconContainer}>
+                    <Ionicons name="camera" size={32} color={colors.primary} />
+                  </View>
                   <Text style={styles.addPhotoText}>Tomar foto del frente</Text>
-                  <Text style={styles.addPhotoSubtext}>o seleccionar de galería</Text>
+                  <Text style={styles.addPhotoSubtext}>Toca para capturar</Text>
                 </TouchableOpacity>
               )}
             </View>
 
             {/* Reverso de la licencia */}
             <View style={styles.photoSection}>
-              <Text style={styles.photoLabel}>📸 Reverso de la Licencia</Text>
+              <Text style={styles.photoLabel}>Reverso de la Licencia</Text>
               {photoBack ? (
                 <View style={styles.photoPreviewContainer}>
                   <Image source={{ uri: photoBack }} style={styles.photoPreview} />
-                  <View style={styles.successBadge}>
-                    <Ionicons name="checkmark-circle" size={24} color={colors.status.success} />
-                    <Text style={styles.successText}>Foto capturada</Text>
+                  <View style={styles.photoOverlay}>
+                    <View style={styles.successBadge}>
+                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                      <Text style={styles.successText}>Listo</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.retakeButton}
+                      onPress={() => showImageOptions('back')}
+                    >
+                      <Ionicons name="refresh" size={20} color="#fff" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={styles.changePhotoButton}
-                    onPress={() => showImageOptions('back')}
-                  >
-                    <Ionicons name="camera" size={20} color="#fff" />
-                    <Text style={styles.changePhotoText}>Cambiar foto</Text>
-                  </TouchableOpacity>
                 </View>
               ) : (
                 <TouchableOpacity
@@ -230,11 +225,13 @@ export default function RegistroStep2({ route, navigation }: any) {
                   onPress={() => showImageOptions('back')}
                   disabled={isCapturing || !photoFront}
                 >
-                  <Ionicons
-                    name="camera-outline"
-                    size={48}
-                    color={!photoFront ? '#D1D5DB' : colors.primary}
-                  />
+                  <View style={[styles.addPhotoIconContainer, !photoFront && styles.iconDisabled]}>
+                    <Ionicons 
+                      name="camera" 
+                      size={32} 
+                      color={!photoFront ? '#9CA3AF' : colors.primary} 
+                    />
+                  </View>
                   <Text
                     style={[styles.addPhotoText, !photoFront && styles.addPhotoTextDisabled]}
                   >
@@ -243,7 +240,7 @@ export default function RegistroStep2({ route, navigation }: any) {
                   <Text
                     style={[styles.addPhotoSubtext, !photoFront && styles.addPhotoTextDisabled]}
                   >
-                    {!photoFront ? 'Primero captura el frente' : 'o seleccionar de galería'}
+                    {!photoFront ? 'Primero captura el frente' : 'Toca para capturar'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -252,10 +249,15 @@ export default function RegistroStep2({ route, navigation }: any) {
             {/* Mensaje informativo */}
             {photoFront && photoBack && (
               <View style={styles.nextStepInfo}>
-                <Ionicons name="checkmark-done-circle-outline" size={20} color={colors.status.success} />
-                <Text style={[styles.nextStepText, { color: colors.status.success }]}>
-                  ¡Perfecto! Ambas fotos capturadas correctamente
-                </Text>
+                <Ionicons name="shield-checkmark" size={24} color={colors.status.success} />
+                <View style={{flex: 1}}>
+                  <Text style={[styles.nextStepText, { color: '#065F46', fontWeight: '600' }]}>
+                    ¡Documentos listos!
+                  </Text>
+                  <Text style={[styles.nextStepText, { color: '#065F46', fontSize: 13 }]}>
+                    Podemos proceder a verificar tu identidad.
+                  </Text>
+                </View>
               </View>
             )}
 
@@ -276,123 +278,74 @@ export default function RegistroStep2({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  backgroundGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: '100%',
-  },
-  content: {
-    flex: 1,
-    width: '100%',
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 40,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 10,
-    padding: 8,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  progressDotActive: {
-    backgroundColor: colors.accent,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-  },
-  progressLine: {
-    width: 40,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: 8,
-  },
-  progressLineDone: {
-    backgroundColor: colors.accent,
-  },
-  stepText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.85)',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  content: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  
+  // Header & Progress
+  header: { alignItems: 'center', marginBottom: 32 },
+  backButton: { position: 'absolute', left: 0, top: 0, padding: 8, zIndex: 10 },
+  
+  progressContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20, marginTop: 10 },
+  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5E7EB' },
+  progressDotActive: { backgroundColor: colors.primary, transform: [{ scale: 1.2 }] },
+  progressDotDone: { backgroundColor: colors.primary },
+  progressLine: { width: 30, height: 2, backgroundColor: '#E5E7EB', marginHorizontal: 4 },
+  progressLineDone: { backgroundColor: colors.primary },
+  
+  stepText: { color: colors.primary, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: '700', color: '#111827', textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#6B7280', marginTop: 4, textAlign: 'center' },
+
   formContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+    width: '100%',
   },
   instructionsCard: {
     backgroundColor: '#F0F9FF',
     borderRadius: 12,
-    padding: 16,
+    padding: 0,
     marginBottom: 24,
     borderWidth: 1,
     borderColor: '#BAE6FD',
+    overflow: 'hidden',
+  },
+  instructionsHeader: {
+    backgroundColor: '#E0F2FE',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#BAE6FD',
   },
   instructionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#032B3C',
-    marginBottom: 12,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0369A1',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   instructionsList: {
-    gap: 10,
+    padding: 16,
+    gap: 12,
   },
   instructionItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+    gap: 12,
   },
   instructionText: {
     flex: 1,
     fontSize: 14,
-    color: '#032B3C',
+    color: '#334155',
     lineHeight: 20,
+    fontWeight: '500',
   },
   photoSection: {
     marginBottom: 24,
   },
   photoLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#032B3C',
+    fontWeight: '700',
+    color: '#1F2937',
     marginBottom: 12,
   },
   addPhotoButton: {
@@ -401,96 +354,79 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#E5E7EB',
     borderStyle: 'dashed',
-    paddingVertical: 40,
+    paddingVertical: 32,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  addPhotoIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  iconDisabled: {
+    backgroundColor: '#F3F4F6',
   },
   addPhotoText: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.primary,
-    marginTop: 12,
   },
   addPhotoSubtext: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6B7280',
     marginTop: 4,
   },
   addPhotoButtonDisabled: {
-    opacity: 0.5,
-    borderColor: '#D1D5DB',
+    backgroundColor: '#F9FAFB',
+    borderColor: '#F3F4F6',
   },
   addPhotoTextDisabled: {
-    color: '#D1D5DB',
+    color: '#9CA3AF',
   },
   photoPreviewContainer: {
     position: 'relative',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   photoPreview: {
     width: '100%',
-    height: 200,
-    borderRadius: 16,
+    height: 220,
+    backgroundColor: '#000',
   },
-  changePhotoButton: {
+  photoOverlay: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  changePhotoText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  button: {
-    width: '100%',
-    height: 52,
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    flexDirection: 'row',
+  retakeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 4,
-  },
-  buttonDisabled: {
-    backgroundColor: '#D1D5DB',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
   },
   successBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(52, 199, 89, 0.1)',
-    borderRadius: 20,
-    marginTop: 12,
+    gap: 6,
   },
   successText: {
-    color: colors.status.success,
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -499,15 +435,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 16,
-    backgroundColor: 'rgba(11, 114, 157, 0.1)',
+    backgroundColor: '#ECFDF5',
     borderRadius: 12,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 8,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
   nextStepText: {
-    flex: 1,
-    color: colors.primary,
+    color: '#065F46',
     fontSize: 14,
     lineHeight: 20,
+  },
+  button: {
+    width: '100%',
+    height: 56,
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    gap: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buttonDisabled: {
+    backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

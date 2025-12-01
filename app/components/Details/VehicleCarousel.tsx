@@ -9,9 +9,10 @@ interface VehicleCarouselProps {
   images: string[];
   onBackPress: () => void;
   onSharePress: () => void;
+  onImagePress?: (index: number) => void;
 }
 
-export default function VehicleCarousel({ images, onBackPress, onSharePress }: VehicleCarouselProps) {
+export default function VehicleCarousel({ images, onBackPress, onSharePress, onImagePress }: VehicleCarouselProps) {
   const [imageIndex, setImageIndex] = useState(0);
 
   const handleScroll = (event: any) => {
@@ -31,13 +32,18 @@ export default function VehicleCarousel({ images, onBackPress, onSharePress }: V
         scrollEventThrottle={16}
       >
         {images.map((img: string, index: number) => (
-          <Image 
-            key={index}
-            source={{ uri: img }} 
-            style={styles.image}
-            contentFit="cover"
-            transition={500}
-          />
+          <TouchableOpacity 
+            key={index} 
+            activeOpacity={0.9} 
+            onPress={() => onImagePress && onImagePress(index)}
+          >
+            <Image 
+              source={{ uri: img }} 
+              style={styles.image}
+              contentFit="cover"
+              transition={500}
+            />
+          </TouchableOpacity>
         ))}
       </ScrollView>
       

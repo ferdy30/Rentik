@@ -7,6 +7,13 @@ import BookingStep2Location from '../Screens/Booking/BookingStep2Location';
 import BookingStep3Time from '../Screens/Booking/BookingStep3Time';
 import BookingStep4Confirmation from '../Screens/Booking/BookingStep4Confirmation';
 import ChatRoom from '../Screens/ChatRoom';
+import CheckInComplete from '../Screens/CheckIn/CheckInComplete';
+import CheckInConditions from '../Screens/CheckIn/CheckInConditions';
+import CheckInDamageReport from '../Screens/CheckIn/CheckInDamageReport';
+import CheckInKeys from '../Screens/CheckIn/CheckInKeys';
+import CheckInPhotos from '../Screens/CheckIn/CheckInPhotos';
+import CheckInSignature from '../Screens/CheckIn/CheckInSignature';
+import CheckInStart from '../Screens/CheckIn/CheckInStart';
 import Details from '../Screens/Details';
 import HomeArrendatario from '../Screens/HomeArrendatario';
 import Login from '../Screens/Login';
@@ -81,14 +88,7 @@ export default function AppNavigation() {
         }}
       >
         {user ? (
-          !roleKnown ? (
-            // Mientras aún no sabemos el rol (doc no creado o sincronizando), mantenemos Splash
-            <Stack.Group>
-              <Stack.Screen name="Splash" component={Splash} />
-              {/* Fallback: incluir Login para evitar acciones REPLACE no manejadas durante transiciones */}
-              <Stack.Screen name="Login" component={Login} />
-            </Stack.Group>
-          ) : isIncompleteProfile ? (
+          isIncompleteProfile ? (
             // Usuario autenticado pero con perfil incompleto: permitir completar registro (pasos 1-3)
             <Stack.Group>
               <Stack.Screen name="RegistroStep1" component={RegistroStep1} />
@@ -96,6 +96,13 @@ export default function AppNavigation() {
               <Stack.Screen name="RegistroAddress" component={RegistroAddress} />
               <Stack.Screen name="RegistroStep3" component={RegistroStep3} />
               {/* Fallback */}
+              <Stack.Screen name="Login" component={Login} />
+            </Stack.Group>
+          ) : !roleKnown ? (
+            // Mientras aún no sabemos el rol (doc no creado o sincronizando), mantenemos Splash
+            <Stack.Group>
+              <Stack.Screen name="Splash" component={Splash} />
+              {/* Fallback: incluir Login para evitar acciones REPLACE no manejadas durante transiciones */}
               <Stack.Screen name="Login" component={Login} />
             </Stack.Group>
           ) :
@@ -110,6 +117,15 @@ export default function AppNavigation() {
             {/* Pantallas comunes para ambos roles */}
             <Stack.Screen name="TripDetails" component={TripDetails} />
             <Stack.Screen name="ChatRoom" component={ChatRoom} />
+            
+            {/* Check-in Flow */}
+            <Stack.Screen name="CheckInStart" component={CheckInStart} />
+            <Stack.Screen name="CheckInPhotos" component={CheckInPhotos} />
+            <Stack.Screen name="CheckInConditions" component={CheckInConditions} />
+            <Stack.Screen name="CheckInDamageReport" component={CheckInDamageReport} />
+            <Stack.Screen name="CheckInKeys" component={CheckInKeys} />
+            <Stack.Screen name="CheckInSignature" component={CheckInSignature} />
+            <Stack.Screen name="CheckInComplete" component={CheckInComplete} />
             
             {/* Flujo de Booking (Común o específico de arrendatario, pero accesible) */}
             <Stack.Screen name="BookingStep1Dates" component={BookingStep1Dates} />

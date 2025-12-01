@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     KeyboardAvoidingView,
     Modal,
@@ -26,15 +25,19 @@ export default function RegistroStep1({ navigation }: Props) {
   const [apellido, setApellido] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  // const [confirmPassword, setConfirmPassword] = useState(''); // Eliminado por redundancia
   const [countryCode, setCountryCode] = useState('+503');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [birthday, setBirthday] = useState<Date | null>(null);
   const [showCodePicker, setShowCodePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState('');
+  
+  // Validation State
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [passwordStrength, setPasswordStrength] = useState(0);
+
   const isDefaultCode = countryCode === '+503' && !phoneNumber;
 
   const COUNTRY_CODES = [
@@ -48,93 +51,123 @@ export default function RegistroStep1({ navigation }: Props) {
     { code: '+1', name: 'EE.UU.', flag: '🇺🇸' },
   ];
 
-  const validateEmail = (email: string) => {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(email);
+  // Real-time validation effects
+  useEffect(() => {
+    if (touched.nombre) validateField('nombre', nombre);
+  }, [nombre]);
+
+  useEffect(() => {
+    if (touched.apellido) validateField('apellido', apellido);
+  }, [apellido]);
+
+  useEffect(() => {
+    if (touched.email) validateField('email', email);
+  }, [email]);
+
+  useEffect(() => {
+    validateField('password', password);
+    calculatePasswordStrength(password);
+  }, [password]);
+
+  useEffect(() => {
+    if (touched.phoneNumber) validateField('phoneNumber', phoneNumber);
+  }, [phoneNumber]);
+
+  useEffect(() => {
+    if (birthday) validateField('birthday', birthday);
+  }, [birthday]);
+
+  const calculatePasswordStrength = (pass: string) => {
+    let score = 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[a-z]/.test(pass)) score++;
+    if (/[0-9]/.test(pass)) score++;
+    if (/[^A-Za-z0-9]/.test(pass)) score++; // Bonus for special chars
+    setPasswordStrength(Math.min(score, 4));
   };
 
-  const validatePassword = (password: string) => {
-    // Al menos 8 caracteres, una mayúscula, una minúscula y un número
-    const minLength = password.length >= 8;
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasLowerCase = /[a-z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-    return minLength && hasUpperCase && hasLowerCase && hasNumber;
-  };
-
-  const validateAge = (birthDate: Date) => {
-    const today = new Date();
-    const age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      return age - 1 >= 18;
+  const validateField = (field: string, value: any) => {
+    let error = '';
+    switch (field) {
+      case 'nombre':
+        if (!value.trim()) error = 'Nombre es obligatorio';
+        else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(value.trim())) error = 'Solo letras permitidas';
+        else if (value.trim().length < 2) error = 'Mínimo 2 caracteres';
+        break;
+      case 'apellido':
+        if (!value.trim()) error = 'Apellido es obligatorio';
+        else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(value.trim())) error = 'Solo letras permitidas';
+        else if (value.trim().length < 2) error = 'Mínimo 2 caracteres';
+        break;
+      case 'email':
+        if (!value.trim()) error = 'Correo es obligatorio';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) error = 'Correo inválido';
+        break;
+      case 'password':
+        if (!value) error = 'Contraseña obligatoria';
+        else if (value.length < 8) error = 'Mínimo 8 caracteres';
+        else if (!/[A-Z]/.test(value)) error = 'Falta una mayúscula';
+        else if (!/[a-z]/.test(value)) error = 'Falta una minúscula';
+        else if (!/[0-9]/.test(value)) error = 'Falta un número';
+        break;
+      case 'phoneNumber':
+        if (!value.trim()) error = 'Teléfono obligatorio';
+        else if (value.replace(/[^0-9]/g, '').length < 8) error = 'Mínimo 8 dígitos';
+        break;
+      case 'birthday':
+        if (!value) error = 'Fecha obligatoria';
+        else {
+          const today = new Date();
+          const age = today.getFullYear() - value.getFullYear();
+          const m = today.getMonth() - value.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < value.getDate())) {
+            if (age - 1 < 18) error = 'Debes ser mayor de 18 años';
+          } else {
+            if (age < 18) error = 'Debes ser mayor de 18 años';
+          }
+        }
+        break;
     }
-    return age >= 18;
+    setErrors(prev => ({ ...prev, [field]: error }));
+    return error;
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    // Trigger validation on blur
+    switch(field) {
+        case 'nombre': validateField('nombre', nombre); break;
+        case 'apellido': validateField('apellido', apellido); break;
+        case 'email': validateField('email', email); break;
+        case 'phoneNumber': validateField('phoneNumber', phoneNumber); break;
+    }
   };
 
   const handleContinue = () => {
-    let errors = [];
+    // Mark all as touched
+    setTouched({
+      nombre: true,
+      apellido: true,
+      email: true,
+      password: true,
+      phoneNumber: true,
+      birthday: true,
+    });
 
-    // Validación de nombre y apellido
-    if (!nombre.trim()) {
-      errors.push('Nombre es obligatorio');
-    } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre.trim())) {
-      errors.push('El nombre solo puede contener letras');
-    } else if (nombre.trim().length < 2) {
-      errors.push('El nombre debe tener al menos 2 caracteres');
-    }
+    // Validate all
+    const e1 = validateField('nombre', nombre);
+    const e2 = validateField('apellido', apellido);
+    const e3 = validateField('email', email);
+    const e4 = validateField('password', password);
+    const e5 = validateField('phoneNumber', phoneNumber);
+    const e6 = validateField('birthday', birthday);
 
-    if (!apellido.trim()) {
-      errors.push('Apellido es obligatorio');
-    } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(apellido.trim())) {
-      errors.push('El apellido solo puede contener letras');
-    } else if (apellido.trim().length < 2) {
-      errors.push('El apellido debe tener al menos 2 caracteres');
-    }
-
-    // Validación de email
-    if (!email.trim()) {
-      errors.push('Correo electrónico es obligatorio');
-    } else if (!validateEmail(email)) {
-      errors.push('Correo electrónico no válido');
-    }
-
-    // Validación de contraseña
-    if (!password) {
-      errors.push('Contraseña es obligatoria');
-    } else if (!validatePassword(password)) {
-      errors.push('La contraseña debe tener: mínimo 8 caracteres, una mayúscula, una minúscula y un número');
-    }
-
-    if (!confirmPassword) {
-      errors.push('Confirmar contraseña es obligatorio');
-    } else if (password !== confirmPassword) {
-      errors.push('Las contraseñas no coinciden');
-    }
-
-    // Validación de teléfono
-    if (!phoneNumber.trim()) {
-      errors.push('Número de teléfono es obligatorio');
-    } else {
-      const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
-      if (cleanPhone.length < 8) {
-        errors.push('El teléfono debe tener al menos 8 dígitos');
-      }
-    }
-
-    // Validación de fecha de nacimiento
-    if (!birthday) {
-      errors.push('Fecha de cumpleaños es obligatoria');
-    } else if (!validateAge(birthday)) {
-      errors.push('Debes ser mayor de 18 años para registrarte');
-    }
-
-    if (errors.length > 0) {
-      setError(errors.join('\n• '));
+    if (e1 || e2 || e3 || e4 || e5 || e6) {
       return;
     }
 
-    // Pasar datos al siguiente paso (convertir Date a string ISO)
+    // Pasar datos al siguiente paso
     navigation.navigate('RegistroStep2', {
       nombre,
       apellido,
@@ -142,19 +175,27 @@ export default function RegistroStep1({ navigation }: Props) {
       password,
       countryCode,
       telefono: phoneNumber.replace(/[^0-9]/g, ''),
-      fechaNacimiento: birthday.toISOString(),
+      fechaNacimiento: birthday!.toISOString(),
     });
+  };
+
+  const getStrengthColor = () => {
+    if (passwordStrength <= 1) return '#EF4444'; // Red
+    if (passwordStrength === 2) return '#F59E0B'; // Yellow
+    if (passwordStrength === 3) return '#10B981'; // Green
+    return '#059669'; // Dark Green
+  };
+
+  const getStrengthLabel = () => {
+    if (passwordStrength <= 1) return 'Débil';
+    if (passwordStrength === 2) return 'Regular';
+    if (passwordStrength === 3) return 'Buena';
+    return 'Fuerte';
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-
-      <LinearGradient
-        colors={[colors.background.gradientStart, colors.background.gradientEnd]}
-        locations={[0.05, 0.82]}
-        style={styles.backgroundGradient}
-      />
+      <StatusBar barStyle="dark-content" />
 
       <KeyboardAvoidingView
         style={styles.content}
@@ -167,7 +208,7 @@ export default function RegistroStep1({ navigation }: Props) {
           {/* Header con progreso */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#fff" />
+              <Ionicons name="arrow-back" size={24} color={colors.primary} />
             </TouchableOpacity>
             <View style={styles.progressContainer}>
               <View style={[styles.progressDot, styles.progressDotActive]} />
@@ -184,7 +225,7 @@ export default function RegistroStep1({ navigation }: Props) {
           {/* Formulario */}
           <View style={styles.formContainer}>
             {/* Nombre */}
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, touched.nombre && errors.nombre ? styles.inputError : null]}>
               <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
@@ -192,11 +233,14 @@ export default function RegistroStep1({ navigation }: Props) {
                 placeholderTextColor="#9CA3AF"
                 value={nombre}
                 onChangeText={setNombre}
+                onBlur={() => handleBlur('nombre')}
               />
+              {touched.nombre && !errors.nombre && nombre.length > 0 && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
             </View>
+            {touched.nombre && errors.nombre && <Text style={styles.errorText}>{errors.nombre}</Text>}
 
             {/* Apellido */}
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, touched.apellido && errors.apellido ? styles.inputError : null]}>
               <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
@@ -204,11 +248,14 @@ export default function RegistroStep1({ navigation }: Props) {
                 placeholderTextColor="#9CA3AF"
                 value={apellido}
                 onChangeText={setApellido}
+                onBlur={() => handleBlur('apellido')}
               />
+              {touched.apellido && !errors.apellido && apellido.length > 0 && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
             </View>
+            {touched.apellido && errors.apellido && <Text style={styles.errorText}>{errors.apellido}</Text>}
 
             {/* Correo */}
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, touched.email && errors.email ? styles.inputError : null]}>
               <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
@@ -218,11 +265,14 @@ export default function RegistroStep1({ navigation }: Props) {
                 keyboardType="email-address"
                 value={email}
                 onChangeText={setEmail}
+                onBlur={() => handleBlur('email')}
               />
+              {touched.email && !errors.email && email.length > 0 && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
             </View>
+            {touched.email && errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
 
             {/* Teléfono */}
-            <View style={[styles.inputWrapper, { paddingHorizontal: 0 }]}>
+            <View style={[styles.inputWrapper, { paddingHorizontal: 0 }, touched.phoneNumber && errors.phoneNumber ? styles.inputError : null]}>
               <View style={styles.phoneRow}>
                 <TouchableOpacity style={styles.codeBox} onPress={() => setShowCodePicker(true)}>
                   <Text style={[styles.codeText, isDefaultCode && styles.placeholderText]}>{countryCode}</Text>
@@ -235,17 +285,24 @@ export default function RegistroStep1({ navigation }: Props) {
                   keyboardType="phone-pad"
                   value={phoneNumber}
                   onChangeText={(t) => setPhoneNumber(t.replace(/[^0-9]/g, ''))}
+                  onBlur={() => handleBlur('phoneNumber')}
                 />
               </View>
             </View>
+            {touched.phoneNumber && errors.phoneNumber && <Text style={styles.errorText}>{errors.phoneNumber}</Text>}
 
             {/* Cumpleaños */}
-            <TouchableOpacity style={styles.inputWrapper} onPress={() => setShowDatePicker(true)}>
+            <TouchableOpacity 
+              style={[styles.inputWrapper, touched.birthday && errors.birthday ? styles.inputError : null]} 
+              onPress={() => setShowDatePicker(true)}
+            >
               <Ionicons name="calendar-outline" size={20} color="#6B7280" style={styles.inputIcon} />
               <Text style={[styles.input, styles.dateText, !birthday && styles.placeholderText]}>
                 {birthday ? birthday.toLocaleDateString('es-SV', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Fecha de cumpleaños'}
               </Text>
+              {touched.birthday && !errors.birthday && birthday && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
             </TouchableOpacity>
+            {touched.birthday && errors.birthday && <Text style={styles.errorText}>{errors.birthday}</Text>}
 
             {/* Android: DatePicker directo */}
             {showDatePicker && Platform.OS === 'android' && (
@@ -258,13 +315,14 @@ export default function RegistroStep1({ navigation }: Props) {
                   setShowDatePicker(false);
                   if (event.type === 'set' && date) {
                     setBirthday(date);
+                    handleBlur('birthday');
                   }
                 }}
               />
             )}
 
             {/* Contraseña */}
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, touched.password && errors.password ? styles.inputError : null]}>
               <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
@@ -273,37 +331,42 @@ export default function RegistroStep1({ navigation }: Props) {
                 secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={setPassword}
+                onBlur={() => handleBlur('password')}
               />
               <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6B7280" />
               </TouchableOpacity>
             </View>
-
-            {/* Confirmar Contraseña */}
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirmar Contraseña"
-                placeholderTextColor="#9CA3AF"
-                secureTextEntry={!showConfirmPassword}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                <Ionicons
-                  name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color="#6B7280"
-                />
-              </TouchableOpacity>
+            
+            {/* Password Strength Meter */}
+            {password.length > 0 && (
+              <View style={styles.strengthContainer}>
+                <View style={styles.strengthBarContainer}>
+                  <View style={[styles.strengthBar, { width: `${(passwordStrength / 4) * 100}%`, backgroundColor: getStrengthColor() }]} />
+                </View>
+                <Text style={[styles.strengthText, { color: getStrengthColor() }]}>
+                  {getStrengthLabel()}
+                </Text>
+              </View>
+            )}
+            
+            {touched.password && errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+            
+            <View style={styles.passwordRequirements}>
+              <Text style={styles.reqTitle}>La contraseña debe tener:</Text>
+              <View style={styles.reqItem}>
+                <Ionicons name={password.length >= 8 ? "checkmark-circle" : "ellipse-outline"} size={14} color={password.length >= 8 ? colors.status.success : "#9CA3AF"} />
+                <Text style={[styles.reqText, password.length >= 8 && styles.reqTextActive]}>Mínimo 8 caracteres</Text>
+              </View>
+              <View style={styles.reqItem}>
+                <Ionicons name={/[A-Z]/.test(password) ? "checkmark-circle" : "ellipse-outline"} size={14} color={/[A-Z]/.test(password) ? colors.status.success : "#9CA3AF"} />
+                <Text style={[styles.reqText, /[A-Z]/.test(password) && styles.reqTextActive]}>Una mayúscula</Text>
+              </View>
+              <View style={styles.reqItem}>
+                <Ionicons name={/[0-9]/.test(password) ? "checkmark-circle" : "ellipse-outline"} size={14} color={/[0-9]/.test(password) ? colors.status.success : "#9CA3AF"} />
+                <Text style={[styles.reqText, /[0-9]/.test(password) && styles.reqTextActive]}>Un número</Text>
+              </View>
             </View>
-
-            {/* Mensaje de error */}
-            {error ? <Text style={styles.error}>• {error}</Text> : null}
 
             {/* Botón continuar */}
             <TouchableOpacity style={styles.button} onPress={handleContinue}>
@@ -383,84 +446,26 @@ export default function RegistroStep1({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  backgroundGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: '100%',
-  },
-  content: {
-    flex: 1,
-    width: '100%',
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 40,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 10,
-    padding: 8,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  progressDotActive: {
-    backgroundColor: colors.accent,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-  },
-  progressLine: {
-    width: 40,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: 8,
-  },
-  stepText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.85)',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  content: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  
+  // Header & Progress
+  header: { alignItems: 'center', marginBottom: 32 },
+  backButton: { position: 'absolute', left: 0, top: 0, padding: 8, zIndex: 10 },
+  
+  progressContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20, marginTop: 10 },
+  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5E7EB' },
+  progressDotActive: { backgroundColor: colors.primary, transform: [{ scale: 1.2 }] },
+  progressLine: { width: 30, height: 2, backgroundColor: '#E5E7EB', marginHorizontal: 4 },
+  
+  stepText: { color: colors.primary, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: '700', color: '#111827', textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#6B7280', marginTop: 4, textAlign: 'center' },
+
+  // Form Container
   formContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+    width: '100%',
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -468,39 +473,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     paddingHorizontal: 15,
-    marginBottom: 15,
-    height: 50,
+    marginBottom: 16,
+    height: 56,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
+  inputError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 12,
+    marginLeft: 4,
+  },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    height: 50,
-    color: '#032B3C',
+    height: '100%',
+    color: '#111827',
     fontSize: 16,
     fontWeight: '500',
-    backgroundColor: 'transparent',
   },
   phoneRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    height: '100%',
   },
   codeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    height: 50,
+    height: '100%',
     borderRightWidth: 1,
     borderRightColor: '#E5E7EB',
   },
   codeText: {
     fontSize: 16,
-    color: '#032B3C',
+    color: '#111827',
     fontWeight: '600',
   },
   phoneInput: {
@@ -508,7 +524,8 @@ const styles = StyleSheet.create({
   },
   dateText: {
     textAlignVertical: 'center',
-    color: '#032B3C',
+    color: '#111827',
+    fontSize: 16,
   },
   placeholderText: {
     color: '#9CA3AF',
@@ -516,38 +533,85 @@ const styles = StyleSheet.create({
   eyeButton: {
     padding: 8,
   },
-  error: {
-    color: '#EF4444',
-    marginBottom: 12,
-    fontSize: 14,
-    lineHeight: 20,
+  strengthContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  strengthBarContainer: {
+    flex: 1,
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    marginRight: 10,
+    overflow: 'hidden',
+  },
+  strengthBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  strengthText: {
+    fontSize: 12,
+    fontWeight: '600',
+    width: 50,
+    textAlign: 'right',
+  },
+  passwordRequirements: {
+    marginBottom: 24,
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  reqTitle: {
+    fontSize: 13,
+    color: '#4B5563',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  reqItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  reqText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+  },
+  reqTextActive: {
+    color: '#374151',
+    fontWeight: '500',
   },
   button: {
     width: '100%',
-    height: 52,
+    height: 56,
     backgroundColor: colors.primary,
-    borderRadius: 14,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 8,
     gap: 8,
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 4,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
   },
   linkContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: 24,
   },
   link: {
     color: '#6B7280',
@@ -564,31 +628,37 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#032B3C',
-    marginBottom: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 20,
     textAlign: 'center',
   },
   modalItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
-    gap: 12,
+    gap: 16,
   },
   modalItemFlag: {
-    fontSize: 24,
+    fontSize: 28,
   },
   modalItemText: {
     flex: 1,
     fontSize: 16,
-    color: '#032B3C',
+    color: '#111827',
+    fontWeight: '500',
   },
   modalItemCode: {
     fontSize: 16,
@@ -596,15 +666,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modalClose: {
-    marginTop: 16,
+    marginTop: 20,
     alignSelf: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: colors.primary,
+    backgroundColor: '#F3F4F6',
   },
   modalCloseText: {
-    color: '#fff',
+    color: '#374151',
     fontWeight: '600',
     fontSize: 16,
   },

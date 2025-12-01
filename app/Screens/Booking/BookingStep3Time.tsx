@@ -14,7 +14,7 @@ import {
 export default function BookingStep3Time() {
     const navigation = useNavigation();
     const route = useRoute<any>();
-    const { vehicle, startDate, endDate, pickupLocation, returnLocation } = route.params;
+    const { vehicle, startDate, endDate, pickupLocation, returnLocation, isDelivery, deliveryAddress } = route.params;
 
     const [pickupTime, setPickupTime] = useState(new Date(new Date().setHours(10, 0, 0, 0)));
     const [returnTime, setReturnTime] = useState(new Date(new Date().setHours(10, 0, 0, 0)));
@@ -51,7 +51,9 @@ export default function BookingStep3Time() {
             pickupLocation,
             returnLocation,
             pickupTime: pickupTime.toISOString(),
-            returnTime: returnTime.toISOString()
+            returnTime: returnTime.toISOString(),
+            isDelivery,
+            deliveryAddress
         } as never);
     };
 

@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { LinearGradient } from 'expo-linear-gradient';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
@@ -118,30 +117,7 @@ export default function RegistroStep3({ route, navigation }: any) {
         console.log('[AUTH] Esperando sesión activa para Storage...');
       }
 
-      // 2. Crear documento del usuario de forma temprana para que el rol esté disponible al contexto
-      try {
-        await setDoc(doc(db, 'users', userId), {
-          nombre: userData.nombre,
-          apellido: userData.apellido,
-          email: userData.email,
-          telefono: `${userData.countryCode}${userData.telefono}`,
-          fechaNacimiento: userData.fechaNacimiento,
-          role: selectedRole,
-          profileComplete: false,
-          vehicleProfileComplete: false,
-          terminosAceptados: {
-            aceptado: true,
-            fecha: new Date().toISOString(),
-            version: '1.0',
-          },
-          address: userData.address || null,
-          createdAt: new Date().toISOString(),
-        }, { merge: true });
-      } catch (e) {
-        console.warn('[USER_DOC] early create failed, will try again later', e);
-      }
-
-      // 3. Subir fotos de licencia
+      // 2. Subir fotos de licencia primero
       const licenseFrontURL = await uploadLicensePhoto(
         userData.licensePhotos.front,
         userId,
@@ -149,7 +125,7 @@ export default function RegistroStep3({ route, navigation }: any) {
       );
       const licenseBackURL = await uploadLicensePhoto(userData.licensePhotos.back, userId, 'back');
 
-      // 3.1 Subir un manifest.json con claves ordenadas a Storage
+      // 2.1 Subir un manifest.json con claves ordenadas a Storage
       try {
         const manifest = sortObjectDeep({
           version: '1.0',
@@ -170,7 +146,7 @@ export default function RegistroStep3({ route, navigation }: any) {
         console.warn('[MANIFEST] failed to upload manifest.json', e);
       }
 
-      // 4. Completar y actualizar datos del usuario en Firestore
+      // 3. Crear documento del usuario UNA SOLA VEZ con profileComplete: true
       await setDoc(doc(db, 'users', userId), {
         nombre: userData.nombre,
         apellido: userData.apellido,
@@ -186,8 +162,14 @@ export default function RegistroStep3({ route, navigation }: any) {
         address: userData.address || null,
         profileComplete: true, // Perfil completo después del registro
         vehicleProfileComplete: false, // Arrendadores pueden agregar vehículos desde el Home
+        terminosAceptados: {
+          aceptado: true,
+          fecha: new Date().toISOString(),
+          version: '1.0',
+        },
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      });
 
       setLoading(false);
 
@@ -212,13 +194,7 @@ export default function RegistroStep3({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-
-      <LinearGradient
-        colors={[colors.background.gradientStart, colors.background.gradientEnd]}
-        locations={[0.05, 0.82]}
-        style={styles.backgroundGradient}
-      />
+      <StatusBar barStyle="dark-content" />
 
       <KeyboardAvoidingView
         style={styles.content}
@@ -228,24 +204,24 @@ export default function RegistroStep3({ route, navigation }: any) {
           {/* Header con progreso */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#fff" />
+              <Ionicons name="arrow-back" size={24} color={colors.primary} />
             </TouchableOpacity>
             <View style={styles.progressContainer}>
-              <View style={styles.progressDot} />
+              <View style={[styles.progressDot, styles.progressDotDone]} />
               <View style={[styles.progressLine, styles.progressLineDone]} />
-              <View style={styles.progressDot} />
+              <View style={[styles.progressDot, styles.progressDotDone]} />
               <View style={[styles.progressLine, styles.progressLineDone]} />
               <View style={[styles.progressDot, styles.progressDotActive]} />
             </View>
             <Text style={styles.stepText}>Paso 3 de 3</Text>
-            <Ionicons name="people-outline" size={48} color="#fff" style={{ marginVertical: 8 }} />
+            <Ionicons name="people-outline" size={48} color={colors.primary} style={{ marginVertical: 8 }} />
             <Text style={styles.title}>Elige tu Rol</Text>
             <Text style={styles.subtitle}>¿Cómo quieres usar Rentik?</Text>
           </View>
 
           {/* Formulario */}
           <View style={styles.formContainer}>
-            {/* Opción Arrendatario */}
+            {/* Opción Viajero */}
             <TouchableOpacity
               style={[
                 styles.roleCard,
@@ -254,101 +230,62 @@ export default function RegistroStep3({ route, navigation }: any) {
               onPress={() => setSelectedRole('arrendatario')}
               disabled={loading}
             >
-              <View style={styles.roleHeader}>
-                <View
-                  style={[
-                    styles.roleIcon,
-                    selectedRole === 'arrendatario' && styles.roleIconSelected,
-                  ]}
-                >
-                  <Ionicons
-                    name="key"
-                    size={32}
-                    color={selectedRole === 'arrendatario' ? '#fff' : colors.primary}
-                  />
-                </View>
-                <View style={styles.radioContainer}>
-                  <View
-                    style={[
-                      styles.radioOuter,
-                      selectedRole === 'arrendatario' && styles.radioOuterSelected,
-                    ]}
-                  >
-                    {selectedRole === 'arrendatario' && <View style={styles.radioInner} />}
-                  </View>
-                </View>
+              <View style={styles.roleContent}>
+                 <View style={[styles.iconContainer, selectedRole === 'arrendatario' && styles.iconContainerSelected]}>
+                    <Ionicons name="map" size={40} color={selectedRole === 'arrendatario' ? '#fff' : colors.primary} />
+                 </View>
+                 <View style={styles.textContainer}>
+                    <Text style={styles.roleTitle}>Viajero</Text>
+                    <Text style={styles.roleSubtitle}>Explora, reserva y viaja seguro con nuestra cobertura total incluida.</Text>
+                 </View>
+                 <View style={styles.radioContainer}>
+                    <View style={[styles.radioOuter, selectedRole === 'arrendatario' && styles.radioOuterSelected]}>
+                        {selectedRole === 'arrendatario' && <View style={styles.radioInner} />}
+                    </View>
+                 </View>
               </View>
-              <Text style={styles.roleTitle}>Arrendatario</Text>
-              <Text style={styles.roleSubtitle}>Rento vehículos</Text>
-              <Text style={styles.roleDescription}>
-                Puedo buscar y rentar vehículos disponibles de otros usuarios. Perfecto si necesitas
-                un auto por días, semanas o meses.
-              </Text>
-              <View style={styles.featuresList}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.featureText}>Buscar vehículos cercanos</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.featureText}>Reservar de forma segura</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.featureText}>Calificar y comentar</Text>
-                </View>
+              {/* Visual cues instead of text heavy description */}
+              <View style={styles.visualFeatures}>
+                  <View style={styles.visualTag}>
+                      <Ionicons name="car-outline" size={16} color={colors.primary} />
+                      <Text style={styles.visualTagText}>Autos únicos</Text>
+                  </View>
+                  <View style={styles.visualTag}>
+                      <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
+                      <Text style={styles.visualTagText}>Seguro incluido</Text>
+                  </View>
               </View>
             </TouchableOpacity>
 
-            {/* Opción Arrendador */}
+            {/* Opción Host */}
             <TouchableOpacity
               style={[styles.roleCard, selectedRole === 'arrendador' && styles.roleCardSelected]}
               onPress={() => setSelectedRole('arrendador')}
               disabled={loading}
             >
-              <View style={styles.roleHeader}>
-                <View
-                  style={[
-                    styles.roleIcon,
-                    selectedRole === 'arrendador' && styles.roleIconSelected,
-                  ]}
-                >
-                  <Ionicons
-                    name="car"
-                    size={32}
-                    color={selectedRole === 'arrendador' ? '#fff' : colors.primary}
-                  />
-                </View>
-                <View style={styles.radioContainer}>
-                  <View
-                    style={[
-                      styles.radioOuter,
-                      selectedRole === 'arrendador' && styles.radioOuterSelected,
-                    ]}
-                  >
-                    {selectedRole === 'arrendador' && <View style={styles.radioInner} />}
-                  </View>
-                </View>
+              <View style={styles.roleContent}>
+                 <View style={[styles.iconContainer, selectedRole === 'arrendador' && styles.iconContainerSelected]}>
+                    <Ionicons name="car-sport" size={40} color={selectedRole === 'arrendador' ? '#fff' : colors.primary} />
+                 </View>
+                 <View style={styles.textContainer}>
+                    <Text style={styles.roleTitle}>Host</Text>
+                    <Text style={styles.roleSubtitle}>Genera ingresos extra rentando tu vehículo a conductores verificados.</Text>
+                 </View>
+                 <View style={styles.radioContainer}>
+                    <View style={[styles.radioOuter, selectedRole === 'arrendador' && styles.radioOuterSelected]}>
+                        {selectedRole === 'arrendador' && <View style={styles.radioInner} />}
+                    </View>
+                 </View>
               </View>
-              <Text style={styles.roleTitle}>Arrendador</Text>
-              <Text style={styles.roleSubtitle}>Rento mis vehículos</Text>
-              <Text style={styles.roleDescription}>
-                Puedo publicar mis vehículos y generar ingresos rentándolos a otros usuarios.
-                Controla disponibilidad, precios y aprueba reservas.
-              </Text>
-              <View style={styles.featuresList}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.featureText}>Publicar tus vehículos</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.featureText}>Generar ingresos pasivos</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                  <Text style={styles.featureText}>Gestionar tus rentas</Text>
-                </View>
+               <View style={styles.visualFeatures}>
+                  <View style={styles.visualTag}>
+                      <Ionicons name="cash-outline" size={16} color={colors.primary} />
+                      <Text style={styles.visualTagText}>Gana dinero</Text>
+                  </View>
+                  <View style={styles.visualTag}>
+                      <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+                      <Text style={styles.visualTagText}>Tu horario</Text>
+                  </View>
               </View>
             </TouchableOpacity>
 
@@ -396,123 +333,85 @@ export default function RegistroStep3({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  backgroundGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: '100%',
-  },
-  content: {
-    flex: 1,
-    width: '100%',
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 40,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 10,
-    padding: 8,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  progressDotActive: {
-    backgroundColor: colors.accent,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-  },
-  progressLine: {
-    width: 40,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: 8,
-  },
-  progressLineDone: {
-    backgroundColor: colors.accent,
-  },
-  stepText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.85)',
-  },
-  formContainer: {
-    gap: 16,
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  content: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  
+  // Header & Progress
+  header: { alignItems: 'center', marginBottom: 32 },
+  backButton: { position: 'absolute', left: 0, top: 0, padding: 8, zIndex: 10 },
+  progressContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20, marginTop: 10 },
+  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5E7EB' },
+  progressDotActive: { backgroundColor: colors.primary, transform: [{ scale: 1.2 }] },
+  progressDotDone: { backgroundColor: colors.primary },
+  progressLine: { width: 30, height: 2, backgroundColor: '#E5E7EB', marginHorizontal: 4 },
+  progressLineDone: { backgroundColor: colors.primary },
+  
+  stepText: { color: colors.primary, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: '700', color: '#111827', textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#6B7280', marginTop: 4, textAlign: 'center' },
+
+  formContainer: { gap: 20 },
+
+  // Role Card Styles - Redesigned
   roleCard: {
     backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 4,
-    borderWidth: 2,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
     borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   roleCardSelected: {
     borderColor: colors.primary,
-    shadowOpacity: 0.3,
-    elevation: 8,
     backgroundColor: '#F0F9FF',
+    borderWidth: 2,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.1,
+    elevation: 4,
   },
-  roleHeader: {
+  roleContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  roleIcon: {
+  iconContainer: {
     width: 64,
     height: 64,
-    borderRadius: 16,
-    backgroundColor: '#F0F9FF',
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 16,
   },
-  roleIconSelected: {
+  iconContainerSelected: {
     backgroundColor: colors.primary,
   },
+  textContainer: {
+    flex: 1,
+  },
+  roleTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  roleSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
   radioContainer: {
-    padding: 4,
+    marginLeft: 8,
   },
   radioOuter: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#D1D5DB',
     alignItems: 'center',
@@ -522,46 +421,36 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   radioInner: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: colors.primary,
   },
-  roleTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#032B3C',
-    marginBottom: 4,
+  visualFeatures: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
   },
-  roleSubtitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.primary,
-    marginBottom: 12,
-  },
-  roleDescription: {
-    fontSize: 15,
-    color: '#4B5563',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  featuresList: {
-    gap: 10,
-  },
-  featureItem: {
+  visualTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
   },
-  featureText: {
-    fontSize: 14,
-    color: '#032B3C',
-    flex: 1,
+  visualTagText: {
+    fontSize: 12,
+    color: '#1E3A8A',
+    fontWeight: '600',
   },
+
+  // Terms
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 12,
     marginBottom: 8,
     paddingHorizontal: 4,
   },
@@ -593,29 +482,29 @@ const styles = StyleSheet.create({
   },
   button: {
     width: '100%',
-    height: 52,
+    height: 56,
     backgroundColor: colors.primary,
-    borderRadius: 14,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 4,
+    shadowRadius: 8,
+    elevation: 6,
     marginTop: 8,
   },
   buttonDisabled: {
-    backgroundColor: '#D1D5DB',
+    backgroundColor: '#E5E7EB',
     shadowOpacity: 0,
     elevation: 0,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
   },
   loaderContainer: {
     alignItems: 'center',

@@ -1,13 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NavigationProp } from '@react-navigation/native';
-// import { StackActions } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, ImageBackground, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Easing,
+    ImageBackground,
+    Platform,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
 
 // Pantalla de splash con secuencia de 3 pantallas de onboarding
 const ONBOARDING_KEY = 'hasSeenOnboarding';
+const { width, height } = Dimensions.get('window');
 
 export default function Splash({ navigation }: { navigation?: NavigationProp<any> }) {
   // Estado para controlar qué pantalla mostrar (0, 1, o 2)
@@ -17,26 +30,26 @@ export default function Splash({ navigation }: { navigation?: NavigationProp<any
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.98)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   // Array con los datos de cada pantalla del onboarding
   const screens = [
     {
-      title: 'Rentik',
-      subtitle: '¡Tu mejor opción para rentar carros en El Salvador!',
-      description: 'Conectamos arrendadores y arrendatarios de manera segura y eficiente.',
+      title: 'Bienvenido a Rentik',
+      subtitle: 'Tu viaje comienza aquí',
+      description: 'La plataforma líder en El Salvador para rentar vehículos de forma segura y confiable.',
       image: require('../../assets/images/splash1.jpeg'),
     },
     {
-      title: 'Seguridad Garantizada',
-      subtitle: 'Verificación completa de usuarios',
-      description: 'Todos nuestros usuarios pasan por un proceso de verificación riguroso.',
+      title: 'Viaja con Libertad',
+      subtitle: 'Encuentra el auto perfecto',
+      description: 'Desde compactos económicos hasta camionetas familiares. Elige el que mejor se adapte a tu aventura.',
       image: require('../../assets/images/splash2.jpeg'),
     },
     {
-      title: 'Fácil y Rápido',
-      subtitle: 'Encuentra tu carro ideal en minutos',
-      description: 'Navega por nuestra amplia selección y reserva al instante.',
+      title: 'Genera Ingresos',
+      subtitle: 'Convierte tu auto en un activo',
+      description: 'Únete como Host y empieza a ganar dinero rentando tu vehículo con total seguridad.',
       image: require('../../assets/images/RentaSplash.jpg'),
     },
   ];
@@ -44,17 +57,17 @@ export default function Splash({ navigation }: { navigation?: NavigationProp<any
   // Trigger content intro animation when screen changes
   useEffect(() => {
     fadeAnim.setValue(0);
-    scaleAnim.setValue(0.98);
+    slideAnim.setValue(30);
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 500,
+        duration: 800,
         useNativeDriver: true,
         easing: Easing.out(Easing.cubic),
       }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 650,
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
         useNativeDriver: true,
         easing: Easing.out(Easing.cubic),
       }),
@@ -116,218 +129,272 @@ export default function Splash({ navigation }: { navigation?: NavigationProp<any
   if (!hasNavigation) {
     return (
       <View style={styles.loadingContainer}>
-        <LinearGradient
-          colors={colors.gradients.main as unknown as readonly [string, string]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <View style={styles.loadingContent}>
-          <View style={styles.brandBadge}>
-            <Text style={styles.brandText}>Rentik</Text>
+        <StatusBar barStyle="light-content" />
+        <ImageBackground
+          source={require('../../assets/images/splash1.jpeg')}
+          style={styles.loadingBg}
+          blurRadius={10}
+        >
+          <View style={styles.overlay} />
+          <View style={styles.loadingContent}>
+            <View style={styles.logoContainer}>
+               <Text style={styles.logoText}>Rentik</Text>
+            </View>
+            <ActivityIndicator size="large" color="#fff" style={{ marginTop: 30 }} />
           </View>
-          <ActivityIndicator size="large" color="#fff" style={{ marginTop: 20 }} />
-          <Text style={styles.loadingText}>Cargando...</Text>
-        </View>
+        </ImageBackground>
       </View>
     );
   }
 
   return (
-    <ImageBackground
-      source={currentData.image}
-      style={styles.bg}
-      resizeMode="cover"
-    >
-      {/* Capa con degradado para mejor contraste */}
-      <LinearGradient
-        colors={colors.gradients.main as unknown as readonly [string, string]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.overlay}
-      />
-      {/* Botón para saltar el onboarding */}
-      {shouldShowOnboarding && (
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={async () => {
-            try { await AsyncStorage.setItem(ONBOARDING_KEY, 'true'); } catch {}
-            if (navigation) {
-              try {
-                const state: any = navigation.getState?.();
-                const routeNames: string[] = state?.routeNames || state?.routes?.map((r: any) => r.name) || [];
-                if (routeNames.includes('Login')) {
-                  navigation.navigate('Login' as never);
-                }
-              } catch {}
-            }
-          }}
-          style={styles.skipButton}
-          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-        >
-          <Text style={styles.skipText}>Saltar</Text>
-        </TouchableOpacity>
-      )}
-      <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-        {/* Textos informativos */}
-        <View style={styles.brandBadge}>
-          <Text style={styles.brandText}>Rentik</Text>
-        </View>
-        <Text style={styles.title}>{currentData.title}</Text>
-        <Text style={styles.subtitle}>{currentData.subtitle}</Text>
-        <Text style={styles.description}>{currentData.description}</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      
+      <ImageBackground
+        source={currentData.image}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+        blurRadius={Platform.OS === 'ios' ? 6 : 3} // Desenfoque sutil pero notable
+      >
+        {/* Gradiente oscuro para legibilidad */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)', '#000']}
+          locations={[0, 0.4, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+        />
 
-        {/* Indicadores de progreso - puntos que muestran en qué pantalla estás */}
-        <View style={styles.progressContainer}>
-          {screens.map((_, index) => (
-            <View
-              key={index}
+        <SafeAreaView style={styles.safeArea}>
+          {/* Header: Skip Button */}
+          <View style={styles.header}>
+            {shouldShowOnboarding && (
+              <TouchableOpacity
+                onPress={async () => {
+                  try { await AsyncStorage.setItem(ONBOARDING_KEY, 'true'); } catch {}
+                  if (navigation) {
+                    try {
+                      const state: any = navigation.getState?.();
+                      const routeNames: string[] = state?.routeNames || state?.routes?.map((r: any) => r.name) || [];
+                      if (routeNames.includes('Login')) {
+                        navigation.navigate('Login' as never);
+                      }
+                    } catch {}
+                  }
+                }}
+                style={styles.skipButton}
+              >
+                <Text style={styles.skipText}>Saltar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Main Content */}
+          <View style={styles.contentContainer}>
+            <Animated.View 
               style={[
-                styles.progressDot,
-                index === currentScreen && styles.progressDotActive,
+                styles.textWrapper, 
+                { 
+                  opacity: fadeAnim, 
+                  transform: [{ translateY: slideAnim }] 
+                }
               ]}
-            />
-          ))}
-        </View>
-        {/* Botón de avance manual */}
-        {shouldShowOnboarding && (
-          <TouchableOpacity
-            style={styles.nextButton}
-            onPress={handleNext}
-            accessibilityRole="button"
-          >
-            <Text style={styles.nextText}>{currentScreen < screens.length - 1 ? 'Siguiente' : 'Empezar'}</Text>
-          </TouchableOpacity>
-        )}
-      </Animated.View>
-    </ImageBackground>
+            >
+              <View style={styles.badgeContainer}>
+                <Text style={styles.badgeText}>Rentik</Text>
+              </View>
+              
+              <Text style={styles.title}>{currentData.title}</Text>
+              <Text style={styles.subtitle}>{currentData.subtitle}</Text>
+              <Text style={styles.description}>{currentData.description}</Text>
+            </Animated.View>
+
+            {/* Footer Controls */}
+            <View style={styles.footer}>
+              {/* Pagination Dots */}
+              <View style={styles.pagination}>
+                {screens.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.dot,
+                      index === currentScreen && styles.dotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+
+              {/* Next Button */}
+              {shouldShowOnboarding && (
+                <TouchableOpacity
+                  style={styles.nextButton}
+                  onPress={handleNext}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.nextButtonText}>
+                    {currentScreen < screens.length - 1 ? 'Siguiente' : 'Comenzar'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </SafeAreaView>
+      </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bg: {
+  container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  backgroundImage: {
+    flex: 1,
     width: '100%',
     height: '100%',
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    // Gradient applied via LinearGradient component
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    opacity: 0.55,
+  safeArea: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 24,
+    paddingTop: 10,
   },
   skipButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 2,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(28,28,30,0.6)',
-  },
-  nextButton: {
-    marginTop: 30,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(11,114,157,0.95)',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 18,
-    shadowColor: '#032B3C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    ...(Platform.OS === 'android' ? { elevation: 2 } : null),
-  },
-  nextText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   skipText: {
-    color: colors.accent,
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
-  content: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: 20,
-    zIndex: 1,
+  contentContainer: {
+    paddingHorizontal: 32,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 24,
+    width: '100%',
   },
-  brandBadge: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+  textWrapper: {
+    alignItems: 'flex-start', // Alineación a la izquierda para look más moderno/editorial
+    marginBottom: 40,
+  },
+  badgeContainer: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    marginBottom: 18,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-  brandText: {
-    color: colors.text.white,
-    fontSize: 16,
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 15,
-    textAlign: 'center',
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 8,
+    letterSpacing: -0.5,
+    lineHeight: 42,
   },
   subtitle: {
     fontSize: 20,
-    color: '#E6F1F5',
-    marginBottom: 15,
-    textAlign: 'center',
     fontWeight: '600',
+    color: colors.primary, // Acento de color
+    marginBottom: 16,
   },
   description: {
     fontSize: 16,
-    color: '#C7D9E1',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 40,
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 26,
+    fontWeight: '400',
   },
-  progressContainer: {
+  footer: {
+    width: '100%',
+    gap: 30,
+  },
+  pagination: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-start', // Puntos alineados a la izquierda
+    gap: 8,
   },
-  progressDot: {
+  dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-    marginHorizontal: 5,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
-  progressDotActive: {
-    backgroundColor: '#FFFFFF',
-    width: 16,
-    borderRadius: 8,
+  dotActive: {
+    backgroundColor: colors.primary,
+    width: 24,
   },
+  nextButton: {
+    width: '100%',
+    height: 58,
+    backgroundColor: colors.primary,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  nextButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  
+  // Loading State Styles
   loadingContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  loadingBg: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
   loadingContent: {
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  loadingText: {
+  logoContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backdropFilter: 'blur(10px)', // Web support
+  },
+  logoText: {
     color: '#fff',
-    fontSize: 16,
-    marginTop: 20,
-    fontWeight: '500',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 });

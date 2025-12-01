@@ -239,9 +239,18 @@ export default function ViajesScreen() {
                   </View>
 
                   <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="location-outline" size={16} color="#6B7280" />
-                    <Text style={styles.cardLocation} numberOfLines={1}>
-                      {res.pickupLocation || 'Ubicación por definir'}
+                    <Ionicons 
+                      name={res.isDelivery ? "car-sport-outline" : "location-outline"} 
+                      size={16} 
+                      color={res.isDelivery ? "#0B729D" : "#6B7280"} 
+                    />
+                    <Text style={[
+                      styles.cardLocation, 
+                      res.isDelivery && { color: '#0B729D', fontWeight: '500' }
+                    ]} numberOfLines={1}>
+                      {res.isDelivery 
+                        ? `Entrega: ${res.deliveryAddress}`
+                        : (res.pickupLocation || 'Ubicación por definir')}
                     </Text>
                   </View>
 

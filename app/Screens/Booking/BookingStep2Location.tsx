@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import React from 'react';
+import React, { useState } from 'react';
 import {
+    KeyboardAvoidingView,
     Platform,
+    ScrollView,
     StatusBar,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -15,14 +18,29 @@ export default function BookingStep2Location() {
     const navigation = useNavigation();
     const route = useRoute<any>();
     const { vehicle, startDate, endDate } = route.params;
+    
+    const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
+    const [deliveryAddress, setDeliveryAddress] = useState('');
+    const [isLocating, setIsLocating] = useState(false);
+
+    const handleUseCurrentLocation = () => {
+        setIsLocating(true);
+        // Simulate getting location
+        setTimeout(() => {
+            setDeliveryAddress('Colonia San Benito, Calle La Reforma #222');
+            setIsLocating(false);
+        }, 1000);
+    };
 
     const handleNext = () => {
         navigation.navigate('BookingStep3Time' as never, { 
             vehicle, 
             startDate, 
             endDate,
-            pickupLocation: vehicle.ubicacion,
-            returnLocation: vehicle.ubicacion
+            pickupLocation: deliveryType === 'delivery' ? deliveryAddress : vehicle.ubicacion,
+            returnLocation: deliveryType === 'delivery' ? deliveryAddress : vehicle.ubicacion,
+            isDelivery: deliveryType === 'delivery',
+            deliveryAddress: deliveryType === 'delivery' ? deliveryAddress : undefined
         } as never);
     };
 
@@ -40,64 +58,135 @@ export default function BookingStep2Location() {
                 <View style={{ width: 40 }} />
             </View>
 
-            <View style={styles.content}>
-                <Text style={styles.stepTitle}>Paso 2 de 4</Text>
-                <Text style={styles.title}>Ubicación</Text>
-                <Text style={styles.subtitle}>Confirma dónde recogerás y devolverás el auto</Text>
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+            >
+                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                    <Text style={styles.stepTitle}>Paso 2 de 4</Text>
+                    <Text style={styles.title}>Ubicación</Text>
+                    <Text style={styles.subtitle}>¿Cómo deseas recibir el auto?</Text>
 
-                <View style={styles.mapContainer}>
-                    <MapView
-                        provider={PROVIDER_GOOGLE}
-                        style={styles.map}
-                        initialRegion={{
-                            latitude: 13.6929, // Mock coords
-                            longitude: -89.2182,
-                            latitudeDelta: 0.01,
-                            longitudeDelta: 0.01,
-                        }}
-                        scrollEnabled={false}
+                    {/* Toggle Switch */}
+                    <View style={styles.toggleContainer}>
+                        <TouchableOpacity 
+                            style={[styles.toggleOption, deliveryType === 'pickup' && styles.toggleOptionActive]}
+                            onPress={() => setDeliveryType('pickup')}
+                        >
+                            <Ionicons 
+                                name="location" 
+                                size={20} 
+                                color={deliveryType === 'pickup' ? '#fff' : '#6B7280'} 
+                            />
+                            <Text style={[styles.toggleText, deliveryType === 'pickup' && styles.toggleTextActive]}>
+                                Recoger
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.toggleOption, deliveryType === 'delivery' && styles.toggleOptionActive]}
+                            onPress={() => setDeliveryType('delivery')}
+                        >
+                            <Ionicons 
+                                name="car" 
+                                size={20} 
+                                color={deliveryType === 'delivery' ? '#fff' : '#6B7280'} 
+                            />
+                            <Text style={[styles.toggleText, deliveryType === 'delivery' && styles.toggleTextActive]}>
+                                Delivery
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {deliveryType === 'pickup' ? (
+                        <>
+                            <View style={styles.mapContainer}>
+                                <MapView
+                                    provider={PROVIDER_GOOGLE}
+                                    style={styles.map}
+                                    initialRegion={{
+                                        latitude: 13.6929, // Mock coords
+                                        longitude: -89.2182,
+                                        latitudeDelta: 0.01,
+                                        longitudeDelta: 0.01,
+                                    }}
+                                    scrollEnabled={false}
+                                >
+                                    <Marker
+                                        coordinate={{ latitude: 13.6929, longitude: -89.2182 }}
+                                        title={vehicle.ubicacion}
+                                    />
+                                </MapView>
+                                <View style={styles.mapOverlay} />
+                            </View>
+
+                            <View style={styles.locationCard}>
+                                <View style={styles.locationRow}>
+                                    <View style={styles.iconContainer}>
+                                        <Ionicons name="location" size={24} color="#0B729D" />
+                                    </View>
+                                    <View style={styles.locationInfo}>
+                                        <Text style={styles.locationLabel}>Lugar de recogida</Text>
+                                        <Text style={styles.locationValue}>{vehicle.ubicacion}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </>
+                    ) : (
+                        <View style={styles.deliveryContainer}>
+                            <View style={styles.deliveryInfoCard}>
+                                <Ionicons name="information-circle" size={24} color="#0B729D" />
+                                <Text style={styles.deliveryInfoText}>
+                                    El anfitrión te llevará el auto a la ubicación que indiques.
+                                </Text>
+                            </View>
+
+                            <Text style={styles.inputLabel}>Dirección de entrega</Text>
+                            
+                            {/* Current Location Button */}
+                            <TouchableOpacity 
+                                style={styles.currentLocationButton}
+                                onPress={handleUseCurrentLocation}
+                                disabled={isLocating}
+                            >
+                                {isLocating ? (
+                                    <ActivityIndicator size="small" color="#0B729D" />
+                                ) : (
+                                    <Ionicons name="locate" size={20} color="#0B729D" />
+                                )}
+                                <Text style={styles.currentLocationText}>
+                                    {isLocating ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="navigate-circle-outline" size={24} color="#9CA3AF" />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Ej: Colonia Escalón, Calle Principal #123"
+                                    placeholderTextColor="#9CA3AF"
+                                    value={deliveryAddress}
+                                    onChangeText={setDeliveryAddress}
+                                    multiline
+                                />
+                            </View>
+                        </View>
+                    )}
+                </ScrollView>
+
+                <View style={styles.footer}>
+                    <TouchableOpacity 
+                        style={[
+                            styles.nextButton, 
+                            (deliveryType === 'delivery' && !deliveryAddress.trim()) && styles.disabledButton
+                        ]} 
+                        onPress={handleNext}
+                        disabled={deliveryType === 'delivery' && !deliveryAddress.trim()}
                     >
-                        <Marker
-                            coordinate={{ latitude: 13.6929, longitude: -89.2182 }}
-                            title={vehicle.ubicacion}
-                        />
-                    </MapView>
-                    <View style={styles.mapOverlay} />
+                        <Text style={styles.nextButtonText}>Continuar</Text>
+                        <Ionicons name="arrow-forward" size={20} color="#fff" />
+                    </TouchableOpacity>
                 </View>
-
-                <View style={styles.locationCard}>
-                    <View style={styles.locationRow}>
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="location" size={24} color="#0B729D" />
-                        </View>
-                        <View style={styles.locationInfo}>
-                            <Text style={styles.locationLabel}>Lugar de recogida</Text>
-                            <Text style={styles.locationValue}>{vehicle.ubicacion}</Text>
-                        </View>
-                    </View>
-                    
-                    <View style={styles.dividerContainer}>
-                        <View style={styles.dashedLine} />
-                    </View>
-
-                    <View style={styles.locationRow}>
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="flag" size={24} color="#0B729D" />
-                        </View>
-                        <View style={styles.locationInfo}>
-                            <Text style={styles.locationLabel}>Lugar de devolución</Text>
-                            <Text style={styles.locationValue}>{vehicle.ubicacion}</Text>
-                        </View>
-                    </View>
-                </View>
-            </View>
-
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-                    <Text style={styles.nextButtonText}>Continuar</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
-                </TouchableOpacity>
-            </View>
+            </KeyboardAvoidingView>
         </View>
     );
 }
@@ -156,6 +245,38 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         marginBottom: 24,
     },
+    toggleContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 16,
+        padding: 4,
+        marginBottom: 24,
+    },
+    toggleOption: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 12,
+        gap: 8,
+    },
+    toggleOptionActive: {
+        backgroundColor: '#0B729D',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    toggleText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    toggleTextActive: {
+        color: '#fff',
+    },
     mapContainer: {
         height: 200,
         borderRadius: 24,
@@ -170,7 +291,7 @@ const styles = StyleSheet.create({
     },
     mapOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'transparent', // Allow interaction if needed, or add gradient
+        backgroundColor: 'transparent',
     },
     locationCard: {
         backgroundColor: '#fff',
@@ -211,18 +332,61 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#111827',
     },
-    dividerContainer: {
-        paddingLeft: 24,
-        height: 32,
-        justifyContent: 'center',
+    deliveryContainer: {
+        gap: 16,
     },
-    dashedLine: {
-        width: 2,
-        height: '100%',
-        backgroundColor: '#E5E7EB',
-        borderStyle: 'dashed',
+    deliveryInfoCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0F9FF',
+        padding: 16,
+        borderRadius: 16,
+        gap: 12,
+    },
+    deliveryInfoText: {
+        flex: 1,
+        fontSize: 14,
+        color: '#0B729D',
+        lineHeight: 20,
+    },
+    currentLocationButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#F0F9FF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+        marginBottom: 16,
+        gap: 8,
+    },
+    currentLocationText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0B729D',
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
         borderWidth: 1,
         borderColor: '#E5E7EB',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 4,
+    },
+    input: {
+        flex: 1,
+        paddingVertical: 16,
+        marginLeft: 12,
+        fontSize: 16,
+        color: '#111827',
     },
     footer: {
         padding: 24,
@@ -244,6 +408,11 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 4,
         gap: 8,
+    },
+    disabledButton: {
+        backgroundColor: '#9CA3AF',
+        shadowOpacity: 0,
+        elevation: 0,
     },
     nextButtonText: {
         color: '#fff',
