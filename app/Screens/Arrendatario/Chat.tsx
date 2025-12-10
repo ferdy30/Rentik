@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
+    Platform,
     StatusBar,
     StyleSheet,
     Text,
@@ -113,9 +114,26 @@ export default function ChatScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mensajes</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerSubtitle}>Tus</Text>
+          <Text style={styles.headerTitle}>Conversaciones</Text>
+        </View>
+        {chats.length > 0 && (
+          <View style={{
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            backgroundColor: '#F0F9FF',
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: '#BFDBFE',
+          }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#0B729D' }}>
+              {chats.length}
+            </Text>
+          </View>
+        )}
       </View>
       
       {loading ? (
@@ -159,31 +177,57 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FAFB',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 60,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
+  headerSubtitle: {
+    color: '#6B7280',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
   headerTitle: {
+    color: '#0B729D',
     fontSize: 28,
     fontWeight: '800',
-    color: '#111827',
+    letterSpacing: -0.5,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 100,
+    paddingTop: 8,
   },
   chatItem: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 18,
     alignItems: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   avatarContainer: {
     position: 'relative',
@@ -193,16 +237,17 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F0F9FF',
+    borderWidth: 2,
+    borderColor: '#BFDBFE',
   },
   avatarPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E0F2FE',
   },
   avatarInitials: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#0B729D',
   },
   chatContent: {
@@ -235,9 +280,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   separator: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginLeft: 92,
+    height: 0,
   },
   emptyState: {
     flex: 1,
@@ -251,21 +294,26 @@ const styles = StyleSheet.create({
   },
   unreadBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: -4,
+    right: -4,
     backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#fff',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
   unreadText: {
     color: '#fff',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   nameUnread: {
     fontWeight: '800',

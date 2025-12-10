@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Vehicle } from '../constants/vehicles';
 
 interface VehicleCardProps {
@@ -21,24 +21,53 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
 }) => {
   const [imageIndex, setImageIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(0);
-  const images = vehicle.imagenes && vehicle.imagenes.length > 0 ? vehicle.imagenes : [vehicle.imagen];
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  
+  const images = useMemo(
+    () => vehicle.imagenes && vehicle.imagenes.length > 0 ? vehicle.imagenes : [vehicle.imagen],
+    [vehicle.imagenes, vehicle.imagen]
+  );
 
-  const handleScroll = (event: any) => {
+  const handleScroll = useCallback((event: any) => {
     const slideSize = event.nativeEvent.layoutMeasurement.width;
     const index = event.nativeEvent.contentOffset.x / slideSize;
     const roundIndex = Math.round(index);
     setImageIndex(roundIndex);
-  };
+  }, []);
+
+  const handlePressIn = useCallback(() => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+    }).start();
+  }, [scaleAnim]);
+
+  const handlePressOut = useCallback(() => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 3,
+    }).start();
+  }, [scaleAnim]);
 
   return (
-    <TouchableOpacity 
-      style={[styles.card, style]} 
-      onPress={onPress} 
-      activeOpacity={0.9}
-      onLayout={(event) => setCardWidth(event.nativeEvent.layout.width)}
-    >
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
+      <TouchableOpacity 
+        style={styles.card} 
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+        onLayout={(event) => setCardWidth(event.nativeEvent.layout.width)}
+      >
       {/* Image with carousel */}
       <View style={styles.imageContainer}>
+        {!imageLoaded && (
+          <View style={styles.imagePlaceholder}>
+            <Ionicons name="car-outline" size={32} color="#D1D5DB" />
+          </View>
+        )}
         <ScrollView
           horizontal
           pagingEnabled
@@ -54,9 +83,18 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
               style={[styles.image, { width: cardWidth || '100%' }]}
               contentFit="cover"
               transition={500}
+              onLoad={() => setImageLoaded(true)}
             />
           ))}
         </ScrollView>
+        
+        {/* Availability Badge */}
+        <View style={[styles.availabilityBadge, { backgroundColor: vehicle.disponible ? '#10B981' : '#EF4444' }]}>
+          <View style={styles.statusDot} />
+          <Text style={styles.availabilityText}>
+            {vehicle.disponible ? 'Disponible' : 'No disponible'}
+          </Text>
+        </View>
         
         {/* Favorite button */}
         {onFavoritePress && (
@@ -98,35 +136,72 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
 
       {/* Content */}
       <View style={styles.content}>
-        {/* Title and rating */}
-        <View style={styles.headerRow}>
-          <Text style={styles.title} numberOfLines={1}>
-            {vehicle.marca} {vehicle.modelo}
-          </Text>
+        {vehicle.rating >= 4.8 && (
+          <View style={styles.topRatedBadge}>
+            <Ionicons name="trophy" size={10} color="#F59E0B" />
+            <Text style={styles.topRatedText}>Top Rated</Text>
+          </View>
+        )}
+        
+        {/* Title */}
+        <Text style={styles.title} numberOfLines={1}>
+          {vehicle.marca} {vehicle.modelo}
+        </Text>
+
+        {/* Year and Specs Row */}
+        <View style={styles.specsRow}>
+          <View style={styles.specItem}>
+            <Ionicons name="calendar-outline" size={13} color="#0B729D" />
+            <Text style={styles.specText}>{vehicle.anio}</Text>
+          </View>
+          <View style={styles.specDivider} />
+          <View style={styles.specItem}>
+            <Ionicons name="settings-outline" size={13} color="#0B729D" />
+            <Text style={styles.specText}>{vehicle.transmision === 'Automático' ? 'Auto' : 'Manual'}</Text>
+          </View>
+          <View style={styles.specDivider} />
+          <View style={styles.specItem}>
+            <Ionicons name="flash-outline" size={13} color="#0B729D" />
+            <Text style={styles.specText}>{vehicle.combustible}</Text>
+          </View>
+        </View>
+
+        {/* Rating Row */}
+        <View style={styles.ratingRow}>
           <View style={styles.ratingContainer}>
             <Ionicons name="star" size={12} color="#FBBF24" />
             <Text style={styles.ratingText}>{vehicle.rating.toFixed(1)}</Text>
           </View>
+          {vehicle.reviewCount > 0 && (
+            <Text style={styles.reviewCount}>• {vehicle.reviewCount} reseñas</Text>
+          )}
         </View>
 
-        {/* Year */}
-        <Text style={styles.year}>{vehicle.anio}</Text>
+        {/* Location */}
+        <View style={styles.locationRow}>
+          <Ionicons name="location" size={13} color="#6B7280" />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {vehicle.distanceText ? vehicle.distanceText : vehicle.ubicacion}
+          </Text>
+        </View>
 
-        {/* Price and Location */}
-        <View style={styles.footerRow}>
+        {/* Divider */}
+        <View style={styles.divider} />
+
+        {/* Price */}
+        <View style={styles.priceRow}>
           <View style={styles.priceContainer}>
             <Text style={styles.price}>${vehicle.precio}</Text>
             <Text style={styles.priceUnit}>/día</Text>
           </View>
-          <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={12} color="#6B7280" />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {vehicle.distanceText ? `${vehicle.distanceText} • ` : ''}{vehicle.ubicacion}
-            </Text>
+          <View style={styles.verMasButton}>
+            <Text style={styles.verMasText}>Ver más</Text>
+            <Ionicons name="arrow-forward" size={12} color="#0B729D" />
           </View>
         </View>
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -218,7 +293,7 @@ const styles = StyleSheet.create({
     width: 16,
   },
   content: {
-    padding: 14,
+    padding: 12,
   },
   headerRow: {
     flexDirection: 'row',
@@ -227,30 +302,30 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   title: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-    flex: 1,
-    marginRight: 8,
-    lineHeight: 20,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 10,
+    lineHeight: 22,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#FFFBEB',
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   ratingText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#B45309',
+    color: '#F59E0B',
   },
   reviewCount: {
-    fontSize: 10,
-    color: '#B45309',
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   year: {
     fontSize: 13,
@@ -302,6 +377,117 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#6B7280',
     fontWeight: '500',
+  },
+  imagePlaceholder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 0,
+  },
+  availabilityBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fff',
+  },
+  availabilityText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  specsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 8,
+    gap: 6,
+  },
+  specItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  specText: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  specDivider: {
+    width: 1,
+    height: 10,
+    backgroundColor: '#E5E7EB',
+  },
+  topRatedBorder: {
+    borderTopWidth: 2,
+    borderTopColor: '#FBBF24',
+  },
+  topRatedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  topRatedText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#F59E0B',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 10,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  verMasButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 6,
+  },
+  verMasText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0B729D',
   },
 });
 

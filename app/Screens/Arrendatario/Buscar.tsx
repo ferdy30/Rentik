@@ -5,26 +5,29 @@ import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Modal,
   RefreshControl,
   ScrollView,
   StatusBar,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useToast } from '../../../context/ToastContext';
 import EmptyState from '../../components/EmptyState';
 import FilterModal, { type FilterOptions } from '../../components/FilterModal';
-import SearchBar from '../../components/SearchBar';
 import VehicleCard from '../../components/VehicleCard';
 import VehicleCardSkeleton from '../../components/VehicleCardSkeleton';
 import { Vehicle } from '../../constants/vehicles';
+import { useFavorites } from '../../context/FavoritesContext';
 import { getAllVehicles } from '../../services/vehicles';
 import type { Coordinates } from '../../utils/distance';
 import { addDistanceToItems, filterByRadius, sortByDistance } from '../../utils/distance';
-import { styles } from './styles';
+import { CARD_WIDTH, styles } from './styles';
 
 const CATEGORIES = [
   { id: 'all', label: 'Todos', icon: 'grid-outline' },
@@ -34,14 +37,16 @@ const CATEGORIES = [
 ];
 
 const PROMOTIONS = [
-  { id: '1', title: '20% OFF', subtitle: 'En tu primera renta', image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=800&q=80' },
-  { id: '2', title: 'Viaja Seguro', subtitle: 'Atención 24/7', image: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' },
-  { id: '3', title: 'Fin de Semana', subtitle: 'Ofertas especiales', image: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&q=80' },
+  { id: '1', title: 'Explora El Salvador', subtitle: 'Viaja con libertad', image: 'https://images.unsplash.com/photo-1632780779804-15e0762bd37e?w=900&auto=format&fit=crop&q=60' },
+  { id: '2', title: 'Tu Aventura Espera', subtitle: 'Descubre nuevos destinos', image: 'https://images.unsplash.com/photo-1690384451505-2aef8ae1b0ef?w=900&auto=format&fit=crop&q=60' },
+  { id: '3', title: 'Viaja Seguro', subtitle: 'Atención 24/7 para ti', image: 'https://media.istockphoto.com/id/1469729479/es/foto/atardecer-en-la-playa.jpg?s=612x612&w=0&k=20&c=sk24uTMckudyN9oeLoNRUTjgWgMi6ymtpFpx6EcTCHA=' },
 ];
 
 export default function BuscarScreen() {
   const navigation = useNavigation<any>();
+  const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -53,13 +58,14 @@ export default function BuscarScreen() {
     yearRange: [2015, 2025],
     features: [],
   });
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  // Pagination placeholders removed to avoid warnings; add when implementing
-  // Pagination placeholders removed to avoid warnings; add when implementing
-  // const VEHICLES_PER_PAGE = 10; // Pagination constant reserved for future use
+  const [applyingFilters, setApplyingFilters] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Estados para ubicación GPS
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
@@ -115,14 +121,35 @@ export default function BuscarScreen() {
     }
   };
 
+  // Debounce effect for search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const loadVehicles = async (reset: boolean = false) => {
     try {
       if (reset) {
         setLoading(true);
-        // Reset pagination when implemented
+        setHasMore(true);
+      } else {
+        setLoadingMore(true);
       }
       
       const data = await getAllVehicles();
+      
+      // Log first vehicle to debug
+      if (data.length > 0) {
+        console.log('🔍 Sample vehicle from Firestore:', {
+          id: data[0].id,
+          marca: data[0].marca,
+          arrendadorId: data[0].arrendadorId,
+          hasArrendadorId: !!data[0].arrendadorId
+        });
+      }
+      
       const mappedVehicles: Vehicle[] = data.map(v => ({
         id: v.id!,
         marca: v.marca,
@@ -144,27 +171,28 @@ export default function BuscarScreen() {
         badges: v.status === 'active' ? ['Verificado'] : [],
         disponible: v.status === 'active',
         propietarioId: v.arrendadorId,
+        arrendadorId: v.arrendadorId, // Add this field explicitly
       }));
-      if (reset) {
-        setVehicles(mappedVehicles);
-      } else {
-        setVehicles(mappedVehicles);
-      }
       
-      // hasMore handling removed until pagination is implemented
+      // Siempre reemplazar vehículos completos para evitar duplicados
+      setVehicles(mappedVehicles);
+      setLastUpdated(new Date());
+      setHasMore(false); // Por ahora no hay paginación real desde backend
     } catch (error) {
       console.error('Error loading vehicles:', error);
+      showToast('Error al cargar vehículos', 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
   // Filtering logic
   const filteredVehicles = vehicles.filter((vehicle) => {
-    // Search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    // Search query (usando debounced)
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       const matchesSearch =
         vehicle.marca.toLowerCase().includes(query) ||
         vehicle.modelo.toLowerCase().includes(query) ||
@@ -255,13 +283,59 @@ export default function BuscarScreen() {
   }, []);
 
   const handleFavoritePress = (id: string) => {
-    setFavorites((prev) =>
-      prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
-    );
+    const vehicle = vehicles.find(v => v.id === id);
+    if (vehicle) {
+      const isFav = isFavorite(id);
+      toggleFavorite(id, vehicle);
+      showToast(
+        isFav ? 'Eliminado de favoritos' : '❤️ Agregado a favoritos',
+        isFav ? 'info' : 'success',
+        2000
+      );
+    }
   };
 
-  const handleApplyFilters = (filters: FilterOptions) => {
+  const handleApplyFilters = async (filters: FilterOptions) => {
+    setApplyingFilters(true);
     setAdvancedFilters(filters);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    setApplyingFilters(false);
+    
+    const activeCount = 
+      filters.vehicleTypes.length +
+      filters.transmision.length +
+      filters.fuelTypes.length +
+      filters.features.length;
+    
+    if (activeCount > 0) {
+      showToast(`Filtros aplicados (${activeCount})`, 'success', 2000);
+    }
+  };
+
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setDebouncedSearchQuery('');
+    setSelectedCategory('all');
+    setSelectedRadius(null);
+    setAdvancedFilters({
+      priceRange: [0, 100],
+      vehicleTypes: [],
+      transmision: [],
+      fuelTypes: [],
+      yearRange: [2015, 2025],
+      features: [],
+    });
+    showToast('Filtros limpiados', 'info', 2000);
+  };
+
+  const getTimeSinceUpdate = () => {
+    if (!lastUpdated) return '';
+    const seconds = Math.floor((new Date().getTime() - lastUpdated.getTime()) / 1000);
+    if (seconds < 60) return 'Actualizado hace unos segundos';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `Actualizado hace ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    return `Actualizado hace ${hours}h`;
   };
 
   const activeFilterCount =
@@ -270,17 +344,31 @@ export default function BuscarScreen() {
     advancedFilters.fuelTypes.length +
     advancedFilters.features.length;
 
+  const hasAnyFilter = activeFilterCount > 0 || searchQuery || selectedCategory !== 'all' || selectedRadius !== null;
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Rentik</Text>
-          <Text style={styles.appName}>Buscar</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, fontWeight: '500', color: '#6B7280', marginBottom: 2 }}>
+            Encuentra tu
+          </Text>
+          <Text style={{ fontSize: 32, fontWeight: '900', color: '#0B729D', lineHeight: 38 }}>
+            Vehículo ideal
+          </Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {hasAnyFilter && (
+            <TouchableOpacity
+              style={[styles.viewToggle, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }]}
+              onPress={clearAllFilters}
+            >
+              <Ionicons name="close-circle" size={20} color="#DC2626" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
-            style={[styles.viewToggle, { paddingHorizontal: 10, paddingVertical: 8 }]}
+            style={styles.viewToggle}
             onPress={requestLocationPermission}
           >
             <Ionicons
@@ -295,20 +383,48 @@ export default function BuscarScreen() {
           >
             <Ionicons 
               name={viewMode === 'list' ? 'map-outline' : 'list-outline'} 
-              size={24} 
+              size={22} 
               color="#0B729D" 
             />
           </TouchableOpacity>
         </View>
       </View>
 
-      <SearchBar
-        onSearch={setSearchQuery}
-        onFilterPress={() => setFilterModalVisible(true)}
-        selectedFilters={activeFilterCount > 0 ? [String(activeFilterCount)] : []}
-        filterChips={[]} // Removed old chips
-        onChipPress={() => {}}
-      />
+      <View style={styles.searchSection}>
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputWrapper}>
+            <Ionicons name="search" size={20} color="#6B7280" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchText}
+              placeholder="Busca por marca, modelo..."
+              placeholderTextColor="#9CA3AF"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+          <TouchableOpacity style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
+            <Ionicons name="options-outline" size={20} color="#0B729D" />
+            {activeFilterCount > 0 && (
+              <View style={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                backgroundColor: '#DC2626',
+                borderRadius: 10,
+                minWidth: 18,
+                height: 18,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingHorizontal: 4,
+              }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                  {activeFilterCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {locationError && (
         <View style={{
@@ -397,12 +513,17 @@ export default function BuscarScreen() {
 
         <ScrollView
           style={styles.content}
+          contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#0B729D']} tintColor="#0B729D" />}
         >
           {/* Promotions Carousel */}
-          {!searchQuery && (
+          {!searchQuery && selectedCategory === 'all' && (
             <View style={styles.promoContainer}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 12 }}>
+                <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0, flex: 1 }]}>Viaja con Nosotros</Text>
+                <Ionicons name="car-sport" size={20} color="#0B729D" />
+              </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promoList}>
                 {PROMOTIONS.map((promo) => (
                   <TouchableOpacity key={promo.id} style={styles.promoCard} activeOpacity={0.9}>
@@ -428,24 +549,15 @@ export default function BuscarScreen() {
               ))}
             </View>
           ) : vehiclesWithDistance.length === 0 ? (
-            <EmptyState
-              icon="search-outline"
-              title="No encontramos resultados"
-              message="Intenta ajustar tus filtros o buscar otra cosa"
-              actionLabel="Limpiar filtros"
-              onActionPress={() => {
-                setSearchQuery('');
-                setSelectedCategory('all');
-                setAdvancedFilters({
-                  priceRange: [0, 100],
-                  vehicleTypes: [],
-                  transmision: [],
-                  fuelTypes: [],
-                  yearRange: [2015, 2025],
-                  features: [],
-                });
-              }}
-            />
+            <View style={{ paddingTop: 60 }}>
+              <EmptyState
+                icon="car-outline"
+                title="Sin resultados"
+                message="No encontramos vehículos que coincidan con tu búsqueda. Prueba con otros filtros."
+                actionLabel="Limpiar filtros"
+                onActionPress={clearAllFilters}
+              />
+            </View>
           ) : (
             <>
               {/* Recommended Section - Only show if no search/filter active */}
@@ -457,12 +569,12 @@ export default function BuscarScreen() {
                       <VehicleCard
                         key={vehicle.id}
                         vehicle={vehicle}
-                        style={{ width: '48%' }}
+                        style={{ width: CARD_WIDTH }}
                         onPress={() =>
                           navigation.getParent()?.navigate('Details', { vehicle })
                         }
                         onFavoritePress={handleFavoritePress}
-                        isFavorite={favorites.includes(vehicle.id)}
+                        isFavorite={isFavorite(vehicle.id)}
                       />
                     ))}
                   </View>
@@ -470,23 +582,56 @@ export default function BuscarScreen() {
               )}
 
               {/* All Vehicles Section */}
-              <Text style={styles.sectionTitle}>
-                {searchQuery || selectedCategory !== 'all' ? `Resultados (${vehiclesWithDistance.length})` : 'Vehículos disponibles'}
-              </Text>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <Text style={styles.sectionTitle}>
+                    {searchQuery || selectedCategory !== 'all' ? `Resultados (${vehiclesWithDistance.length})` : 'Vehículos disponibles'}
+                  </Text>
+                  {applyingFilters && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <ActivityIndicator size="small" color="#0B729D" />
+                      <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '500' }}>Filtrando...</Text>
+                    </View>
+                  )}
+                </View>
+                {lastUpdated && (
+                  <Text style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 12, marginLeft: 2 }}>
+                    {getTimeSinceUpdate()}
+                  </Text>
+                )}
+              </View>
               <View style={styles.grid}>
                 {vehiclesWithDistance.map((vehicle) => (
                   <VehicleCard
                     key={vehicle.id}
                     vehicle={vehicle}
-                    style={{ width: '48%' }}
+                    style={{ width: CARD_WIDTH }}
                     onPress={() =>
                       navigation.getParent()?.navigate('Details', { vehicle })
                     }
                     onFavoritePress={handleFavoritePress}
-                    isFavorite={favorites.includes(vehicle.id)}
+                    isFavorite={isFavorite(vehicle.id)}
                   />
                 ))}
               </View>
+              
+              {/* Loading more indicator */}
+              {loadingMore && (
+                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="#0B729D" />
+                  <Text style={{ marginTop: 8, fontSize: 13, color: '#6B7280' }}>Cargando más vehículos...</Text>
+                </View>
+              )}
+              
+              {/* End of results message */}
+              {!hasMore && vehiclesWithDistance.length > 10 && (
+                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                  <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                  <Text style={{ marginTop: 8, fontSize: 13, color: '#6B7280', fontWeight: '500' }}>
+                    Has visto todos los vehículos disponibles
+                  </Text>
+                </View>
+              )}
             </>
           )}
         </ScrollView>

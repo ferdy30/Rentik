@@ -123,3 +123,68 @@ export function addDistanceToItems<T>(
     };
   });
 }
+
+/**
+ * Calcula el costo de delivery basado en la distancia
+ * Estructura de precios:
+ * - 0-5 km: $5
+ * - 5-10 km: $10
+ * - 10-20 km: $15
+ * - 20-30 km: $20
+ * - +30 km: $25
+ * @param pickupLocation Coordenadas del punto de recogida
+ * @param deliveryLocation Coordenadas de entrega
+ * @returns Costo de delivery en dólares
+ */
+export function calculateDeliveryCost(
+  pickupLocation: Coordinates,
+  deliveryLocation: Coordinates
+): number {
+  const distance = calculateDistance(pickupLocation, deliveryLocation);
+  
+  if (distance <= 5) return 5;
+  if (distance <= 10) return 10;
+  if (distance <= 20) return 15;
+  if (distance <= 30) return 20;
+  return 25;
+}
+
+/**
+ * Obtiene detalles del costo de delivery con distancia
+ * @param pickupLocation Coordenadas del punto de recogida
+ * @param deliveryLocation Coordenadas de entrega
+ * @returns Objeto con distancia, costo y mensaje informativo
+ */
+export function getDeliveryDetails(
+  pickupLocation: Coordinates,
+  deliveryLocation: Coordinates
+): {
+  distance: number;
+  distanceText: string;
+  cost: number;
+  message: string;
+} {
+  const distance = calculateDistance(pickupLocation, deliveryLocation);
+  const cost = calculateDeliveryCost(pickupLocation, deliveryLocation);
+  const distanceText = formatDistance(distance);
+  
+  let message = '';
+  if (distance <= 5) {
+    message = 'Zona cercana - Entrega rápida';
+  } else if (distance <= 10) {
+    message = 'Zona intermedia';
+  } else if (distance <= 20) {
+    message = 'Zona extendida';
+  } else if (distance <= 30) {
+    message = 'Zona lejana';
+  } else {
+    message = 'Zona muy lejana - Puede tomar más tiempo';
+  }
+  
+  return {
+    distance,
+    distanceText,
+    cost,
+    message,
+  };
+}

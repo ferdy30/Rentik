@@ -27,6 +27,7 @@ export default function TripDetails() {
     const { user } = useAuth();
     const { reservation } = route.params as { reservation: Reservation };
     const [loadingChat, setLoadingChat] = useState(false);
+    const [showTimeline, setShowTimeline] = useState(true);
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -103,8 +104,82 @@ export default function TripDetails() {
     };
 
     const handleCheckIn = () => {
-        Alert.alert('Check-in', 'Iniciando inspección del vehículo...');
-        // navigation.navigate('CheckInInspection', { reservationId: reservation.id });
+        // Verificar que la reserva esté confirmada
+        if (reservation.status !== 'confirmed') {
+            Alert.alert('Error', 'Solo puedes hacer check-in en reservas confirmadas.');
+            return;
+        }
+        
+        navigation.navigate('CheckInStart', { reservation });
+    };
+
+    const handleRepeatBooking = () => {
+        if (!reservation.vehicleSnapshot) {
+            Alert.alert('Error', 'Información del vehículo no disponible.');
+            return;
+        }
+
+        Alert.alert(
+            'Repetir reserva',
+            '¿Quieres reservar este vehículo nuevamente?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Continuar',
+                    onPress: () => {
+                        // Navigate to vehicle details with the same vehicle
+                        const vehicle = {
+                            id: reservation.vehicleId,
+                            marca: reservation.vehicleSnapshot.marca,
+                            modelo: reservation.vehicleSnapshot.modelo,
+                            anio: reservation.vehicleSnapshot.anio,
+                            precio: reservation.vehicleSnapshot.precio,
+                            imagen: reservation.vehicleSnapshot.imagen,
+                            propietarioId: reservation.arrendadorId,
+                        };
+                        navigation.navigate('Details', { vehicle });
+                    }
+                }
+            ]
+        );
+    };
+
+    const getTimelineSteps = () => {
+        const startDate = reservation.startDate?.toDate();
+        const endDate = reservation.endDate?.toDate();
+        const now = new Date();
+        
+        const steps = [
+            {
+                title: 'Reserva confirmada',
+                date: reservation.createdAt?.toDate(),
+                completed: true,
+                icon: 'checkmark-circle',
+            },
+            {
+                title: 'Check-in',
+                date: startDate,
+                completed: reservation.checkIn?.completed || false,
+                active: reservation.status === 'confirmed' && startDate && startDate <= now,
+                icon: 'key',
+            },
+            {
+                title: 'Viaje en curso',
+                date: startDate,
+                completed: reservation.status === 'completed',
+                active: reservation.checkIn?.completed && reservation.status === 'confirmed',
+                icon: 'car-sport',
+            },
+            {
+                title: 'Check-out',
+                date: endDate,
+                completed: reservation.checkOut?.completed || false,
+                active: reservation.status === 'confirmed' && endDate && endDate <= now,
+                icon: 'exit',
+            },
+        ];
+
+        return steps;
     };
 
     return (
@@ -131,6 +206,70 @@ export default function TripDetails() {
                     </Text>
                 </View>
 
+                {/* Timeline */}
+                {(reservation.status === 'confirmed' || reservation.status === 'completed') && (
+                    <View style={styles.timelineSection}>
+                        <TouchableOpacity 
+                            style={styles.timelineHeader}
+                            onPress={() => setShowTimeline(!showTimeline)}
+                        >
+                            <Text style={styles.sectionTitle}>Progreso del viaje</Text>
+                            <Ionicons 
+                                name={showTimeline ? 'chevron-up' : 'chevron-down'} 
+                                size={20} 
+                                color="#6B7280" 
+                            />
+                        </TouchableOpacity>
+                        
+                        {showTimeline && (
+                            <View style={styles.timeline}>
+                                {getTimelineSteps().map((step, index) => (
+                                    <View key={index} style={styles.timelineItem}>
+                                        <View style={styles.timelineIconContainer}>
+                                            <View style={[
+                                                styles.timelineIcon,
+                                                step.completed && styles.timelineIconCompleted,
+                                                step.active && styles.timelineIconActive,
+                                            ]}>
+                                                <Ionicons 
+                                                    name={step.icon as any} 
+                                                    size={18} 
+                                                    color={step.completed || step.active ? '#fff' : '#9CA3AF'} 
+                                                />
+                                            </View>
+                                            {index < getTimelineSteps().length - 1 && (
+                                                <View style={[
+                                                    styles.timelineLine,
+                                                    step.completed && styles.timelineLineCompleted
+                                                ]} />
+                                            )}
+                                        </View>
+                                        <View style={styles.timelineContent}>
+                                            <Text style={[
+                                                styles.timelineTitle,
+                                                step.completed && styles.timelineTitleCompleted,
+                                                step.active && styles.timelineTitleActive,
+                                            ]}>
+                                                {step.title}
+                                            </Text>
+                                            {step.date && (
+                                                <Text style={styles.timelineDate}>
+                                                    {step.date.toLocaleDateString('es-ES', { 
+                                                        day: 'numeric', 
+                                                        month: 'short',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                )}
+
                 {/* Vehicle Card */}
                 <View style={styles.vehicleCard}>
                     <Image 
@@ -153,6 +292,29 @@ export default function TripDetails() {
                         <TouchableOpacity style={styles.primaryButton} onPress={handleCheckIn}>
                             <Ionicons name="qr-code-outline" size={20} color="#fff" />
                             <Text style={styles.primaryButtonText}>Iniciar Check-in</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.secondaryButton, loadingChat && styles.buttonDisabled]} 
+                            onPress={handleChat}
+                            disabled={loadingChat}
+                        >
+                            {loadingChat ? (
+                                <ActivityIndicator size="small" color="#0B729D" />
+                            ) : (
+                                <>
+                                    <Ionicons name="chatbubble-outline" size={20} color="#0B729D" />
+                                    <Text style={styles.secondaryButtonText}>Chat con anfitrión</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {reservation.status === 'completed' && (
+                    <View style={styles.actionButtons}>
+                        <TouchableOpacity style={styles.primaryButton} onPress={handleRepeatBooking}>
+                            <Ionicons name="repeat-outline" size={20} color="#fff" />
+                            <Text style={styles.primaryButtonText}>Repetir reserva</Text>
                         </TouchableOpacity>
                         <TouchableOpacity 
                             style={[styles.secondaryButton, loadingChat && styles.buttonDisabled]} 
@@ -202,14 +364,98 @@ export default function TripDetails() {
 
                     <View style={styles.infoRow}>
                         <View style={styles.iconBox}>
-                            <Ionicons name="location-outline" size={20} color="#0B729D" />
+                            <Ionicons 
+                                name={reservation.isDelivery ? "car-sport-outline" : "location-outline"} 
+                                size={20} 
+                                color="#0B729D" 
+                            />
                         </View>
                         <View style={styles.infoContent}>
-                            <Text style={styles.infoLabel}>Ubicación de recogida</Text>
-                            <Text style={styles.infoValue}>{reservation.pickupLocation || 'Ubicación no disponible'}</Text>
+                            <Text style={styles.infoLabel}>
+                                {reservation.isDelivery ? 'Dirección de entrega' : 'Ubicación de recogida'}
+                            </Text>
+                            <Text style={styles.infoValue}>
+                                {reservation.isDelivery 
+                                    ? reservation.deliveryAddress 
+                                    : (reservation.pickupLocation || 'Ubicación no disponible')}
+                            </Text>
                         </View>
                     </View>
                 </View>
+
+                {/* Extras */}
+                {reservation.extras && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Extras contratados</Text>
+                        {reservation.extras.insurance && (
+                            <View style={styles.infoRow}>
+                                <View style={styles.iconBox}>
+                                    <Ionicons name="shield-checkmark-outline" size={20} color="#0B729D" />
+                                </View>
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Seguro</Text>
+                                    <Text style={styles.infoValue}>Seguro Premium</Text>
+                                </View>
+                            </View>
+                        )}
+                        {reservation.extras.babySeat && (
+                            <View style={styles.infoRow}>
+                                <View style={styles.iconBox}>
+                                    <Ionicons name="happy-outline" size={20} color="#0B729D" />
+                                </View>
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Accesorio</Text>
+                                    <Text style={styles.infoValue}>Silla de bebé</Text>
+                                </View>
+                            </View>
+                        )}
+                        {reservation.extras.gps && (
+                            <View style={styles.infoRow}>
+                                <View style={styles.iconBox}>
+                                    <Ionicons name="navigate-outline" size={20} color="#0B729D" />
+                                </View>
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Accesorio</Text>
+                                    <Text style={styles.infoValue}>GPS Navegador</Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {/* Price Breakdown */}
+                {reservation.priceBreakdown && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Resumen de pago</Text>
+                        <View style={{ gap: 8 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ color: '#4B5563' }}>Renta ({reservation.priceBreakdown.days} días)</Text>
+                                <Text style={{ fontWeight: '600' }}>${(reservation.priceBreakdown.pricePerDay * reservation.priceBreakdown.days).toFixed(2)}</Text>
+                            </View>
+                            {reservation.priceBreakdown.extrasTotal > 0 && (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text style={{ color: '#4B5563' }}>Extras</Text>
+                                    <Text style={{ fontWeight: '600' }}>${reservation.priceBreakdown.extrasTotal.toFixed(2)}</Text>
+                                </View>
+                            )}
+                            {reservation.priceBreakdown.deliveryFee > 0 && (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text style={{ color: '#4B5563' }}>Delivery</Text>
+                                    <Text style={{ fontWeight: '600' }}>${reservation.priceBreakdown.deliveryFee.toFixed(2)}</Text>
+                                </View>
+                            )}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ color: '#4B5563' }}>Tarifa de servicio</Text>
+                                <Text style={{ fontWeight: '600' }}>${reservation.priceBreakdown.serviceFee.toFixed(2)}</Text>
+                            </View>
+                            <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 4 }} />
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontWeight: '700', fontSize: 16 }}>Total</Text>
+                                <Text style={{ fontWeight: '700', fontSize: 16, color: '#0B729D' }}>${reservation.priceBreakdown.total.toFixed(2)}</Text>
+                            </View>
+                        </View>
+                    </View>
+                )}
 
                 {/* Map */}
                 <View style={styles.mapSection}>
@@ -442,5 +688,74 @@ const styles = StyleSheet.create({
     },
     buttonDisabled: {
         opacity: 0.6,
+    },
+    timelineSection: {
+        padding: 20,
+        borderBottomWidth: 8,
+        borderBottomColor: '#F9FAFB',
+    },
+    timelineHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    timeline: {
+        paddingLeft: 4,
+    },
+    timelineItem: {
+        flexDirection: 'row',
+        marginBottom: 24,
+    },
+    timelineIconContainer: {
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    timelineIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F3F4F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+    },
+    timelineIconCompleted: {
+        backgroundColor: '#10B981',
+        borderColor: '#10B981',
+    },
+    timelineIconActive: {
+        backgroundColor: '#0B729D',
+        borderColor: '#0B729D',
+    },
+    timelineLine: {
+        width: 2,
+        flex: 1,
+        backgroundColor: '#E5E7EB',
+        marginTop: 4,
+    },
+    timelineLineCompleted: {
+        backgroundColor: '#10B981',
+    },
+    timelineContent: {
+        flex: 1,
+        paddingTop: 8,
+    },
+    timelineTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#6B7280',
+        marginBottom: 4,
+    },
+    timelineTitleCompleted: {
+        color: '#10B981',
+    },
+    timelineTitleActive: {
+        color: '#0B729D',
+    },
+    timelineDate: {
+        fontSize: 13,
+        color: '#9CA3AF',
     },
 });

@@ -1,19 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
 import { colors } from '../../constants/colors';
@@ -42,14 +41,6 @@ export default function RegistroAddress({ route, navigation }: any) {
 
   // Referencia al mapa para animateToRegion
   const mapRef = React.useRef<MapView>(null);
-
-  // Comentado: dejar que el marcador sea independiente de la región
-  // para permitir drag del marcador sin que el mapa lo recentre
-  // useEffect(() => {
-  //   if (!selectedPlace) {
-  //     setMarker({ latitude: region.latitude, longitude: region.longitude });
-  //   }
-  // }, [region.latitude, region.longitude, selectedPlace]);
 
   const fetchAutocomplete = async (text: string) => {
     if (!text.trim()) {
@@ -195,13 +186,7 @@ export default function RegistroAddress({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-
-      <LinearGradient
-        colors={[colors.background.gradientStart, colors.background.gradientEnd]}
-        locations={[0.05, 0.82]}
-        style={styles.backgroundGradient}
-      />
+      <StatusBar barStyle="dark-content" />
 
       <KeyboardAvoidingView
         style={styles.content}
@@ -211,11 +196,19 @@ export default function RegistroAddress({ route, navigation }: any) {
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#fff" />
+              <Ionicons name="arrow-back" size={24} color={colors.primary} />
             </TouchableOpacity>
-            <Ionicons name="location-outline" size={48} color="#fff" style={{ marginBottom: 8 }} />
-            <Text style={styles.title}>Tu dirección</Text>
-            <Text style={styles.subtitle}>Búsca tu dirección y ajústala en el mapa</Text>
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressDot, styles.progressDotDone]} />
+              <View style={[styles.progressLine, styles.progressLineDone]} />
+              <View style={[styles.progressDot, styles.progressDotActive]} />
+              <View style={styles.progressLine} />
+              <View style={styles.progressDot} />
+            </View>
+            <Text style={styles.stepText}>Paso 2 de 3</Text>
+            <Ionicons name="location-outline" size={48} color={colors.primary} style={{ marginVertical: 8 }} />
+            <Text style={styles.title}>Tu Dirección</Text>
+            <Text style={styles.subtitle}>Para validar tu identidad</Text>
           </View>
 
           {/* Botón destacado: Usar ubicación actual */}
@@ -224,22 +217,32 @@ export default function RegistroAddress({ route, navigation }: any) {
             onPress={handleGetCurrentLocation}
             disabled={loading}
           >
-            <Ionicons name="navigate-circle" size={24} color="#fff" />
-            <Text style={styles.currentLocationText}>Usar mi ubicación actual</Text>
-            {loading && <ActivityIndicator size="small" color="#fff" style={{ marginLeft: 8 }} />}
+            <View style={styles.iconContainer}>
+              <Ionicons name="navigate" size={24} color={colors.primary} />
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={styles.currentLocationText}>Usar mi ubicación actual</Text>
+              <Text style={styles.currentLocationSubtext}>Detectar automáticamente</Text>
+            </View>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            )}
           </TouchableOpacity>
 
           {/* Separador */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>o busca manualmente</Text>
+            <Text style={styles.dividerText}>O ingresa manualmente</Text>
             <View style={styles.dividerLine} />
           </View>
 
           {/* Buscador */}
           <View style={styles.card}>
+            <Text style={styles.cardLabel}>Buscar dirección</Text>
             <View style={styles.searchRow}>
-              <Ionicons name="search" size={18} color="#6B7280" />
+              <Ionicons name="search" size={20} color="#9CA3AF" />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Ej: Col. Escalón, San Salvador"
@@ -250,16 +253,23 @@ export default function RegistroAddress({ route, navigation }: any) {
                   fetchAutocomplete(t);
                 }}
               />
+              {query.length > 0 && (
+                <TouchableOpacity onPress={() => { setQuery(''); setPredictions([]); }}>
+                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
             </View>
             {predictions.length > 0 && (
-              <View style={{ maxHeight: 200, marginTop: 8 }}>
+              <View style={styles.predictionsContainer}>
                 {predictions.map((item) => (
                   <TouchableOpacity 
                     key={item.place_id} 
                     style={styles.predictionItem} 
                     onPress={() => handleSelectPrediction(item)}
                   >
-                    <Ionicons name="location" size={18} color={colors.primary} />
+                    <View style={styles.predictionIcon}>
+                      <Ionicons name="location" size={16} color={colors.primary} />
+                    </View>
                     <Text style={styles.predictionText}>{item.description}</Text>
                   </TouchableOpacity>
                 ))}
@@ -268,34 +278,44 @@ export default function RegistroAddress({ route, navigation }: any) {
           </View>
 
           {/* Mapa */}
-          <View style={[styles.card, { overflow: 'hidden' }]}> 
-            <MapView
-              ref={mapRef}
-              style={{ height: 240, width: '100%' }}
-              region={region}
-              onRegionChangeComplete={setRegion}
-            >
-              <Marker
-                coordinate={marker}
-                draggable
-                onDragEnd={(e) => {
-                  setMarker(e.nativeEvent.coordinate);
-                  // Limpiar selectedPlace cuando el usuario arrastra manualmente
-                  setSelectedPlace(null);
-                }}
-              />
-            </MapView>
-            <Text style={[styles.infoText, { marginTop: 8 }]}>
-              {selectedPlace 
-                ? `📍 ${selectedPlace.formattedAddress}`
-                : 'Arrastra el pin para ajustar la ubicación exacta'
-              }
-            </Text>
+          <View style={styles.mapCard}> 
+            <View style={styles.mapHeader}>
+              <Text style={styles.mapTitle}>Confirmar ubicación</Text>
+              <Text style={styles.mapSubtitle}>Arrastra el pin si es necesario</Text>
+            </View>
+            <View style={styles.mapContainer}>
+              <MapView
+                ref={mapRef}
+                style={styles.map}
+                region={region}
+                onRegionChangeComplete={setRegion}
+              >
+                <Marker
+                  coordinate={marker}
+                  draggable
+                  onDragEnd={(e) => {
+                    setMarker(e.nativeEvent.coordinate);
+                    setSelectedPlace(null);
+                  }}
+                />
+              </MapView>
+              {/* Overlay de dirección seleccionada */}
+              <View style={styles.addressOverlay}>
+                <Ionicons name="location" size={16} color={colors.primary} />
+                <Text style={styles.addressOverlayText} numberOfLines={1}>
+                  {selectedPlace 
+                    ? selectedPlace.formattedAddress
+                    : 'Ubicación seleccionada en el mapa'
+                  }
+                </Text>
+              </View>
+            </View>
           </View>
 
           {/* Confirmar */}
           <TouchableOpacity style={styles.primaryBtn} onPress={handleConfirm}>
-            <Text style={styles.primaryText}>Confirmar dirección</Text>
+            <Text style={styles.primaryText}>Confirmar Dirección</Text>
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -304,59 +324,204 @@ export default function RegistroAddress({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.primary },
-  backgroundGradient: { position: 'absolute', left: 0, right: 0, top: 0, height: '100%' },
+  container: { flex: 1, backgroundColor: '#fff' },
   content: { flex: 1 },
-  scroll: { paddingHorizontal: 20, paddingTop: 50, paddingBottom: 40 },
-  header: { alignItems: 'center', marginBottom: 16 },
-  backButton: { position: 'absolute', left: 0, top: 10, padding: 8 },
-  title: { fontSize: 24, fontWeight: '700', color: '#fff', marginTop: 6 },
-  subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.85)' },
+  scroll: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  
+  // Header & Progress
+  header: { alignItems: 'center', marginBottom: 32 },
+  backButton: { position: 'absolute', left: 0, top: 0, padding: 8, zIndex: 10 },
+  progressContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20, marginTop: 10 },
+  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5E7EB' },
+  progressDotActive: { backgroundColor: colors.primary, transform: [{ scale: 1.2 }] },
+  progressDotDone: { backgroundColor: colors.primary },
+  progressLine: { width: 30, height: 2, backgroundColor: '#E5E7EB', marginHorizontal: 4 },
+  progressLineDone: { backgroundColor: colors.primary },
+  
+  stepText: { color: colors.primary, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: '700', color: '#111827', textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#6B7280', marginTop: 4, textAlign: 'center' },
+
+  // Current Location Button
   currentLocationBtn: { 
     flexDirection: 'row', 
     alignItems: 'center', 
+    backgroundColor: '#F9FAFB', 
+    padding: 16, 
+    borderRadius: 16, 
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB'
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary, 
-    paddingVertical: 16, 
-    paddingHorizontal: 20,
-    borderRadius: 14, 
-    marginBottom: 16,
-    shadowColor: colors.primary, 
-    shadowOffset: { width: 0, height: 3 }, 
-    shadowOpacity: 0.3, 
-    shadowRadius: 5, 
-    elevation: 4 
+    marginRight: 12
   },
   currentLocationText: { 
-    color: '#fff', 
+    color: '#111827', 
     fontSize: 16, 
     fontWeight: '600',
-    marginLeft: 8
   },
+  currentLocationSubtext: {
+    color: '#6B7280',
+    fontSize: 12,
+    marginTop: 2
+  },
+
+  // Divider
   divider: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    marginBottom: 16 
+    marginBottom: 24 
   },
   dividerLine: { 
     flex: 1, 
     height: 1, 
-    backgroundColor: 'rgba(255,255,255,0.3)' 
+    backgroundColor: '#E5E7EB' 
   },
   dividerText: { 
-    color: 'rgba(255,255,255,0.7)', 
-    fontSize: 13, 
+    color: '#9CA3AF', 
+    fontSize: 12, 
     marginHorizontal: 12,
+    fontWeight: '500',
+    textTransform: 'uppercase'
+  },
+
+  // Search Card
+  card: { 
+    backgroundColor: '#fff', 
+    borderRadius: 20, 
+    padding: 0, 
+    marginBottom: 20,
+  },
+  cardLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8
+  },
+  searchRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12, 
+    paddingHorizontal: 12, 
+    height: 48
+  },
+  searchInput: { 
+    flex: 1, 
+    color: '#111827',
+    fontSize: 15,
+    marginLeft: 8
+  },
+  predictionsContainer: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 4
+  },
+  predictionItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: 12, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#F9FAFB' 
+  },
+  predictionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10
+  },
+  predictionText: { 
+    flex: 1,
+    color: '#4B5563',
+    fontSize: 14
+  },
+
+  // Map Card
+  mapCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  mapHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6'
+  },
+  mapTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827'
+  },
+  mapSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2
+  },
+  mapContainer: {
+    height: 250,
+    width: '100%',
+    position: 'relative'
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  addressOverlay: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    padding: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  addressOverlayText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 13,
+    color: '#374151',
     fontWeight: '500'
   },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 14 },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  searchInput: { flex: 1, color: '#111827' },
-  locationButton: { padding: 4 },
-  predictionItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  predictionText: { color: '#111827' },
-  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#EFF6FF', padding: 10, borderRadius: 10 },
-  infoText: { color: '#374151', fontSize: 12 },
-  primaryBtn: { height: 52, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4 },
-  primaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  // Primary Button
+  primaryBtn: { 
+    flexDirection: 'row',
+    height: 56, 
+    borderRadius: 16, 
+    backgroundColor: colors.primary, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    shadowColor: colors.primary, 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.3, 
+    shadowRadius: 8, 
+    elevation: 6,
+    marginBottom: 20
+  },
+  primaryText: { 
+    color: '#fff', 
+    fontSize: 16, 
+    fontWeight: '700',
+    marginRight: 8
+  },
 });

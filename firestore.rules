@@ -18,6 +18,21 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
     
+    // Favorites collection
+    match /favorites/{favoriteId} {
+      // favoriteId format: {userId}_{vehicleId}
+      allow read: if isAuthenticated() && 
+                    (favoriteId.split('_')[0] == request.auth.uid || 
+                     resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && 
+                    request.query.limit <= 100;
+      allow create: if isAuthenticated() && 
+                      favoriteId.split('_')[0] == request.auth.uid &&
+                      request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && favoriteId.split('_')[0] == request.auth.uid;
+      allow update: if false; // No updates allowed, only create/delete
+    }
+    
     // Vehicles collection
     match /vehicles/{vehicleId} {
       allow read: if true;
@@ -40,6 +55,31 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || 
         resource.data.arrendadorId == request.auth.uid
       );
+    }
+
+    // Check-ins collection
+    match /checkIns/{checkInId} {
+      // Allow read if user is authenticated AND either:
+      // - Document doesn't exist yet (for checking if checkIn exists)
+      // - Document exists and user is participant
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.renterId == request.auth.uid || 
+        resource.data.ownerId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.renterId == request.auth.uid || 
+        request.resource.data.ownerId == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.renterId == request.auth.uid || 
+        resource.data.ownerId == request.auth.uid
+      );
+    }
+
+    // Check-outs collection
+    match /checkOuts/{checkOutId} {
+      allow read, write: if isAuthenticated();
     }
     
     // Availability collection (Public read access)
@@ -89,6 +129,9 @@ service cloud.firestore {
         // Allow create messages only to chat participants and if senderId matches auth uid
         allow create: if isChatParticipant() && 
                         request.resource.data.senderId == request.auth.uid;
+        
+        // Allow update messages for read receipts (readBy field updates)
+        allow update: if isChatParticipant();
       }
     }
   }

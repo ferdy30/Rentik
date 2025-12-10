@@ -1,5 +1,5 @@
-import { Timestamp, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { db } from '../../FirebaseConfig';
+import { Timestamp, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { auth, db } from '../../FirebaseConfig';
 
 export interface AvailabilityData {
   id?: string;
@@ -23,6 +23,10 @@ export interface Reservation {
   returnLocation?: string;
   pickupTime?: string;
   returnTime?: string;
+  isDelivery?: boolean;
+  deliveryAddress?: string;
+  deliveryCoords?: { latitude: number; longitude: number };
+  pickupCoords?: { latitude: number; longitude: number };
   denialReason?: string;
     cancellationReason?: string;
   messageToHost?: string;
@@ -36,6 +40,20 @@ export interface Reservation {
     modelo: string;
     anio: number;
     imagen: string;
+  };
+  extras?: {
+    babySeat?: boolean;
+    insurance?: boolean;
+    gps?: boolean;
+  };
+  priceBreakdown?: {
+    days: number;
+    pricePerDay: number;
+    deliveryFee: number;
+    extrasTotal: number;
+    serviceFee: number;
+    subtotal: number;
+    total: number;
   };
 }
 
@@ -53,9 +71,8 @@ export const getUserReservations = async (userId: string): Promise<Reservation[]
     });
     // Sort by date (newest first)
     return reservations.sort((a, b) => b.startDate.toMillis() - a.startDate.toMillis());
-  } catch (error) {
-    console.error('Error fetching user reservations:', error);
-    return [];
+  } catch (error: any) {
+    throw new Error(error.message || 'Error al cargar las reservas');
   }
 };
 
@@ -73,16 +90,14 @@ export const getOwnerReservations = async (arrendadorId: string): Promise<Reserv
     });
     // Sort by date (newest first)
     return reservations.sort((a, b) => b.startDate.toMillis() - a.startDate.toMillis());
-  } catch (error) {
-    console.error('Error fetching owner reservations:', error);
-    return [];
+  } catch (error: any) {
+    throw new Error(error.message || 'Error al cargar las reservas');
   }
 };
 
 export const getVehicleReservations = async (vehicleId: string): Promise<Reservation[]> => {
   try {
     if (!vehicleId) {
-      console.warn('getVehicleReservations called with empty vehicleId');
       return [];
     }
     // Query the public availability collection instead of restricted reservations
@@ -98,9 +113,8 @@ export const getVehicleReservations = async (vehicleId: string): Promise<Reserva
       reservations.push({ id: doc.id, ...doc.data() } as unknown as Reservation);
     });
     return reservations;
-  } catch (error) {
-    console.error('Error fetching reservations:', error);
-    return [];
+  } catch (error: any) {
+    throw new Error(error.message || 'Error al cargar disponibilidad del vehículo');
   }
 };
 
@@ -128,9 +142,8 @@ export const createReservation = async (reservationData: Omit<Reservation, 'id' 
 
     await batch.commit();
     return reservationId;
-  } catch (error) {
-    console.error('Error creating reservation:', error);
-    throw error;
+  } catch (error: any) {
+    throw new Error(error.message || 'Error al crear la reserva');
   }
 };
 
@@ -192,10 +205,28 @@ export const updateReservationStatus = async (
 export const deleteReservation = async (reservationId: string) => {
   try {
     const reservationRef = doc(db, 'reservations', reservationId);
+    
+    // Verify the reservation exists and user has permission
+    const reservationSnap = await getDoc(reservationRef);
+    if (!reservationSnap.exists()) {
+      throw new Error('Reserva no encontrada');
+    }
+    
+    const reservationData = reservationSnap.data();
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      throw new Error('Usuario no autenticado');
+    }
+    
+    // Verify user is either the renter or the host
+    if (reservationData.userId !== currentUser.uid && reservationData.arrendadorId !== currentUser.uid) {
+      throw new Error('No tienes permisos para eliminar esta reserva');
+    }
+    
     await deleteDoc(reservationRef);
-  } catch (error) {
-    console.error('Error deleting reservation:', error);
-    throw error;
+  } catch (error: any) {
+    throw new Error(error.message || 'Error al eliminar la reserva');
   }
 };
 
@@ -206,8 +237,7 @@ export const archiveReservation = async (reservationId: string) => {
       archived: true,
       archivedAt: serverTimestamp()
     });
-  } catch (error) {
-    console.error('Error archiving reservation:', error);
-    throw error;
+  } catch (error: any) {
+    throw new Error(error.message || 'Error al archivar la reserva');
   }
 };

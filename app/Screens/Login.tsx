@@ -8,20 +8,19 @@ import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword } 
 import { doc, getDoc } from 'firebase/firestore';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { Firebaseauth, db } from '../../FirebaseConfig';
-import SocialAuthButtons from '../components/SocialAuthButtons';
 import { colors } from '../constants/colors';
 // import { getHomeRouteByRole } from '../navigation/role';
 
@@ -259,11 +258,12 @@ const Login = ({ navigation }: any) => {
                 <Text style={styles.signUpButtonText}>Crear cuenta nueva</Text>
               </TouchableOpacity>
 
-              {/* Social auth */}
+              {/* Social auth - Comentado temporalmente
               <SocialAuthButtons
                 onGoogle={() => { void signInWithGoogle(); }}
                 // Apple Sign-In comentado hasta tener Apple Developer Program
               />
+              */}
 
               {__DEV__ && (
                 <TouchableOpacity

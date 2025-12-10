@@ -42,6 +42,9 @@ Thumbs.db
 # Firebase config with sensitive keys
 FirebaseConfig.js
 
+# App config with API keys
+app.json
+
 # Firebase
 .firebase/
 firebase-debug.log

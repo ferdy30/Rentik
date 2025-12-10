@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
     Platform,
+    ScrollView,
     StatusBar,
     StyleSheet,
     Text,
@@ -11,47 +11,41 @@ import {
     View
 } from 'react-native';
 
+const HOURS = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
+
 export default function BookingStep3Time() {
     const navigation = useNavigation();
     const route = useRoute<any>();
-    const { vehicle, startDate, endDate, pickupLocation, returnLocation } = route.params;
+    const { vehicle, startDate, endDate, pickupLocation, returnLocation, isDelivery, deliveryAddress, deliveryCoords } = route.params;
 
-    const [pickupTime, setPickupTime] = useState(new Date(new Date().setHours(10, 0, 0, 0)));
-    const [returnTime, setReturnTime] = useState(new Date(new Date().setHours(10, 0, 0, 0)));
-    const [showPickupPicker, setShowPickupPicker] = useState(false);
-    const [showReturnPicker, setShowReturnPicker] = useState(false);
+    const [pickupHour, setPickupHour] = useState(10);
+    const [returnHour, setReturnHour] = useState(10);
 
-    const onPickupTimeChange = (event: any, selectedDate?: Date) => {
-        if (Platform.OS === 'android') {
-            setShowPickupPicker(false);
-        }
-        if (selectedDate) {
-            setPickupTime(selectedDate);
-        }
-    };
-
-    const onReturnTimeChange = (event: any, selectedDate?: Date) => {
-        if (Platform.OS === 'android') {
-            setShowReturnPicker(false);
-        }
-        if (selectedDate) {
-            setReturnTime(selectedDate);
-        }
-    };
-
-    const formatTime = (date: Date) => {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const formatHour = (hour: number) => {
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour > 12 ? hour - 12 : hour;
+        return `${displayHour}:00 ${period}`;
     };
 
     const handleNext = () => {
+        // Create ISO strings with exact hours
+        const pickupDate = new Date(startDate);
+        pickupDate.setHours(pickupHour, 0, 0, 0);
+        
+        const returnDate = new Date(endDate);
+        returnDate.setHours(returnHour, 0, 0, 0);
+
         navigation.navigate('BookingStep4Confirmation' as never, { 
             vehicle, 
             startDate, 
             endDate,
             pickupLocation,
             returnLocation,
-            pickupTime: pickupTime.toISOString(),
-            returnTime: returnTime.toISOString()
+            pickupTime: pickupDate.toISOString(),
+            returnTime: returnDate.toISOString(),
+            isDelivery,
+            deliveryAddress,
+            deliveryCoords
         } as never);
     };
 
@@ -69,74 +63,101 @@ export default function BookingStep3Time() {
                 <View style={{ width: 40 }} />
             </View>
 
-            <View style={styles.content}>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Step Indicators */}
+                <View style={styles.stepIndicators}>
+                    <View style={styles.stepIndicatorComplete}>
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                    </View>
+                    <View style={styles.stepIndicatorLine} />
+                    <View style={styles.stepIndicatorComplete}>
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                    </View>
+                    <View style={styles.stepIndicatorLine} />
+                    <View style={styles.stepIndicatorActive}>
+                        <Text style={styles.stepIndicatorNumber}>3</Text>
+                    </View>
+                    <View style={styles.stepIndicatorLineInactive} />
+                    <View style={styles.stepIndicatorInactive}>
+                        <Text style={styles.stepIndicatorNumberInactive}>4</Text>
+                    </View>
+                </View>
+
                 <Text style={styles.stepTitle}>Paso 3 de 4</Text>
                 <Text style={styles.title}>Horario</Text>
                 <Text style={styles.subtitle}>Selecciona la hora de entrega y devolución</Text>
 
-                <View style={styles.timeContainer}>
-                    <TouchableOpacity 
-                        style={[styles.timeCard, showPickupPicker && styles.activeCard]} 
-                        onPress={() => {
-                            setShowPickupPicker(!showPickupPicker);
-                            setShowReturnPicker(false);
-                        }}
-                        activeOpacity={0.8}
-                    >
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="time-outline" size={24} color="#0B729D" />
-                        </View>
-                        <View style={styles.timeInfo}>
-                            <Text style={styles.timeLabel}>Hora de recogida</Text>
-                            <Text style={styles.timeValue}>{formatTime(pickupTime)}</Text>
-                        </View>
-                        <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                        style={[styles.timeCard, showReturnPicker && styles.activeCard]} 
-                        onPress={() => {
-                            setShowReturnPicker(!showReturnPicker);
-                            setShowPickupPicker(false);
-                        }}
-                        activeOpacity={0.8}
-                    >
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="time" size={24} color="#0B729D" />
-                        </View>
-                        <View style={styles.timeInfo}>
-                            <Text style={styles.timeLabel}>Hora de devolución</Text>
-                            <Text style={styles.timeValue}>{formatTime(returnTime)}</Text>
-                        </View>
-                        <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-                    </TouchableOpacity>
-                </View>
-
                 <View style={styles.infoBox}>
                     <Ionicons name="information-circle-outline" size={20} color="#0B729D" />
                     <Text style={styles.infoText}>
-                        El horario de atención es de 8:00 AM a 8:00 PM.
+                        Horario de atención: 8:00 AM - 8:00 PM
                     </Text>
                 </View>
 
-                {showPickupPicker && (
-                    <DateTimePicker
-                        value={pickupTime}
-                        mode="time"
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                        onChange={onPickupTimeChange}
-                    />
-                )}
+                {/* Pickup Time */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="log-in-outline" size={20} color="#0B729D" />
+                        <Text style={styles.sectionTitle}>Hora de recogida</Text>
+                    </View>
+                    <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.hoursScroll}
+                    >
+                        {HOURS.map((hour) => (
+                            <TouchableOpacity
+                                key={`pickup-${hour}`}
+                                style={[
+                                    styles.hourButton,
+                                    pickupHour === hour && styles.hourButtonActive
+                                ]}
+                                onPress={() => setPickupHour(hour)}
+                            >
+                                <Text style={[
+                                    styles.hourText,
+                                    pickupHour === hour && styles.hourTextActive
+                                ]}>
+                                    {formatHour(hour)}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
 
-                {showReturnPicker && (
-                    <DateTimePicker
-                        value={returnTime}
-                        mode="time"
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                        onChange={onReturnTimeChange}
-                    />
-                )}
-            </View>
+                {/* Return Time */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="log-out-outline" size={20} color="#0B729D" />
+                        <Text style={styles.sectionTitle}>Hora de devolución</Text>
+                    </View>
+                    <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.hoursScroll}
+                    >
+                        {HOURS.map((hour) => (
+                            <TouchableOpacity
+                                key={`return-${hour}`}
+                                style={[
+                                    styles.hourButton,
+                                    returnHour === hour && styles.hourButtonActive
+                                ]}
+                                onPress={() => setReturnHour(hour)}
+                            >
+                                <Text style={[
+                                    styles.hourText,
+                                    returnHour === hour && styles.hourTextActive
+                                ]}>
+                                    {formatHour(hour)}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                <View style={{ height: 40 }} />
+            </ScrollView>
 
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
@@ -165,6 +186,56 @@ const styles = StyleSheet.create({
         padding: 8,
         borderRadius: 12,
         backgroundColor: '#F3F4F6',
+    },
+    stepIndicators: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 24,
+    },
+    stepIndicatorComplete: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#10B981',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    stepIndicatorActive: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#0B729D',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    stepIndicatorInactive: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#E5E7EB',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    stepIndicatorNumber: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#fff',
+    },
+    stepIndicatorNumberInactive: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#9CA3AF',
+    },
+    stepIndicatorLine: {
+        width: 40,
+        height: 2,
+        backgroundColor: '#10B981',
+    },
+    stepIndicatorLineInactive: {
+        width: 40,
+        height: 2,
+        backgroundColor: '#E5E7EB',
     },
     progressBarContainer: {
         flex: 1,
@@ -200,66 +271,69 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 16,
         color: '#6B7280',
-        marginBottom: 32,
-    },
-    timeContainer: {
-        gap: 16,
-    },
-    timeCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    activeCard: {
-        borderColor: '#0B729D',
-        backgroundColor: '#F0F9FF',
-    },
-    iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: '#F0F9FF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 16,
-    },
-    timeInfo: {
-        flex: 1,
-    },
-    timeLabel: {
-        fontSize: 12,
-        color: '#6B7280',
-        marginBottom: 4,
-        fontWeight: '500',
-    },
-    timeValue: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#111827',
+        marginBottom: 24,
     },
     infoBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F3F4F6',
-        padding: 16,
+        backgroundColor: '#F0F9FF',
+        padding: 14,
         borderRadius: 12,
-        marginTop: 24,
-        gap: 12,
+        marginBottom: 32,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
     },
     infoText: {
         flex: 1,
-        fontSize: 14,
-        color: '#4B5563',
-        lineHeight: 20,
+        fontSize: 13,
+        color: '#0B729D',
+        fontWeight: '600',
+    },
+    section: {
+        marginBottom: 32,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    hoursScroll: {
+        gap: 12,
+        paddingHorizontal: 4,
+    },
+    hourButton: {
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+        backgroundColor: '#fff',
+        minWidth: 100,
+        alignItems: 'center',
+    },
+    hourButtonActive: {
+        borderColor: '#0B729D',
+        backgroundColor: '#0B729D',
+        shadowColor: '#0B729D',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    hourText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#6B7280',
+    },
+    hourTextActive: {
+        color: '#fff',
     },
     footer: {
         padding: 24,

@@ -5,7 +5,6 @@ import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Image,
     Modal,
     RefreshControl,
     ScrollView,
@@ -16,8 +15,9 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { db } from '../../../FirebaseConfig';
 import { useAuth } from '../../../context/Auth';
+import { db } from '../../../FirebaseConfig';
+import ReservationCard from '../../components/ReservationCard';
 import { createChatIfNotExists } from '../../services/chat';
 import { archiveReservation, deleteReservation, getOwnerReservations, Reservation, updateReservationStatus } from '../../services/reservations';
 
@@ -37,6 +37,7 @@ export default function ReservasScreen() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'requests' | 'upcoming' | 'history'>('requests');
   
   // Modal state for denial
   const [modalVisible, setModalVisible] = useState(false);
@@ -108,13 +109,15 @@ export default function ReservasScreen() {
       
       // Cargar información de los arrendatarios
       const profiles: Record<string, UserProfile> = {};
-      for (const reservation of data) {
-        if (!profiles[reservation.userId]) {
+      const uniqueUserIds = [...new Set(data.map(r => r.userId))];
+      
+      await Promise.all(
+        uniqueUserIds.map(async (userId) => {
           try {
-            const userDoc = await getDoc(doc(db, 'users', reservation.userId));
+            const userDoc = await getDoc(doc(db, 'users', userId));
             if (userDoc.exists()) {
               const userData = userDoc.data();
-              profiles[reservation.userId] = {
+              profiles[userId] = {
                 nombre: userData.nombre || 'Usuario',
                 email: userData.email || '',
                 photoURL: userData.photoURL,
@@ -124,14 +127,15 @@ export default function ReservasScreen() {
                 rating: userData.rating || 0,
               };
             }
-          } catch (_error) {
-            console.error('Error loading user profile:', _error);
+          } catch (error) {
+            // Silently fail for individual profiles
           }
-        }
-      }
+        })
+      );
+      
       setUserProfiles(profiles);
-    } catch (_error) {
-      console.error(_error);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudieron cargar las reservas');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -231,12 +235,15 @@ export default function ReservasScreen() {
           onPress: async () => {
             try {
               setDeletingId(reservationId);
+              console.log('Attempting to delete reservation:', reservationId);
+              console.log('Current user:', user?.uid);
               await deleteReservation(reservationId);
               Alert.alert('Eliminada', 'Reserva eliminada correctamente');
               fetchReservations();
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error deleting reservation:', error);
-              Alert.alert('Error', 'No se pudo eliminar la reserva');
+              const errorMessage = error.message || 'No se pudo eliminar la reserva';
+              Alert.alert('Error', errorMessage);
             } finally {
               setDeletingId(null);
             }
@@ -245,6 +252,18 @@ export default function ReservasScreen() {
       ]
     );
   };
+
+  const getFilteredReservations = () => {
+    return reservations.filter(r => {
+      if (r.archived) return false;
+      if (activeTab === 'requests') return r.status === 'pending';
+      if (activeTab === 'upcoming') return r.status === 'confirmed';
+      if (activeTab === 'history') return ['completed', 'cancelled', 'denied'].includes(r.status);
+      return false;
+    });
+  };
+
+  const filteredReservations = getFilteredReservations();
 
   if (loading) {
     return (
@@ -260,254 +279,80 @@ export default function ReservasScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Reservas</Text>
       </View>
+
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'requests' && styles.activeTab]} 
+          onPress={() => setActiveTab('requests')}
+        >
+          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Solicitudes</Text>
+          {reservations.filter(r => r.status === 'pending' && !r.archived).length > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {reservations.filter(r => r.status === 'pending' && !r.archived).length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]} 
+          onPress={() => setActiveTab('upcoming')}
+        >
+          <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>Próximas</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'history' && styles.activeTab]} 
+          onPress={() => setActiveTab('history')}
+        >
+          <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>Historial</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView 
         style={styles.content} 
-        contentContainerStyle={{ paddingBottom: 24, gap: 16 }}
+        contentContainerStyle={{ paddingBottom: 120, gap: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {reservations.length === 0 ? (
+        {filteredReservations.length === 0 ? (
           <View style={{ alignItems: 'center', marginTop: 50 }}>
-            <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-            <Text style={{ marginTop: 16, fontSize: 16, color: '#6B7280' }}>No tienes reservas aún.</Text>
+            <Ionicons 
+              name={
+                activeTab === 'requests' ? "notifications-outline" : 
+                activeTab === 'upcoming' ? "calendar-outline" : "time-outline"
+              } 
+              size={64} 
+              color="#D1D5DB" 
+            />
+            <Text style={{ marginTop: 16, fontSize: 16, color: '#6B7280' }}>
+              {activeTab === 'requests' ? 'No tienes solicitudes pendientes.' :
+               activeTab === 'upcoming' ? 'No tienes reservas próximas.' :
+               'No tienes historial de reservas.'}
+            </Text>
           </View>
         ) : (
-          reservations.filter(r => !r.archived).map((r) => {
-            const statusInfo = getStatusInfo(r.status);
+          filteredReservations.map((r) => {
+            const renterProfile = userProfiles[r.userId];
             const vehicleName = r.vehicleSnapshot 
               ? `${r.vehicleSnapshot.marca} ${r.vehicleSnapshot.modelo}`
               : 'Vehículo';
-            const renterProfile = userProfiles[r.userId];
-            const memberSince = renterProfile?.createdAt 
-              ? (renterProfile.createdAt.toDate ? new Date(renterProfile.createdAt.toDate()).getFullYear() : null)
-              : null;
 
             return (
-              <View key={r.id} style={styles.card}>
-                {/* Header con vehículo y estado */}
-                <View style={styles.cardHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{vehicleName}</Text>
-                    <Text style={styles.cardSubtitle}>
-                      {formatDate(r.startDate)} - {formatDate(r.endDate)}
-                    </Text>
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: statusInfo.color }]}>
-                    <Text style={[styles.statusText, { color: statusInfo.textColor }]}>{statusInfo.label}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.divider} />
-                
-                {/* Perfil del Arrendatario */}
-                <View style={styles.renterSection}>
-                  <Text style={styles.sectionTitle}>Solicitado por</Text>
-                  <View style={styles.renterProfile}>
-                    <View style={styles.avatar}>
-                      {renterProfile?.photoURL ? (
-                        <Image 
-                          source={{ uri: renterProfile.photoURL }} 
-                          style={styles.avatarImage}
-                        />
-                      ) : (
-                        <View style={styles.avatarPlaceholder}>
-                          <Text style={styles.avatarText}>
-                            {renterProfile?.nombre?.charAt(0).toUpperCase() || 'U'}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.renterInfo}>
-                      <Text style={styles.renterName}>{renterProfile?.nombre || 'Usuario'}</Text>
-                      <View style={styles.renterMeta}>
-                        {renterProfile?.rating ? (
-                          <View style={styles.ratingContainer}>
-                            <Ionicons name="star" size={14} color="#F59E0B" />
-                            <Text style={styles.ratingText}>{renterProfile.rating.toFixed(1)}</Text>
-                          </View>
-                        ) : null}
-                        {renterProfile?.completedTrips !== undefined && (
-                          <Text style={styles.tripsText}>
-                            {renterProfile.completedTrips} {renterProfile.completedTrips === 1 ? 'viaje' : 'viajes'}
-                          </Text>
-                        )}
-                        {memberSince && (
-                          <Text style={styles.memberSince}>Miembro desde {memberSince}</Text>
-                        )}
-                      </View>
-                      {renterProfile?.telefono && (
-                        <View style={styles.contactRow}>
-                          <Ionicons name="call-outline" size={14} color="#0B729D" />
-                          <Text style={styles.contactText}>{renterProfile.telefono}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-                
-                {/* Mensaje del arrendatario */}
-                {r.messageToHost && (
-                  <View style={styles.messageSection}>
-                    <View style={styles.messageHeader}>
-                      <Ionicons name="chatbubble-outline" size={16} color="#6B7280" />
-                      <Text style={styles.messageTitle}>Mensaje del arrendatario</Text>
-                    </View>
-                    <Text style={styles.messageText}>{r.messageToHost}</Text>
-                  </View>
-                )}
-                
-                <View style={styles.divider} />
-                
-                {/* Detalles de la reserva */}
-                <View style={styles.detailsSection}>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="location-outline" size={16} color="#6B7280" />
-                    <Text style={styles.detailText}>
-                      {r.pickupLocation || 'Por confirmar'}
-                    </Text>
-                  </View>
-                  {r.pickupTime && (
-                    <View style={styles.detailRow}>
-                      <Ionicons name="time-outline" size={16} color="#6B7280" />
-                      <Text style={styles.detailText}>
-                        Recogida: {r.pickupTime}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.detailRow}>
-                    <Ionicons name="cash-outline" size={16} color="#16A34A" />
-                    <Text style={[styles.detailText, { fontWeight: '700', color: '#16A34A' }]}>
-                      Total: ${r.totalPrice.toFixed(2)}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Acciones */}
-                {r.status === 'pending' && (
-                  <View style={styles.actions}>
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.confirmButton]}
-                      onPress={() => handleConfirm(r.id)}
-                      disabled={processingId === r.id}
-                    >
-                      {processingId === r.id ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                          <Text style={styles.buttonText}>Aceptar</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.denyButton]}
-                      onPress={() => handleDenyPress(r.id)}
-                      disabled={processingId === r.id}
-                    >
-                      <Ionicons name="close-circle" size={20} color="#fff" />
-                      <Text style={styles.buttonText}>Rechazar</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.chatButton]}
-                      onPress={() => handleChat(r)}
-                      disabled={loadingChat === r.id}
-                    >
-                      {loadingChat === r.id ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Ionicons name="chatbubble" size={20} color="#fff" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-                
-                {r.status === 'confirmed' && (
-                  <TouchableOpacity 
-                    style={[styles.actionButton, styles.chatButtonFull]}
-                    onPress={() => handleChat(r)}
-                    disabled={loadingChat === r.id}
-                  >
-                    {loadingChat === r.id ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <Ionicons name="chatbubble" size={18} color="#fff" />
-                        <Text style={styles.buttonText}>Chatear con {renterProfile?.nombre || 'cliente'}</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-                
-                {(r.status === 'completed' || r.status === 'cancelled' || r.status === 'denied') && (
-                  <TouchableOpacity 
-                    style={[styles.actionButton, styles.viewButton]}
-                    onPress={() => handleChat(r)}
-                    disabled={loadingChat === r.id}
-                  >
-                    {loadingChat === r.id ? (
-                      <ActivityIndicator size="small" color="#0B729D" />
-                    ) : (
-                      <>
-                        <Ionicons name="eye" size={18} color="#0B729D" />
-                        <Text style={[styles.buttonText, { color: '#0B729D' }]}>Ver detalles</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                {(r.status === 'cancelled' || r.status === 'denied') && (
-                  <View style={{ 
-                    marginTop: 12, 
-                    paddingTop: 12, 
-                    borderTopWidth: 1, 
-                    borderTopColor: '#F3F4F6',
-                    flexDirection: 'row',
-                    gap: 8
-                  }}>
-                    <TouchableOpacity
-                      style={{
-                        flex: 1,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        paddingVertical: 10,
-                        paddingHorizontal: 12,
-                        backgroundColor: '#F3F4F6',
-                        borderRadius: 8,
-                        gap: 6
-                      }}
-                      onPress={() => handleArchiveReservation(r.id)}
-                      disabled={deletingId === r.id}
-                    >
-                      <Ionicons name="archive-outline" size={18} color="#6B7280" />
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280' }}>Archivar</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={{
-                        flex: 1,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        paddingVertical: 10,
-                        paddingHorizontal: 12,
-                        backgroundColor: '#FEE2E2',
-                        borderRadius: 8,
-                        gap: 6
-                      }}
-                      onPress={() => handleDeleteReservation(r.id, vehicleName)}
-                      disabled={deletingId === r.id}
-                    >
-                      {deletingId === r.id ? (
-                        <ActivityIndicator size="small" color="#DC2626" />
-                      ) : (
-                        <>
-                          <Ionicons name="trash-outline" size={18} color="#DC2626" />
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#DC2626' }}>Eliminar</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
+              <ReservationCard
+                key={r.id}
+                reservation={r}
+                userProfile={renterProfile}
+                onConfirm={() => handleConfirm(r.id)}
+                onDeny={() => handleDenyPress(r.id)}
+                onChat={() => handleChat(r)}
+                onCheckIn={() => navigation.navigate('CheckInStart', { reservation: r })}
+                onViewDetails={() => handleChat(r)}
+                onArchive={() => handleArchiveReservation(r.id)}
+                onDelete={() => handleDeleteReservation(r.id, vehicleName)}
+                isProcessing={processingId === r.id}
+                isLoadingChat={loadingChat === r.id}
+                isDeleting={deletingId === r.id}
+              />
             );
           })
         )}
@@ -561,15 +406,52 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 10,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
     color: '#032B3C',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    gap: 16,
+  },
+  tab: {
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#0B729D',
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  activeTabText: {
+    color: '#0B729D',
+  },
+  badge: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   content: {
     flex: 1,

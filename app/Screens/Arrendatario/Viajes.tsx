@@ -8,15 +8,18 @@ import {
   ScrollView,
   StatusBar,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
 import { useAuth } from '../../../context/Auth';
 import { useToast } from '../../../context/ToastContext';
+import TripCard from '../../components/TripCard';
 import { archiveReservation, deleteReservation, getUserReservations, type Reservation } from '../../services/reservations';
 import { styles } from './styles';
 
 type FilterType = 'all' | 'active' | 'completed' | 'cancelled';
+type SortType = 'date-desc' | 'date-asc' | 'price-desc' | 'price-asc';
 
 export default function ViajesScreen() {
   const navigation = useNavigation<any>();
@@ -26,6 +29,8 @@ export default function ViajesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterType, setFilterType] = useState<FilterType>('all');
+  const [sortType, setSortType] = useState<SortType>('date-desc');
+  const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchReservations = useCallback(async () => {
@@ -34,12 +39,12 @@ export default function ViajesScreen() {
       const data = await getUserReservations(user.uid);
       setReservations(data);
     } catch (error) {
-      console.error(error);
+      showToast('Error al cargar reservas', 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user]);
+  }, [user, showToast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -53,19 +58,61 @@ export default function ViajesScreen() {
   };
 
   const filteredReservations = useMemo(() => {
-    if (filterType === 'all') return reservations;
-    if (filterType === 'active') return reservations.filter(r => r.status === 'pending' || r.status === 'confirmed');
-    if (filterType === 'completed') return reservations.filter(r => r.status === 'completed');
-    if (filterType === 'cancelled') return reservations.filter(r => r.status === 'cancelled' || r.status === 'denied');
-    return reservations;
-  }, [reservations, filterType]);
+    let filtered = reservations;
+
+    // Aplicar filtro por estado
+    if (filterType === 'active') filtered = filtered.filter(r => r.status === 'pending' || r.status === 'confirmed');
+    else if (filterType === 'completed') filtered = filtered.filter(r => r.status === 'completed');
+    else if (filterType === 'cancelled') filtered = filtered.filter(r => r.status === 'cancelled' || r.status === 'denied');
+
+    // Aplicar búsqueda
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(r => {
+        const vehicleName = r.vehicleSnapshot 
+          ? `${r.vehicleSnapshot.marca} ${r.vehicleSnapshot.modelo} ${r.vehicleSnapshot.anio}`.toLowerCase()
+          : '';
+        const location = (r.pickupLocation || r.deliveryAddress || '').toLowerCase();
+        return vehicleName.includes(query) || location.includes(query);
+      });
+    }
+
+    // Aplicar ordenamiento
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortType === 'date-desc') {
+        return (b.startDate?.toMillis() || 0) - (a.startDate?.toMillis() || 0);
+      } else if (sortType === 'date-asc') {
+        return (a.startDate?.toMillis() || 0) - (b.startDate?.toMillis() || 0);
+      } else if (sortType === 'price-desc') {
+        return b.totalPrice - a.totalPrice;
+      } else if (sortType === 'price-asc') {
+        return a.totalPrice - b.totalPrice;
+      }
+      return 0;
+    });
+
+    return sorted;
+  }, [reservations, filterType, searchQuery, sortType]);
 
   const stats = useMemo(() => {
+    const now = new Date();
+    const activeReservations = reservations.filter(r => r.status === 'pending' || r.status === 'confirmed');
+    const upcomingTrips = activeReservations.filter(r => {
+      const startDate = r.startDate?.toDate();
+      if (!startDate) return false;
+      const daysUntil = Math.ceil((startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return daysUntil >= 0 && daysUntil <= 7;
+    });
+
     return {
       total: reservations.length,
-      active: reservations.filter(r => r.status === 'pending' || r.status === 'confirmed').length,
+      active: activeReservations.length,
       completed: reservations.filter(r => r.status === 'completed').length,
       cancelled: reservations.filter(r => r.status === 'cancelled' || r.status === 'denied').length,
+      upcoming: upcomingTrips.length,
+      totalSpent: reservations
+        .filter(r => r.status === 'completed')
+        .reduce((sum, r) => sum + r.totalPrice, 0),
     };
   }, [reservations]);
 
@@ -84,9 +131,9 @@ export default function ViajesScreen() {
               await deleteReservation(reservationId);
               showToast('Viaje eliminado correctamente', 'success');
               fetchReservations();
-            } catch (error) {
-              console.error('Error deleting reservation:', error);
-              showToast('No se pudo eliminar el viaje', 'error');
+            } catch (error: any) {
+              const errorMessage = error.message || 'No se pudo eliminar el viaje';
+              showToast(errorMessage, 'error');
             } finally {
               setDeletingId(null);
             }
@@ -102,9 +149,9 @@ export default function ViajesScreen() {
       await archiveReservation(reservationId);
       showToast('Viaje archivado', 'success');
       fetchReservations();
-    } catch (error) {
-      console.error('Error archiving reservation:', error);
-      showToast('No se pudo archivar el viaje', 'error');
+    } catch (error: any) {
+      const errorMessage = error.message || 'No se pudo archivar el viaje';
+      showToast(errorMessage, 'error');
     } finally {
       setDeletingId(null);
     }
@@ -135,13 +182,103 @@ export default function ViajesScreen() {
     );
   }
 
+  const getSortIcon = () => {
+    if (sortType === 'date-desc') return 'calendar';
+    if (sortType === 'date-asc') return 'calendar-outline';
+    if (sortType === 'price-desc') return 'cash';
+    return 'cash-outline';
+  };
+
+  const cycleSortType = () => {
+    const types: SortType[] = ['date-desc', 'date-asc', 'price-desc', 'price-asc'];
+    const currentIndex = types.indexOf(sortType);
+    const nextIndex = (currentIndex + 1) % types.length;
+    setSortType(types[nextIndex]);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Mis Viajes</Text>
-          <Text style={{ fontSize: 14, color: '#6B7280', marginTop: 2 }}>{stats.total} viajes en total</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerSubtitle}>Gestiona tus</Text>
+          <Text style={styles.headerTitle}>Viajes</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+            <Text style={{ fontSize: 24, fontWeight: '800', color: '#0B729D' }}>{stats.total}</Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500' }}>viajes</Text>
+          </View>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingVertical: 6,
+              paddingHorizontal: 12,
+              backgroundColor: '#F0F9FF',
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: '#BFDBFE',
+            }}
+            onPress={cycleSortType}
+          >
+            <Ionicons name={getSortIcon() as any} size={16} color="#0B729D" />
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#0B729D' }}>Ordenar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Stats Banner */}
+      {stats.upcoming > 0 && (
+        <View style={{
+          marginHorizontal: 20,
+          marginTop: 12,
+          padding: 16,
+          backgroundColor: '#DBEAFE',
+          borderRadius: 12,
+          borderLeftWidth: 4,
+          borderLeftColor: '#0B729D',
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="time" size={20} color="#0B729D" />
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#1E40AF', flex: 1 }}>
+              Tienes {stats.upcoming} {stats.upcoming === 1 ? 'viaje próximo' : 'viajes próximos'} esta semana
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Search Bar */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: '#F9FAFB',
+          borderRadius: 12,
+          paddingHorizontal: 14,
+          height: 46,
+          borderWidth: 1,
+          borderColor: searchQuery ? '#0B729D' : '#E5E7EB',
+        }}>
+          <Ionicons name="search" size={20} color="#6B7280" />
+          <TextInput
+            style={{
+              flex: 1,
+              marginLeft: 10,
+              fontSize: 15,
+              color: '#111827',
+            }}
+            placeholder="Buscar por vehículo o ubicación..."
+            placeholderTextColor="#9CA3AF"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#6B7280" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -194,143 +331,60 @@ export default function ViajesScreen() {
       >
         {filteredReservations.length === 0 ? (
           <View style={{ alignItems: 'center', marginTop: 50 }}>
-            <Ionicons name="car-sport-outline" size={64} color="#D1D5DB" />
-            <Text style={{ marginTop: 16, fontSize: 16, color: '#6B7280' }}>
-              {reservations.length === 0 ? 'No tienes viajes registrados aún.' : 'No hay viajes en esta categoría.'}
+            <Ionicons name={searchQuery ? 'search-outline' : 'car-sport-outline'} size={64} color="#D1D5DB" />
+            <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '600', color: '#374151' }}>
+              {searchQuery ? 'Sin resultados' : reservations.length === 0 ? 'No tienes viajes' : 'Sin viajes aquí'}
             </Text>
+            <Text style={{ marginTop: 4, fontSize: 14, color: '#6B7280', textAlign: 'center', paddingHorizontal: 40 }}>
+              {searchQuery ? 'Intenta con otra búsqueda' : reservations.length === 0 ? 'Comienza explorando vehículos disponibles' : 'Cambia el filtro para ver otros viajes'}
+            </Text>
+            {searchQuery && (
+              <TouchableOpacity
+                style={{ marginTop: 20, paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#0B729D', borderRadius: 8 }}
+                onPress={() => setSearchQuery('')}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Limpiar búsqueda</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
-          filteredReservations.map((res) => {
-            const statusInfo = getStatusInfo(res.status);
-            const vehicleName = res.vehicleSnapshot 
-              ? `${res.vehicleSnapshot.marca} ${res.vehicleSnapshot.modelo} ${res.vehicleSnapshot.anio}`
-              : 'Vehículo';
-            const showReason = (res.status === 'denied' || res.status === 'cancelled') && 
-                               (res.denialReason || res.cancellationReason);
-
-            return (
-              <View key={res.id} style={styles.card}>
-                <TouchableOpacity 
-                  onPress={() => navigation.navigate('TripDetails', { reservation: res })}
-                  activeOpacity={0.7}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Text style={styles.cardTitle} numberOfLines={1}>{vehicleName}</Text>
-                    <View style={[{ 
-                      paddingVertical: 5, 
-                      paddingHorizontal: 10, 
-                      borderRadius: 999, 
-                      backgroundColor: statusInfo.color,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 4,
-                      marginLeft: 8
-                    }]}>
-                      <Ionicons name={statusInfo.icon as any} size={12} color={statusInfo.textColor} />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: statusInfo.textColor }}>{statusInfo.label}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                    <Text style={styles.cardDate}>
-                      {formatDate(res.startDate)} - {formatDate(res.endDate)}
-                    </Text>
-                  </View>
-
-                  <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="location-outline" size={16} color="#6B7280" />
-                    <Text style={styles.cardLocation} numberOfLines={1}>
-                      {res.pickupLocation || 'Ubicación por definir'}
-                    </Text>
-                  </View>
-
-                  <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="cash-outline" size={16} color="#6B7280" />
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827' }}>
-                      ${res.totalPrice.toFixed(2)}
-                    </Text>
-                  </View>
-
-                  {showReason && (
-                    <View style={{
-                      marginTop: 12,
-                      padding: 10,
-                      backgroundColor: '#FEF2F2',
-                      borderRadius: 8,
-                      borderLeftWidth: 3,
-                      borderLeftColor: '#DC2626'
-                    }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <Ionicons name="information-circle" size={16} color="#DC2626" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#991B1B' }}>
-                          {res.status === 'denied' ? 'Motivo del rechazo:' : 'Motivo de cancelación:'}
-                        </Text>
-                      </View>
-                      <Text style={{ fontSize: 13, color: '#7F1D1D', lineHeight: 18 }}>
-                        {res.denialReason || res.cancellationReason}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* Action buttons for cancelled/denied */}
-                {(res.status === 'cancelled' || res.status === 'denied') && (
-                  <View style={{ 
-                    marginTop: 12, 
-                    paddingTop: 12, 
-                    borderTopWidth: 1, 
-                    borderTopColor: '#F3F4F6',
-                    flexDirection: 'row',
-                    gap: 8
-                  }}>
-                    <TouchableOpacity
-                      style={{
-                        flex: 1,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        paddingVertical: 8,
-                        paddingHorizontal: 12,
-                        backgroundColor: '#F3F4F6',
-                        borderRadius: 8,
-                        gap: 6
-                      }}
-                      onPress={() => handleArchiveReservation(res.id)}
-                      disabled={deletingId === res.id}
-                    >
-                      <Ionicons name="archive-outline" size={18} color="#6B7280" />
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280' }}>Archivar</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={{
-                        flex: 1,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        paddingVertical: 8,
-                        paddingHorizontal: 12,
-                        backgroundColor: '#FEE2E2',
-                        borderRadius: 8,
-                        gap: 6
-                      }}
-                      onPress={() => handleDeleteReservation(res.id, vehicleName)}
-                      disabled={deletingId === res.id}
-                    >
-                      {deletingId === res.id ? (
-                        <ActivityIndicator size="small" color="#DC2626" />
-                      ) : (
-                        <>
-                          <Ionicons name="trash-outline" size={18} color="#DC2626" />
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#DC2626' }}>Eliminar</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            );
-          })
+          filteredReservations.map((res) => (
+            <TripCard
+              key={res.id}
+              reservation={res}
+              onPress={() => navigation.navigate('TripDetails', { reservation: res })}
+              onDelete={() => {
+                const vehicleName = res.vehicleSnapshot 
+                  ? `${res.vehicleSnapshot.marca} ${res.vehicleSnapshot.modelo} ${res.vehicleSnapshot.anio}`
+                  : 'este vehículo';
+                handleDeleteReservation(res.id, vehicleName);
+              }}
+              onArchive={() => handleArchiveReservation(res.id)}
+              isDeleting={deletingId === res.id}
+              onQuickAction={(action) => {
+                if (action === 'chat') {
+                  navigation.navigate('ChatRoom', { 
+                    reservationId: res.id,
+                    otherUserId: res.arrendadorId,
+                    vehicleName: res.vehicleSnapshot 
+                      ? `${res.vehicleSnapshot.marca} ${res.vehicleSnapshot.modelo}`
+                      : 'Vehículo'
+                  });
+                } else if (action === 'navigate') {
+                  // Navigate to location
+                  showToast('Abriendo navegación...', 'info');
+                } else if (action === 'checkin') {
+                  const startDate = res.startDate?.toDate();
+                  const daysUntil = startDate ? Math.ceil((startDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+                  if (daysUntil !== null && daysUntil <= 1) {
+                    navigation.navigate('CheckInStart', { reservation: res });
+                  } else {
+                    showToast('El check-in estará disponible 24 horas antes del inicio', 'info');
+                  }
+                }
+              }}
+            />
+          ))
         )}
       </ScrollView>
     </View>

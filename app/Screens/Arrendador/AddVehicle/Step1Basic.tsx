@@ -16,7 +16,7 @@ import {
 import type { ArrendadorStackParamList } from '../../../navigation/ArrendadorStack';
 import { styles } from './styles';
 
-const MARCAS = ['Toyota', 'Honda', 'Nissan', 'Mazda', 'Hyundai', 'Kia', 'Ford', 'Chevrolet', 'Volkswagen', 'Mitsubishi'];
+const MARCAS = ['Toyota', 'Honda', 'Nissan', 'Mazda', 'Hyundai', 'Kia', 'Ford', 'Chevrolet', 'Volkswagen', 'Mitsubishi', 'Jeep'];
 
 type NavigationProp = NativeStackNavigationProp<ArrendadorStackParamList, 'AddVehicleStep1Basic'>;
 

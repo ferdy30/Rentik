@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { Image } from 'expo-image';
 import { doc, getDoc } from 'firebase/firestore';
-import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, Modal, Platform, ScrollView, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { db } from '../../FirebaseConfig';
 import BottomActionBar from '../components/Details/BottomActionBar';
 import HostInfo from '../components/Details/HostInfo';
@@ -16,6 +17,8 @@ import type { RootStackParamList } from '../types/navigation';
 
 type DetailsRouteProp = RouteProp<RootStackParamList, 'Details'>;
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 export default function Details() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute<DetailsRouteProp>();
@@ -25,9 +28,12 @@ export default function Details() {
   const [hostPhoto, setHostPhoto] = useState<string | undefined>(undefined);
   const [loadingHost, setLoadingHost] = useState<boolean>(true);
   const [errorHost, setErrorHost] = useState<string | null>(null);
-  const [priceInfoVisible, setPriceInfoVisible] = useState<boolean>(false);
   const [hostRating, setHostRating] = useState<number | undefined>(undefined);
   const [hostTrips, setHostTrips] = useState<number | undefined>(undefined);
+
+  // Full screen image state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   useEffect(() => {
     const fetchHost = async () => {
@@ -69,14 +75,6 @@ export default function Details() {
 
   const images = vehicle.imagenes && vehicle.imagenes.length > 0 ? vehicle.imagenes : [vehicle.imagen];
 
-  const priceBreakdown = useMemo(() => {
-    const base = Number(vehicle.precio) || 0;
-    const serviceFee = +(base * 0.12).toFixed(2);
-    const taxes = +(base * 0.07).toFixed(2);
-    const totalPerDay = +(base + serviceFee + taxes).toFixed(2);
-    return { base, serviceFee, taxes, totalPerDay };
-  }, [vehicle.precio]);
-
   const handleShare = async () => {
     try {
       await Share.share({
@@ -87,12 +85,9 @@ export default function Details() {
     }
   };
 
-  const handleChatHost = () => {
-    navigation.navigate('ChatRoom', {
-      reservationId: `preview-${vehicle.id}`,
-      participants: [/* se completa al crear la reserva */],
-      vehicleInfo: { marca: vehicle.marca, modelo: vehicle.modelo, imagen: images[0] }
-    });
+  const handleImagePress = (index: number) => {
+    setSelectedImageIndex(index);
+    setModalVisible(true);
   };
 
   return (
@@ -104,6 +99,7 @@ export default function Details() {
           images={images}
           onBackPress={() => navigation.goBack()}
           onSharePress={handleShare}
+          onImagePress={handleImagePress}
         />
 
         <View style={styles.content}>
@@ -114,6 +110,28 @@ export default function Details() {
             rating={vehicle.rating}
             reviewCount={vehicle.reviewCount}
           />
+
+          {/* Availability Badge */}
+          <View style={styles.availabilityCard}>
+            <View style={styles.availabilityRow}>
+              <Ionicons 
+                name={vehicle.disponible ? "checkmark-circle" : "close-circle"} 
+                size={20} 
+                color={vehicle.disponible ? "#10B981" : "#EF4444"} 
+              />
+              <Text style={[
+                styles.availabilityText,
+                { color: vehicle.disponible ? "#10B981" : "#EF4444" }
+              ]}>
+                {vehicle.disponible ? "Disponible ahora" : "No disponible"}
+              </Text>
+            </View>
+            {vehicle.disponible && (
+              <Text style={styles.availabilitySubtext}>
+                Reserva instantánea • Respuesta rápida
+              </Text>
+            )}
+          </View>
 
           <View style={styles.divider} />
 
@@ -164,41 +182,6 @@ export default function Details() {
             </View>
           ) : null}
 
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#F3F4F6',
-                paddingVertical: 10,
-                borderRadius: 10,
-                gap: 6
-              }}
-              onPress={() => setPriceInfoVisible(true)}
-            >
-              <Ionicons name="cash-outline" size={18} color="#374151" />
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>Ver desglose</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#0B729D',
-                paddingVertical: 10,
-                borderRadius: 10,
-                gap: 6
-              }}
-              onPress={handleChatHost}
-            >
-              <Ionicons name="chatbubble-outline" size={18} color="#fff" />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Chatear con anfitrión</Text>
-            </TouchableOpacity>
-          </View>
-
           <View style={{ height: 100 }} />
         </View>
       </ScrollView>
@@ -208,50 +191,46 @@ export default function Details() {
         onBookPress={() => navigation.navigate('BookingStep1Dates', { vehicle })}
       />
 
-      {/* Modal simple de desglose de precio */}
-      {priceInfoVisible && (
-        <View style={{
-          position: 'absolute', left: 0, right: 0, bottom: 0, top: 0,
-          backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end'
-        }}>
-          <View style={{ backgroundColor: '#fff', padding: 20, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 12 }}>Desglose por día</Text>
-            <View style={{ gap: 8 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: '#374151' }}>Precio base</Text>
-                <Text style={{ color: '#111827', fontWeight: '600' }}>${priceBreakdown.base.toFixed(2)}</Text>
+      {/* Full Screen Image Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+        statusBarTranslucent
+      >
+        <View style={styles.modalContainer}>
+          <StatusBar barStyle="light-content" />
+          <TouchableOpacity 
+            style={styles.closeButton} 
+            onPress={() => setModalVisible(false)}
+          >
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
+          
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: selectedImageIndex * SCREEN_WIDTH, y: 0 }}
+            style={styles.imageScrollView}
+          >
+            {images.map((img: string, index: number) => (
+              <View key={index} style={styles.fullScreenImageContainer}>
+                <Image
+                  source={{ uri: img }}
+                  style={styles.fullScreenImage}
+                  contentFit="contain"
+                />
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: '#374151' }}>Servicio</Text>
-                <Text style={{ color: '#111827', fontWeight: '600' }}>${priceBreakdown.serviceFee.toFixed(2)}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: '#374151' }}>Impuestos</Text>
-                <Text style={{ color: '#111827', fontWeight: '600' }}>${priceBreakdown.taxes.toFixed(2)}</Text>
-              </View>
-              <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 8 }} />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: '#111827', fontWeight: '700' }}>Total/día</Text>
-                <Text style={{ color: '#111827', fontWeight: '700' }}>${priceBreakdown.totalPerDay.toFixed(2)}</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-              <TouchableOpacity
-                style={{ flex: 1, backgroundColor: '#F3F4F6', paddingVertical: 12, borderRadius: 10 }}
-                onPress={() => setPriceInfoVisible(false)}
-              >
-                <Text style={{ textAlign: 'center', color: '#374151', fontWeight: '600' }}>Cerrar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ flex: 1, backgroundColor: '#0B729D', paddingVertical: 12, borderRadius: 10 }}
-                onPress={() => { setPriceInfoVisible(false); navigation.navigate('BookingStep1Dates', { vehicle }); }}
-              >
-                <Text style={{ textAlign: 'center', color: '#fff', fontWeight: '700' }}>Reservar</Text>
-              </TouchableOpacity>
-            </View>
+            ))}
+          </ScrollView>
+          
+          <View style={styles.pageIndicator}>
+            <Text style={styles.pageText}>{selectedImageIndex + 1} / {images.length}</Text>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 }
@@ -281,5 +260,69 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     marginBottom: 12,
+  },
+  availabilityCard: {
+    backgroundColor: '#F0FDF4',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+    marginBottom: 24,
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  availabilityText: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  availabilitySubtext: {
+    fontSize: 13,
+    color: '#059669',
+    marginLeft: 28,
+    fontWeight: '500',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? 50 : 60,
+    right: 20,
+    zIndex: 10,
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 25,
+  },
+  imageScrollView: {
+    flex: 1,
+  },
+  fullScreenImageContainer: {
+    width: SCREEN_WIDTH,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  pageIndicator: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  pageText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

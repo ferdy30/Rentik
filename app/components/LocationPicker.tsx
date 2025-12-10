@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -61,6 +61,87 @@ export default function LocationPicker({
   } : null);
 
   const mapRef = useRef<MapView>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Efecto para obtener ubicación inicial si no se provee
+  useEffect(() => {
+    if (!initialLocation) {
+      getCurrentLocation();
+    }
+  }, []);
+
+  const getCurrentLocation = async () => {
+    try {
+      setLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso denegado', 'Activa la ubicación para encontrar tu dirección actual.');
+        setLoading(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const { latitude, longitude } = location.coords;
+
+      // Actualizar mapa
+      const newRegion = {
+        latitude,
+        longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      };
+      
+      setRegion(newRegion);
+      setMarker({ latitude, longitude });
+      mapRef.current?.animateToRegion(newRegion, 1000);
+
+      // Reverse geocoding
+      await reverseGeocode(latitude, longitude);
+
+    } catch (error) {
+      console.log('Error getting location', error);
+      Alert.alert('Error', 'No pudimos obtener tu ubicación.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reverseGeocode = async (latitude: number, longitude: number) => {
+    try {
+      const addressResponse = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (addressResponse && addressResponse.length > 0) {
+        const addr = addressResponse[0];
+        // Construir dirección legible
+        const formattedAddress = [
+          addr.street,
+          addr.streetNumber,
+          addr.city,
+          addr.region,
+          addr.country
+        ].filter(Boolean).join(', ');
+
+        setQuery(formattedAddress);
+        
+        // Notificar al padre
+        onLocationSelected({
+          address: formattedAddress,
+          coordinates: { latitude, longitude },
+          placeId: `custom-${latitude}-${longitude}` // ID temporal
+        });
+      }
+    } catch (error) {
+      console.log('Reverse geocode error', error);
+    }
+  };
+
+  const onRegionChangeComplete = async (newRegion: Region) => {
+    // Solo actualizar si fue por arrastre del usuario (podemos usar un flag o simplemente hacerlo siempre)
+    // Actualizamos el marcador al centro
+    setMarker({ latitude: newRegion.latitude, longitude: newRegion.longitude });
+    
+    // Opcional: Reverse geocode al soltar
+    // await reverseGeocode(newRegion.latitude, newRegion.longitude);
+  };
 
   const fetchAutocomplete = async (text: string) => {
     if (!text.trim() || text.length < 3) {
@@ -204,16 +285,34 @@ export default function LocationPicker({
     }
   };
 
-  const handleMarkerDragEnd = (e: any) => {
+  const handleMarkerDragEnd = async (e: any) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setMarker({ latitude, longitude });
     
-    // Actualizar sin placeId cuando se arrastra manualmente
-    onLocationSelected({
-      address: query || 'Ubicación personalizada',
-      coordinates: { latitude, longitude },
-      placeId: selectedPlace?.placeId || '',
-    });
+    try {
+      // Reverse geocoding al arrastrar
+      const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (addresses.length > 0) {
+        const addr = addresses[0];
+        const formattedAddress = `${addr.street || ''} ${addr.name || ''}, ${addr.city || ''}, ${addr.region || ''}`.trim();
+        setQuery(formattedAddress);
+        
+        onLocationSelected({
+          address: formattedAddress,
+          coordinates: { latitude, longitude },
+          placeId: '',
+        });
+      } else {
+        // Fallback si no hay dirección
+        onLocationSelected({
+          address: query || 'Ubicación personalizada',
+          coordinates: { latitude, longitude },
+          placeId: selectedPlace?.placeId || '',
+        });
+      }
+    } catch (error) {
+      console.warn('Reverse geocode error on drag', error);
+    }
   };
 
   return (
