@@ -21,3 +21,8 @@ export {
     placesDetails
 } from './places';
 
+// Export VIN OCR function
+export {
+    detectVin
+} from './vinOcr';
+

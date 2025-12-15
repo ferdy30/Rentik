@@ -298,7 +298,7 @@ export default function TripCard({
       </TouchableOpacity>
 
       {/* Quick Actions */}
-      {(isActive || isPending) && onQuickAction && (
+      {(tripDetails.isActive || tripDetails.isPending) && onQuickAction && (
         <View style={styles.quickActionsContainer}>
           {/* Chat Action */}
           <TouchableOpacity
@@ -311,7 +311,7 @@ export default function TripCard({
           </TouchableOpacity>
           
           {/* Check-in/Navigate for active trips */}
-          {isActive && isStartingSoon && (
+          {tripDetails.isActive && tripDetails.isStartingSoon && (
             <TouchableOpacity
               style={[styles.quickActionButton, styles.quickActionHighlight]}
               onPress={() => onQuickAction('checkin')}
@@ -322,7 +322,7 @@ export default function TripCard({
             </TouchableOpacity>
           )}
 
-          {isActive && !isStartingSoon && (
+          {tripDetails.isActive && !tripDetails.isStartingSoon && (
             <TouchableOpacity
               style={styles.quickActionButton}
               onPress={onPress}
@@ -336,7 +336,7 @@ export default function TripCard({
       )}
 
       {/* Completed Trip - Review Prompt */}
-      {isCompleted && (
+      {tripDetails.isCompleted && (
         <View style={styles.reviewPrompt}>
           <Ionicons name="star-outline" size={20} color="#F59E0B" />
           <Text style={styles.reviewPromptText}>¿Cómo estuvo tu experiencia?</Text>
