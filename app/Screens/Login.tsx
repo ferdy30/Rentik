@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Dimensions,
     Image,
     KeyboardAvoidingView,
     Platform,
@@ -22,14 +23,15 @@ import {
 } from 'react-native';
 import { Firebaseauth, db } from '../../FirebaseConfig';
 import { colors } from '../constants/colors';
-// import { getHomeRouteByRole } from '../navigation/role';
+
+const { width } = Dimensions.get('window');
 
 const Login = ({ navigation }: any) => {
     // Estados para manejar el formulario
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false); // Para mostrar/ocultar contraseña
+    const [showPassword, setShowPassword] = useState(false);
   
     // Completar sesión en web (Google)
     WebBrowser.maybeCompleteAuthSession();
@@ -53,39 +55,23 @@ const Login = ({ navigation }: any) => {
    
   // Función para iniciar sesión con Firebase
   const signIn = async () => {  
-    // Validación básica antes de intentar login
     if (!email || !password) {
       Alert.alert('Campos vacíos', 'Por favor ingresa tu correo y contraseña');
       return;
     }
 
-    console.log('[LOGIN] Intentando login con email:', email);
     setLoading(true);
     try {
-      // Intento de login con Firebase Auth
-      console.log('[LOGIN] Llamando a signInWithEmailAndPassword...');
       const userCredential = await signInWithEmailAndPassword(Firebaseauth, email, password);
-      console.log('[LOGIN] Login exitoso, UID:', userCredential.user.uid);
-      
-      // Obtener datos del usuario desde Firestore para determinar el rol
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      console.log('[LOGIN] UserDoc exists:', userDoc.exists());
       
       if (userDoc.exists()) {
-        const userData = userDoc.data();
-        console.log('[LOGIN] UserData:', { role: userData.role, profileComplete: userData.profileComplete });
-        
-        // NO navegamos manualmente - el AuthContext y AppNavigation se encargan automáticamente
-        // Al cambiar el estado de autenticación, el stack se reconstruye con las rutas correctas
-        // y el usuario será redirigido según su rol y estado (ver AppNavigation)
-        console.log('[LOGIN] Login completado, esperando reconstrucción del stack...');
+        // AuthContext handles navigation
       } else {
-        console.log('[LOGIN] UserDoc no existe');
         Alert.alert('Error', 'No se encontraron datos del usuario.');
       }
     } catch (error: any) {
       console.error('Error en login:', error);
-      // Mensajes de error más específicos según el código
       if (error.code === 'auth/invalid-credential') {
         Alert.alert('Error', 'Correo o contraseña incorrectos');
       } else if (error.code === 'auth/user-not-found') {
@@ -120,7 +106,6 @@ const Login = ({ navigation }: any) => {
       }
       const credential = GoogleAuthProvider.credential(idToken);
       const userCred = await signInWithCredential(Firebaseauth, credential);
-      // Asegurar doc de usuario en Firestore
       const uid = userCred.user.uid;
       const ref = doc(db, 'users', uid);
       const snapshot = await getDoc(ref);
@@ -169,113 +154,120 @@ const Login = ({ navigation }: any) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Fondo con degradado azul */}
       <LinearGradient
         colors={[colors.background.gradientStart, colors.background.gradientEnd]}
         locations={[0.05, 0.82]}
         style={styles.backgroundGradient}
       />
       
-      {/* KeyboardAvoidingView para que el teclado no tape los inputs */}
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
       >
-        {/* Logo de la app */}
-        <View style={styles.logoContainer}>
-          <Image
-            style={styles.logo}
-            source={require('../../assets/images/Logo.png')}
-            resizeMode="contain"
-          />
+        <View style={styles.headerContainer}>
+            <View style={styles.logoContainer}>
+            <Image
+                style={styles.logo}
+                source={require('../../assets/images/Logo.png')}
+                resizeMode="contain"
+            />
+            </View>
+            <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
+            <Text style={styles.subText}>Tu próxima aventura comienza aquí</Text>
         </View>
 
-        {/* Mensaje de bienvenida */}
-        <View style={styles.header}>
-          <Text style={styles.welcomeText}>Bienvenido</Text>
-          <Text style={styles.subText}>Inicia sesión para continuar</Text>
-        </View>
-
-        {/* Formulario principal con fondo blanco */}
-        <View style={styles.formContainer}>
-          {/* Campo de correo con icono */}
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={24} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                value={email}
-                style={styles.input}
-                placeholder="Correo electrónico"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="none"
-                onChangeText={(text) => setEmail(text)}
-                keyboardType="email-address"
-              />
+        <View style={styles.formCard}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Correo electrónico</Text>
+            <View style={[styles.inputContainer, email.length > 0 && styles.inputActive]}>
+                <Ionicons name="mail-outline" size={20} color={email.length > 0 ? colors.primary : "#9CA3AF"} style={styles.inputIcon} />
+                <TextInput
+                    value={email}
+                    style={styles.input}
+                    placeholder="ejemplo@correo.com"
+                    placeholderTextColor="#D1D5DB"
+                    autoCapitalize="none"
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                />
+            </View>
           </View>
 
-          {/* Campo de contraseña con toggle */}
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={24} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                secureTextEntry={!showPassword}
-                value={password}
-                style={styles.input}
-                placeholder="Contraseña"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="none"
-                onChangeText={(text) => setPassword(text)}
-              />
-            {/* Botón para mostrar/ocultar contraseña */}
-            <TouchableOpacity
-              style={styles.eyeButton}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Ionicons
-                name={showPassword ? "eye-off-outline" : "eye-outline"}
-                size={24}
-                color="#6B7280"
-              />
-            </TouchableOpacity>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Contraseña</Text>
+            <View style={[styles.inputContainer, password.length > 0 && styles.inputActive]}>
+                <Ionicons name="lock-closed-outline" size={20} color={password.length > 0 ? colors.primary : "#9CA3AF"} style={styles.inputIcon} />
+                <TextInput
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    style={styles.input}
+                    placeholder="••••••••"
+                    placeholderTextColor="#D1D5DB"
+                    autoCapitalize="none"
+                    onChangeText={setPassword}
+                />
+                <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword(!showPassword)}
+                >
+                <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#9CA3AF"
+                />
+                </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Botones de acción */}
+          <TouchableOpacity style={styles.forgotPassword}>
+            <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+          </TouchableOpacity>
+
           {loading ? (
-            <ActivityIndicator size="large" color="#0B729D" style={styles.loader} />
+            <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
           ) : (
             <View style={styles.buttonContainer}>
-              {/* Botón principal de login */}
               <TouchableOpacity
                 style={styles.signInButton}
                 onPress={() => { void signIn(); }}
               >
-                <Text style={styles.signInButtonText}>Iniciar sesión</Text>
+                <Text style={styles.signInButtonText}>Iniciar Sesión</Text>
+                <Ionicons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
               </TouchableOpacity>
 
-              {/* Link para ir a registro */}
-              <TouchableOpacity
-                style={styles.signUpButton}
-                onPress={() => navigation.navigate('RegistroStep1')}
-              >
-                <Text style={styles.signUpButtonText}>Crear cuenta nueva</Text>
-              </TouchableOpacity>
+              <View style={styles.dividerContainer}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>O continúa con</Text>
+                <View style={styles.divider} />
+              </View>
 
-              {/* Social auth - Comentado temporalmente
-              <SocialAuthButtons
-                onGoogle={() => { void signInWithGoogle(); }}
-                // Apple Sign-In comentado hasta tener Apple Developer Program
-              />
-              */}
-
-              {__DEV__ && (
-                <TouchableOpacity
-                  style={styles.devButton}
-                  onPress={resetOnboarding}
-                >
-                  <Text style={styles.devButtonText}>Reset Onboarding (dev)</Text>
+              <View style={styles.socialButtonsContainer}>
+                <TouchableOpacity style={styles.socialButton} onPress={() => { void signInWithGoogle(); }}>
+                    <Ionicons name="logo-google" size={24} color="#DB4437" />
                 </TouchableOpacity>
-              )}
+                <TouchableOpacity style={styles.socialButton}>
+                    <Ionicons name="logo-apple" size={24} color="black" />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
+
+        <View style={styles.footer}>
+            <Text style={styles.footerText}>¿No tienes una cuenta?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('RegistroStep1')}>
+                <Text style={styles.signUpText}>Regístrate aquí</Text>
+            </TouchableOpacity>
+        </View>
+
+        {__DEV__ && (
+            <TouchableOpacity
+                style={styles.devButton}
+                onPress={resetOnboarding}
+            >
+                <Text style={styles.devButtonText}>Reset Onboarding (dev)</Text>
+            </TouchableOpacity>
+        )}
       </KeyboardAvoidingView>
     </View>
   )
@@ -297,117 +289,174 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    width: '100%',
-    paddingHorizontal: 25,
     justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
   },
   logoContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     tintColor: '#fff',
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
   welcomeText: {
-    fontSize: 32,
-    fontWeight: '600',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#fff',
-    marginBottom: 10,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   subText: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
   },
-  formContainer: {
+  formCard: {
     backgroundColor: '#fff',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
-    width: '100%',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    marginLeft: 4,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    marginBottom: 15,
-    paddingHorizontal: 15,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 56,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
+  inputActive: {
+    borderColor: colors.primary,
+    backgroundColor: '#F0F9FF',
+  },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    height: 50,
-    color: '#032B3C',
     fontSize: 16,
-    fontWeight: '500',
-    backgroundColor: 'transparent',
+    color: '#1F2937',
   },
   eyeButton: {
-    marginLeft: 10,
-    padding: 5,
+    padding: 8,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: 24,
+  },
+  forgotPasswordText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   buttonContainer: {
-    marginTop: 20,
-  },
-  loader: {
-    marginTop: 20,
+    gap: 16,
   },
   signInButton: {
     backgroundColor: colors.primary,
-    borderRadius: 14,
-    height: 50,
+    borderRadius: 16,
+    height: 56,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 15,
     shadowColor: colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowRadius: 8,
     elevation: 4,
   },
   signInButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
   },
-  signUpButton: {
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  socialButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  socialButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  signUpButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  
-  
-  devButton: {
-    marginTop: 12,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 32,
     alignItems: 'center',
-    paddingVertical: 8,
+  },
+  footerText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    marginRight: 4,
+  },
+  signUpText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  loader: {
+    marginVertical: 20,
+  },
+  devButton: {
+    marginTop: 20,
+    alignItems: 'center',
   },
   devButtonText: {
-    color: '#9CA3AF',
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
   },
 });

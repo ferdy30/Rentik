@@ -26,3 +26,8 @@ export {
     detectVin
 } from './vinOcr';
 
+// Export License OCR function
+export {
+    detectLicense
+} from './licenseOcr';
+

@@ -99,7 +99,7 @@ export default function BuscarScreen() {
   useFocusEffect(
     useCallback(() => {
       loadVehicles();
-    }, [])
+    }, [loadVehicles])
   );
 
   const getUserLocation = async () => {
@@ -129,7 +129,7 @@ export default function BuscarScreen() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const loadVehicles = async (reset: boolean = false) => {
+  const loadVehicles = useCallback(async (reset: boolean = false) => {
     try {
       if (reset) {
         setLoading(true);
@@ -186,7 +186,7 @@ export default function BuscarScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  };
+  }, [showToast]);
 
   // Filtering logic
   const filteredVehicles = vehicles.filter((vehicle) => {
@@ -280,7 +280,7 @@ export default function BuscarScreen() {
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     loadVehicles(true);
-  }, []);
+  }, [loadVehicles]);
 
   const handleFavoritePress = (id: string) => {
     const vehicle = vehicles.find(v => v.id === id);

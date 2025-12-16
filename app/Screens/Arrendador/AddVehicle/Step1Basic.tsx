@@ -743,8 +743,10 @@ export default function Step1Basic() {
 							<Text style={styles.successText}>Modelo válido</Text>
 						</View>
 					) : null}
-				</View>					{/* Año y Placa */}
-					<View style={styles.row}>
+				</View>
+				
+				{/* Año y Placa */}
+				<View style={styles.row}>
 					<View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
 						<Text style={styles.label}>Año *</Text>
 						<TouchableOpacity

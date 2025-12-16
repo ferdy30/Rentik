@@ -1,8 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+﻿import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
+    Keyboard,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -14,6 +17,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { StepIndicator } from '../../components/StepIndicator';
 import { colors } from '../../constants/colors';
 import { RootStackParamList } from '../../types/navigation';
 
@@ -25,7 +29,6 @@ export default function RegistroStep1({ navigation }: Props) {
   const [apellido, setApellido] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // const [confirmPassword, setConfirmPassword] = useState(''); // Eliminado por redundancia
   const [countryCode, setCountryCode] = useState('+503');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [birthday, setBirthday] = useState<Date | null>(null);
@@ -33,12 +36,16 @@ export default function RegistroStep1({ navigation }: Props) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
+  // Phone Verification State
+  const [verificationCode, setVerificationCode] = useState('');
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  
   // Validation State
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [passwordStrength, setPasswordStrength] = useState(0);
-
-  const isDefaultCode = countryCode === '+503' && !phoneNumber;
 
   const COUNTRY_CODES = [
     { code: '+503', name: 'El Salvador', flag: '🇸🇻' },
@@ -51,18 +58,17 @@ export default function RegistroStep1({ navigation }: Props) {
     { code: '+1', name: 'EE.UU.', flag: '🇺🇸' },
   ];
 
-  // Real-time validation effects
   useEffect(() => {
     if (touched.nombre) validateField('nombre', nombre);
-  }, [nombre]);
+  }, [nombre, touched.nombre]);
 
   useEffect(() => {
     if (touched.apellido) validateField('apellido', apellido);
-  }, [apellido]);
+  }, [apellido, touched.apellido]);
 
   useEffect(() => {
     if (touched.email) validateField('email', email);
-  }, [email]);
+  }, [email, touched.email]);
 
   useEffect(() => {
     validateField('password', password);
@@ -71,7 +77,7 @@ export default function RegistroStep1({ navigation }: Props) {
 
   useEffect(() => {
     if (touched.phoneNumber) validateField('phoneNumber', phoneNumber);
-  }, [phoneNumber]);
+  }, [phoneNumber, touched.phoneNumber]);
 
   useEffect(() => {
     if (birthday) validateField('birthday', birthday);
@@ -83,7 +89,7 @@ export default function RegistroStep1({ navigation }: Props) {
     if (/[A-Z]/.test(pass)) score++;
     if (/[a-z]/.test(pass)) score++;
     if (/[0-9]/.test(pass)) score++;
-    if (/[^A-Za-z0-9]/.test(pass)) score++; // Bonus for special chars
+    if (/[^A-Za-z0-9]/.test(pass)) score++;
     setPasswordStrength(Math.min(score, 4));
   };
 
@@ -135,7 +141,6 @@ export default function RegistroStep1({ navigation }: Props) {
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
-    // Trigger validation on blur
     switch(field) {
         case 'nombre': validateField('nombre', nombre); break;
         case 'apellido': validateField('apellido', apellido); break;
@@ -144,8 +149,31 @@ export default function RegistroStep1({ navigation }: Props) {
     }
   };
 
+  const sendVerificationCode = async () => {
+    if (!phoneNumber || phoneNumber.length < 8) {
+        Alert.alert('Error', 'Ingresa un número válido');
+        return;
+    }
+    setIsVerifying(true);
+    // Simulate API call
+    setTimeout(() => {
+        setIsVerifying(false);
+        setShowVerifyModal(true);
+        Alert.alert('Código enviado', 'Tu código de verificación es 123456 (Simulado)');
+    }, 1500);
+  };
+
+  const confirmVerificationCode = () => {
+    if (verificationCode === '123456') {
+        setPhoneVerified(true);
+        setShowVerifyModal(false);
+        Alert.alert('Éxito', 'Teléfono verificado correctamente');
+    } else {
+        Alert.alert('Error', 'Código incorrecto');
+    }
+  };
+
   const handleContinue = () => {
-    // Mark all as touched
     setTouched({
       nombre: true,
       apellido: true,
@@ -155,7 +183,6 @@ export default function RegistroStep1({ navigation }: Props) {
       birthday: true,
     });
 
-    // Validate all
     const e1 = validateField('nombre', nombre);
     const e2 = validateField('apellido', apellido);
     const e3 = validateField('email', email);
@@ -167,7 +194,11 @@ export default function RegistroStep1({ navigation }: Props) {
       return;
     }
 
-    // Pasar datos al siguiente paso
+    if (!phoneVerified) {
+        Alert.alert('Verificación requerida', 'Por favor verifica tu número de teléfono para continuar.');
+        return;
+    }
+
     navigation.navigate('RegistroStep2', {
       nombre,
       apellido,
@@ -180,10 +211,10 @@ export default function RegistroStep1({ navigation }: Props) {
   };
 
   const getStrengthColor = () => {
-    if (passwordStrength <= 1) return '#EF4444'; // Red
-    if (passwordStrength === 2) return '#F59E0B'; // Yellow
-    if (passwordStrength === 3) return '#10B981'; // Green
-    return '#059669'; // Dark Green
+    if (passwordStrength <= 1) return '#EF4444';
+    if (passwordStrength === 2) return '#F59E0B';
+    if (passwordStrength === 3) return '#10B981';
+    return '#059669';
   };
 
   const getStrengthLabel = () => {
@@ -196,503 +227,569 @@ export default function RegistroStep1({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#032B3C" />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Crear Cuenta</Text>
+            <Text style={styles.headerSubtitle}>Paso 1 de 3</Text>
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <StepIndicator currentStep={1} totalSteps={3} labels={['Datos', 'Licencia', 'Rol']} />
 
       <KeyboardAvoidingView
-        style={styles.content}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header con progreso */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.primary} />
-            </TouchableOpacity>
-            <View style={styles.progressContainer}>
-              <View style={[styles.progressDot, styles.progressDotActive]} />
-              <View style={styles.progressLine} />
-              <View style={styles.progressDot} />
-              <View style={styles.progressLine} />
-              <View style={styles.progressDot} />
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.titleContainer}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={styles.title}>Información Personal</Text>
+              <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                  ~3 min
+                </Text>
+              </View>
             </View>
-            <Text style={styles.stepText}>Paso 1 de 3</Text>
-            <Text style={styles.title}>Información Personal</Text>
-            <Text style={styles.subtitle}>Completa tus datos básicos</Text>
+            <Text style={styles.subtitle}>
+              Necesitamos tus datos para verificar tu identidad y mantener la seguridad de la comunidad.
+            </Text>
           </View>
 
           {/* Formulario */}
           <View style={styles.formContainer}>
             {/* Nombre */}
-            <View style={[styles.inputWrapper, touched.nombre && errors.nombre ? styles.inputError : null]}>
-              <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Nombre"
-                placeholderTextColor="#9CA3AF"
-                value={nombre}
-                onChangeText={setNombre}
-                onBlur={() => handleBlur('nombre')}
-              />
-              {touched.nombre && !errors.nombre && nombre.length > 0 && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Nombre</Text>
+                <View style={[styles.inputWrapper, touched.nombre && errors.nombre ? styles.inputError : null]}>
+                <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Tu nombre"
+                    placeholderTextColor="#9CA3AF"
+                    value={nombre}
+                    onChangeText={setNombre}
+                    onBlur={() => handleBlur('nombre')}
+                />
+                {touched.nombre && !errors.nombre && nombre.length > 0 && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
+                </View>
+                {touched.nombre && errors.nombre && <Text style={styles.errorText}>{errors.nombre}</Text>}
             </View>
-            {touched.nombre && errors.nombre && <Text style={styles.errorText}>{errors.nombre}</Text>}
 
             {/* Apellido */}
-            <View style={[styles.inputWrapper, touched.apellido && errors.apellido ? styles.inputError : null]}>
-              <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Apellido"
-                placeholderTextColor="#9CA3AF"
-                value={apellido}
-                onChangeText={setApellido}
-                onBlur={() => handleBlur('apellido')}
-              />
-              {touched.apellido && !errors.apellido && apellido.length > 0 && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Apellido</Text>
+                <View style={[styles.inputWrapper, touched.apellido && errors.apellido ? styles.inputError : null]}>
+                <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Tu apellido"
+                    placeholderTextColor="#9CA3AF"
+                    value={apellido}
+                    onChangeText={setApellido}
+                    onBlur={() => handleBlur('apellido')}
+                />
+                {touched.apellido && !errors.apellido && apellido.length > 0 && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
+                </View>
+                {touched.apellido && errors.apellido && <Text style={styles.errorText}>{errors.apellido}</Text>}
             </View>
-            {touched.apellido && errors.apellido && <Text style={styles.errorText}>{errors.apellido}</Text>}
 
             {/* Correo */}
-            <View style={[styles.inputWrapper, touched.email && errors.email ? styles.inputError : null]}>
-              <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Correo electrónico"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-                onBlur={() => handleBlur('email')}
-              />
-              {touched.email && !errors.email && email.length > 0 && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
-            </View>
-            {touched.email && errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-
-            {/* Teléfono */}
-            <View style={[styles.inputWrapper, { paddingHorizontal: 0 }, touched.phoneNumber && errors.phoneNumber ? styles.inputError : null]}>
-              <View style={styles.phoneRow}>
-                <TouchableOpacity style={styles.codeBox} onPress={() => setShowCodePicker(true)}>
-                  <Text style={[styles.codeText, isDefaultCode && styles.placeholderText]}>{countryCode}</Text>
-                  <Ionicons name="chevron-down" size={18} color="#6B7280" />
-                </TouchableOpacity>
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Correo Electrónico</Text>
+                <View style={[styles.inputWrapper, touched.email && errors.email ? styles.inputError : null]}>
+                <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
                 <TextInput
-                  style={[styles.input, styles.phoneInput]}
-                  placeholder="Número de teléfono"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="phone-pad"
-                  value={phoneNumber}
-                  onChangeText={(t) => setPhoneNumber(t.replace(/[^0-9]/g, ''))}
-                  onBlur={() => handleBlur('phoneNumber')}
+                    style={styles.input}
+                    placeholder="ejemplo@correo.com"
+                    placeholderTextColor="#9CA3AF"
+                    value={email}
+                    onChangeText={setEmail}
+                    onBlur={() => handleBlur('email')}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                 />
-              </View>
+                {touched.email && !errors.email && email.length > 0 && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
+                </View>
+                {touched.email && errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
             </View>
-            {touched.phoneNumber && errors.phoneNumber && <Text style={styles.errorText}>{errors.phoneNumber}</Text>}
 
-            {/* Cumpleaños */}
-            <TouchableOpacity 
-              style={[styles.inputWrapper, touched.birthday && errors.birthday ? styles.inputError : null]} 
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Ionicons name="calendar-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-              <Text style={[styles.input, styles.dateText, !birthday && styles.placeholderText]}>
-                {birthday ? birthday.toLocaleDateString('es-SV', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Fecha de cumpleaños'}
-              </Text>
-              {touched.birthday && !errors.birthday && birthday && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
-            </TouchableOpacity>
-            {touched.birthday && errors.birthday && <Text style={styles.errorText}>{errors.birthday}</Text>}
+            {/* Teléfono con Verificación */}
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Teléfono Móvil</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                    <TouchableOpacity 
+                        style={[styles.inputWrapper, { width: 100, marginRight: 8, justifyContent: 'center' }]}
+                        onPress={() => setShowCodePicker(true)}
+                    >
+                        <Text style={{ fontSize: 24, marginRight: 4 }}>
+                            {COUNTRY_CODES.find(c => c.code === countryCode)?.flag}
+                        </Text>
+                        <Text style={{ fontSize: 16, color: '#374151', fontWeight: '600' }}>{countryCode}</Text>
+                        <Ionicons name="chevron-down" size={16} color="#6B7280" style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                    
+                    <View style={{ flex: 1 }}>
+                        <View style={[styles.inputWrapper, touched.phoneNumber && errors.phoneNumber ? styles.inputError : null]}>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="0000-0000"
+                                placeholderTextColor="#9CA3AF"
+                                value={phoneNumber}
+                                onChangeText={(text) => {
+                                  // Auto-format phone number with dash
+                                  const cleaned = text.replace(/[^0-9]/g, '');
+                                  if (cleaned.length <= 8) {
+                                    if (cleaned.length > 4) {
+                                      setPhoneNumber(cleaned.slice(0, 4) + '-' + cleaned.slice(4));
+                                    } else {
+                                      setPhoneNumber(cleaned);
+                                    }
+                                  }
+                                }}
+                                onBlur={() => handleBlur('phoneNumber')}
+                                keyboardType="phone-pad"
+                                maxLength={9}
+                            />
+                            {phoneVerified ? (
+                                <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />
+                            ) : (
+                                <TouchableOpacity 
+                                    onPress={sendVerificationCode}
+                                    disabled={isVerifying || phoneNumber.length < 8}
+                                >
+                                    {isVerifying ? (
+                                        <ActivityIndicator size="small" color={colors.primary} />
+                                    ) : (
+                                        <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 12 }}>Verificar</Text>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        {touched.phoneNumber && errors.phoneNumber && <Text style={styles.errorText}>{errors.phoneNumber}</Text>}
+                    </View>
+                </View>
+            </View>
 
-            {/* Android: DatePicker directo */}
-            {showDatePicker && Platform.OS === 'android' && (
-              <DateTimePicker
-                value={birthday || new Date(2000, 0, 1)}
-                mode="date"
-                display="default"
-                maximumDate={new Date()}
-                onChange={(event: DateTimePickerEvent, date?: Date) => {
-                  setShowDatePicker(false);
-                  if (event.type === 'set' && date) {
-                    setBirthday(date);
-                    handleBlur('birthday');
-                  }
-                }}
-              />
-            )}
+            {/* Fecha de Nacimiento */}
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Fecha de Nacimiento</Text>
+                <TouchableOpacity
+                    style={[styles.inputWrapper, touched.birthday && errors.birthday ? styles.inputError : null]}
+                    onPress={() => setShowDatePicker(true)}
+                >
+                    <Ionicons name="calendar-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                    {birthday ? (
+                      <View style={{ flex: 1, justifyContent: 'center' }}>
+                        <Text style={[styles.input, { color: '#1F2937', marginBottom: 0 }]}>
+                            {birthday.toLocaleDateString('es-SV', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                          {new Date().getFullYear() - birthday.getFullYear()} años
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={[styles.input, { color: '#9CA3AF', textAlignVertical: 'center' }]}>
+                        Selecciona tu fecha de nacimiento
+                      </Text>
+                    )}
+                    {touched.birthday && !errors.birthday && birthday && <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />}
+                </TouchableOpacity>
+                {touched.birthday && errors.birthday && <Text style={styles.errorText}>{errors.birthday}</Text>}
+            </View>
 
             {/* Contraseña */}
-            <View style={[styles.inputWrapper, touched.password && errors.password ? styles.inputError : null]}>
-              <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Contraseña"
-                placeholderTextColor="#9CA3AF"
-                secureTextEntry={!showPassword}
-                value={password}
-                onChangeText={setPassword}
-                onBlur={() => handleBlur('password')}
-              />
-              <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
-                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#6B7280" />
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Contraseña</Text>
+                <View style={[styles.inputWrapper, touched.password && errors.password ? styles.inputError : null]}>
+                <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Mínimo 8 caracteres"
+                    placeholderTextColor="#9CA3AF"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                    <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#6B7280" />
+                </TouchableOpacity>
+                </View>
+                
+                {/* Password Strength Indicator */}
+                {password.length > 0 && (
+                    <View style={{ marginTop: 8 }}>
+                        <View style={{ flexDirection: 'row', height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                            <View style={{ flex: 1, backgroundColor: passwordStrength >= 1 ? getStrengthColor() : 'transparent' }} />
+                            <View style={{ width: 2, backgroundColor: 'white' }} />
+                            <View style={{ flex: 1, backgroundColor: passwordStrength >= 2 ? getStrengthColor() : 'transparent' }} />
+                            <View style={{ width: 2, backgroundColor: 'white' }} />
+                            <View style={{ flex: 1, backgroundColor: passwordStrength >= 3 ? getStrengthColor() : 'transparent' }} />
+                            <View style={{ width: 2, backgroundColor: 'white' }} />
+                            <View style={{ flex: 1, backgroundColor: passwordStrength >= 4 ? getStrengthColor() : 'transparent' }} />
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                          <Text style={{ fontSize: 12, color: getStrengthColor(), fontWeight: '600' }}>
+                              {getStrengthLabel()}
+                          </Text>
+                          {passwordStrength < 3 && (
+                            <Text style={{ fontSize: 11, color: '#6B7280' }}>
+                              {!/[A-Z]/.test(password) && 'A-Z '}
+                              {!/[a-z]/.test(password) && 'a-z '}
+                              {!/[0-9]/.test(password) && '0-9 '}
+                              {!/[^A-Za-z0-9]/.test(password) && '@#$'}
+                            </Text>
+                          )}
+                        </View>
+                    </View>
+                )}
+                {touched.password && errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+            </View>
+
+          </View>
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Footer */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+            style={[styles.nextButton, (!phoneVerified && phoneNumber.length > 0) && { opacity: 0.7 }]}
+            onPress={handleContinue}
+        >
+            <Text style={styles.nextButtonText}>Continuar</Text>
+            <Ionicons name="arrow-forward" size={20} color="white" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Country Code Picker Modal */}
+      <Modal
+        visible={showCodePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCodePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Selecciona tu país</Text>
+                    <TouchableOpacity onPress={() => setShowCodePicker(false)}>
+                        <Ionicons name="close" size={24} color="#374151" />
+                    </TouchableOpacity>
+                </View>
+                <ScrollView>
+                    {COUNTRY_CODES.map((country) => (
+                        <TouchableOpacity
+                            key={country.code}
+                            style={styles.countryItem}
+                            onPress={() => {
+                                setCountryCode(country.code);
+                                setShowCodePicker(false);
+                            }}
+                        >
+                            <Text style={{ fontSize: 24, marginRight: 12 }}>{country.flag}</Text>
+                            <Text style={{ fontSize: 16, color: '#374151', flex: 1 }}>{country.name}</Text>
+                            <Text style={{ fontSize: 16, color: '#6B7280', fontWeight: '600' }}>{country.code}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
+        </View>
+      </Modal>
+
+      {/* Verification Code Modal */}
+      <Modal
+        visible={showVerifyModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowVerifyModal(false)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <TouchableOpacity 
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => Keyboard.dismiss()}
+          >
+              <TouchableOpacity 
+                  style={[styles.modalContent, { padding: 24 }]}
+                  activeOpacity={1}
+              >
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: '#032B3C', marginBottom: 8, textAlign: 'center' }}>
+                      Verifica tu teléfono
+                  </Text>
+                  <Text style={{ fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 24 }}>
+                      Ingresa el código de 6 dígitos enviado a {countryCode} {phoneNumber}
+                  </Text>
+                  
+                  <TextInput
+                      style={{ 
+                          width: '100%',
+                          textAlign: 'center', 
+                          fontSize: 32, 
+                          letterSpacing: 8, 
+                          marginBottom: 24, 
+                          borderBottomWidth: 2, 
+                          borderColor: colors.primary,
+                          color: '#032B3C',
+                          backgroundColor: '#F3F4F6',
+                          height: 80,
+                          borderRadius: 12,
+                          paddingHorizontal: 10
+                      }}
+                      placeholder="000000"
+                      placeholderTextColor="#9CA3AF"
+                      value={verificationCode}
+                      onChangeText={setVerificationCode}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      autoFocus
+                      returnKeyType="done"
+                      onSubmitEditing={() => {
+                          Keyboard.dismiss();
+                          if (verificationCode.length === 6) {
+                              confirmVerificationCode();
+                          }
+                      }}
+                      blurOnSubmit={true}
+                  />
+
+                  <TouchableOpacity
+                      style={[styles.nextButton, { width: '100%' }]}
+                      onPress={confirmVerificationCode}
+                  >
+                      <Text style={styles.nextButtonText}>Verificar</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                      style={{ marginTop: 16, alignSelf: 'center' }}
+                      onPress={() => setShowVerifyModal(false)}
+                  >
+                      <Text style={{ color: '#6B7280' }}>Cancelar</Text>
+                  </TouchableOpacity>
+              </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Date Picker Modal - Mejor UX para iOS */}
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: Platform.OS === 'ios' ? 40 : 20 }]}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Text style={{ color: '#6B7280', fontSize: 16 }}>Cancelar</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Fecha de Nacimiento</Text>
+              <TouchableOpacity onPress={() => {
+                if (birthday) {
+                  const age = new Date().getFullYear() - birthday.getFullYear();
+                  if (age < 18) {
+                    Alert.alert('Edad mínima', 'Debes tener al menos 18 años para registrarte.');
+                    return;
+                  }
+                }
+                setShowDatePicker(false);
+              }}>
+                <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '600' }}>Listo</Text>
               </TouchableOpacity>
             </View>
             
-            {/* Password Strength Meter */}
-            {password.length > 0 && (
-              <View style={styles.strengthContainer}>
-                <View style={styles.strengthBarContainer}>
-                  <View style={[styles.strengthBar, { width: `${(passwordStrength / 4) * 100}%`, backgroundColor: getStrengthColor() }]} />
-                </View>
-                <Text style={[styles.strengthText, { color: getStrengthColor() }]}>
-                  {getStrengthLabel()}
+            {birthday && (
+              <View style={{ padding: 16, backgroundColor: '#F0F9FF', marginHorizontal: 20, borderRadius: 12, marginBottom: 10 }}>
+                <Text style={{ fontSize: 14, color: '#1E40AF', textAlign: 'center' }}>
+                  Edad: {new Date().getFullYear() - birthday.getFullYear()} años
                 </Text>
               </View>
             )}
             
-            {touched.password && errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-            
-            <View style={styles.passwordRequirements}>
-              <Text style={styles.reqTitle}>La contraseña debe tener:</Text>
-              <View style={styles.reqItem}>
-                <Ionicons name={password.length >= 8 ? "checkmark-circle" : "ellipse-outline"} size={14} color={password.length >= 8 ? colors.status.success : "#9CA3AF"} />
-                <Text style={[styles.reqText, password.length >= 8 && styles.reqTextActive]}>Mínimo 8 caracteres</Text>
-              </View>
-              <View style={styles.reqItem}>
-                <Ionicons name={/[A-Z]/.test(password) ? "checkmark-circle" : "ellipse-outline"} size={14} color={/[A-Z]/.test(password) ? colors.status.success : "#9CA3AF"} />
-                <Text style={[styles.reqText, /[A-Z]/.test(password) && styles.reqTextActive]}>Una mayúscula</Text>
-              </View>
-              <View style={styles.reqItem}>
-                <Ionicons name={/[0-9]/.test(password) ? "checkmark-circle" : "ellipse-outline"} size={14} color={/[0-9]/.test(password) ? colors.status.success : "#9CA3AF"} />
-                <Text style={[styles.reqText, /[0-9]/.test(password) && styles.reqTextActive]}>Un número</Text>
-              </View>
-            </View>
-
-            {/* Botón continuar */}
-            <TouchableOpacity style={styles.button} onPress={handleContinue}>
-              <Text style={styles.buttonText}>Continuar</Text>
-              <Ionicons name="arrow-forward" size={20} color="#fff" />
-            </TouchableOpacity>
-
-            {/* Link para volver atrás (si estás autenticado, evita ir a Login fuera del stack actual) */}
-            <TouchableOpacity style={styles.linkContainer} onPress={() => navigation.goBack()}>
-              <Text style={styles.link}>¿Ya tienes cuenta? </Text>
-              <Text style={[styles.link, { color: colors.primary, fontWeight: '600' }]}>Inicia sesión</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/* Modal de códigos de país */}
-      <Modal visible={showCodePicker} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Selecciona tu código</Text>
-            <ScrollView style={{ maxHeight: 400 }}>
-              {COUNTRY_CODES.map((item) => (
-                <TouchableOpacity
-                  key={item.code}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    setCountryCode(item.code);
-                    setShowCodePicker(false);
-                  }}
-                >
-                  <Text style={styles.modalItemFlag}>{item.flag}</Text>
-                  <Text style={styles.modalItemText}>{item.name}</Text>
-                  <Text style={styles.modalItemCode}>{item.code}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={styles.modalClose} onPress={() => setShowCodePicker(false)}>
-              <Text style={styles.modalCloseText}>Cerrar</Text>
-            </TouchableOpacity>
+            <DateTimePicker
+              value={birthday || new Date(2000, 0, 1)}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              maximumDate={new Date()}
+              minimumDate={new Date(1940, 0, 1)}
+              onChange={(event, selectedDate) => {
+                if (selectedDate) {
+                  setBirthday(selectedDate);
+                }
+              }}
+              textColor="#1F2937"
+              style={{ height: 200 }}
+            />
           </View>
         </View>
       </Modal>
-
-      {/* Modal de fecha de nacimiento (Solo iOS) */}
-      {Platform.OS === 'ios' && (
-        <Modal visible={showDatePicker} transparent animationType="slide">
-          <View style={styles.datePickerOverlay}>
-            <View style={styles.datePickerModal}>
-              <View style={styles.datePickerHeader}>
-                <Text style={styles.modalTitle}>Fecha de Nacimiento</Text>
-              </View>
-              <DateTimePicker
-                value={birthday || new Date(2000, 0, 1)}
-                mode="date"
-                display="inline"
-                maximumDate={new Date()}
-                onChange={(event: DateTimePickerEvent, date?: Date) => {
-                  if (date) {
-                    setBirthday(date);
-                  }
-                }}
-                style={{ height: 260 }}
-              />
-              <TouchableOpacity
-                style={styles.modalClose}
-                onPress={() => setShowDatePicker(false)}
-              >
-                <Text style={styles.modalCloseText}>Confirmar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  content: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
-  
-  // Header & Progress
-  header: { alignItems: 'center', marginBottom: 32 },
-  backButton: { position: 'absolute', left: 0, top: 0, padding: 8, zIndex: 10 },
-  
-  progressContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20, marginTop: 10 },
-  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5E7EB' },
-  progressDotActive: { backgroundColor: colors.primary, transform: [{ scale: 1.2 }] },
-  progressLine: { width: 30, height: 2, backgroundColor: '#E5E7EB', marginHorizontal: 4 },
-  
-  stepText: { color: colors.primary, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-  title: { fontSize: 28, fontWeight: '700', color: '#111827', textAlign: 'center' },
-  subtitle: { fontSize: 16, color: '#6B7280', marginTop: 4, textAlign: 'center' },
-
-  // Form Container
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 20,
+    paddingBottom: 20,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  backButton: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  headerCenter: {
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#032B3C',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  content: {
+    flex: 1,
+  },
+  titleContainer: {
+    padding: 24,
+    paddingBottom: 0,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#032B3C',
+    marginBottom: 12,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#6B7280',
+    lineHeight: 22,
+  },
   formContainer: {
-    width: '100%',
+    padding: 24,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    marginBottom: 16,
-    height: 56,
-    borderWidth: 1,
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1.5,
     borderColor: '#E5E7EB',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 54,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   inputError: {
     borderColor: '#EF4444',
     backgroundColor: '#FEF2F2',
-  },
-  errorText: {
-    color: '#EF4444',
-    fontSize: 12,
-    marginTop: -12,
-    marginBottom: 12,
-    marginLeft: 4,
+    borderWidth: 2,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: 10,
   },
   input: {
     flex: 1,
-    height: '100%',
-    color: '#111827',
     fontSize: 16,
-    fontWeight: '500',
+    color: '#1F2937',
   },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    height: '100%',
-  },
-  codeBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    height: '100%',
-    borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
-  },
-  codeText: {
-    fontSize: 16,
-    color: '#111827',
-    fontWeight: '600',
-  },
-  phoneInput: {
-    paddingHorizontal: 15,
-  },
-  dateText: {
-    textAlignVertical: 'center',
-    color: '#111827',
-    fontSize: 16,
-  },
-  placeholderText: {
-    color: '#9CA3AF',
-  },
-  eyeButton: {
-    padding: 8,
-  },
-  strengthContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    marginTop: -8,
-  },
-  strengthBarContainer: {
-    flex: 1,
-    height: 4,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 2,
-    marginRight: 10,
-    overflow: 'hidden',
-  },
-  strengthBar: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  strengthText: {
+  errorText: {
     fontSize: 12,
-    fontWeight: '600',
-    width: 50,
-    textAlign: 'right',
+    color: '#EF4444',
+    marginTop: 4,
+    marginLeft: 4,
   },
-  passwordRequirements: {
-    marginBottom: 24,
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+  footer: {
+    padding: 24,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
-  reqTitle: {
-    fontSize: 13,
-    color: '#4B5563',
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  reqItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-    gap: 8,
-  },
-  reqText: {
-    fontSize: 13,
-    color: '#9CA3AF',
-  },
-  reqTextActive: {
-    color: '#374151',
-    fontWeight: '500',
-  },
-  button: {
-    width: '100%',
-    height: 56,
+  nextButton: {
     backgroundColor: colors.primary,
     borderRadius: 16,
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    gap: 8,
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
+  nextButtonText: {
+    color: 'white',
+    fontSize: 18,
     fontWeight: '700',
-  },
-  linkContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  link: {
-    color: '#6B7280',
-    fontSize: 15,
+    marginRight: 8,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  modalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    gap: 16,
-  },
-  modalItemFlag: {
-    fontSize: 28,
-  },
-  modalItemText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
-  },
-  modalItemCode: {
-    fontSize: 16,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  modalClose: {
-    marginTop: 20,
-    alignSelf: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-  },
-  modalCloseText: {
-    color: '#374151',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  datePickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
-  datePickerModal: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
-    alignSelf: 'center',
-    marginBottom: 20,
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
   },
-  datePickerHeader: {
-    marginBottom: 16,
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#032B3C',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9FAFB',
   },
 });

@@ -31,6 +31,12 @@ export type RootStackParamList = {
     licensePhotos: {
       front: string;
       back: string;
+      selfie?: string;
+    };
+    licenseData: {
+      number: string;
+      expiry: string;
+      country: string;
     };
     address?: {
       formatted?: string;

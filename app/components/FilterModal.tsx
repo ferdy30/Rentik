@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
+import MultiSlider from '@ptomasroos/react-native-multi-slider';
 import React, { useState } from 'react';
 import {
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import { colors } from '../constants/colors';
 import { FEATURES, FUEL_TYPES, TRANSMISION_TYPES, VEHICLE_TYPES } from '../constants/vehicles';
 
 export interface FilterOptions {
@@ -26,6 +29,9 @@ interface FilterModalProps {
   initialFilters: FilterOptions;
 }
 
+const { width } = Dimensions.get('window');
+const SLIDER_WIDTH = width - 48 - 32; // paddingHorizontal - extra padding
+
 const FilterModal: React.FC<FilterModalProps> = ({
   visible,
   onClose,
@@ -33,6 +39,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
   initialFilters,
 }) => {
   const [filters, setFilters] = useState<FilterOptions>(initialFilters);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   const handleReset = () => {
     const resetFilters: FilterOptions = {
@@ -58,6 +65,9 @@ const FilterModal: React.FC<FilterModalProps> = ({
     return [...array, item];
   };
 
+  const enableScroll = () => setScrollEnabled(true);
+  const disableScroll = () => setScrollEnabled(false);
+
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
@@ -65,28 +75,61 @@ const FilterModal: React.FC<FilterModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Filtros</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={28} color="#032B3C" />
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#032B3C" />
             </TouchableOpacity>
           </View>
 
           {/* Content */}
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.content} 
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={scrollEnabled}
+          >
             {/* Price Range */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Precio por día</Text>
               <View style={styles.priceRangeContainer}>
                 <View style={styles.priceBox}>
-                  <Text style={styles.priceLabel}>Mín</Text>
+                  <Text style={styles.priceLabel}>Mínimo</Text>
                   <Text style={styles.priceValue}>${filters.priceRange[0]}</Text>
                 </View>
                 <View style={styles.priceDivider} />
                 <View style={styles.priceBox}>
-                  <Text style={styles.priceLabel}>Máx</Text>
+                  <Text style={styles.priceLabel}>Máximo</Text>
                   <Text style={styles.priceValue}>${filters.priceRange[1]}</Text>
                 </View>
               </View>
-              <Text style={styles.hint}>Desliza para ajustar (próximamente)</Text>
+              <View style={styles.sliderContainer}>
+                <MultiSlider
+                  values={[filters.priceRange[0], filters.priceRange[1]]}
+                  sliderLength={SLIDER_WIDTH}
+                  onValuesChange={(values) => setFilters({ ...filters, priceRange: [values[0], values[1]] })}
+                  onValuesChangeStart={disableScroll}
+                  onValuesChangeFinish={enableScroll}
+                  min={0}
+                  max={300}
+                  step={5}
+                  allowOverlap={false}
+                  snapped
+                  selectedStyle={{ backgroundColor: colors.primary }}
+                  unselectedStyle={{ backgroundColor: '#E5E7EB' }}
+                  containerStyle={{ height: 40 }}
+                  trackStyle={{ height: 4 }}
+                  markerStyle={{
+                    backgroundColor: '#fff',
+                    height: 24,
+                    width: 24,
+                    borderWidth: 2,
+                    borderColor: colors.primary,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: 4,
+                  }}
+                />
+              </View>
             </View>
 
             {/* Vehicle Type */}
@@ -181,6 +224,36 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   <Text style={styles.priceValue}>{filters.yearRange[1]}</Text>
                 </View>
               </View>
+              <View style={styles.sliderContainer}>
+                <MultiSlider
+                  values={[filters.yearRange[0], filters.yearRange[1]]}
+                  sliderLength={SLIDER_WIDTH}
+                  onValuesChange={(values) => setFilters({ ...filters, yearRange: [values[0], values[1]] })}
+                  onValuesChangeStart={disableScroll}
+                  onValuesChangeFinish={enableScroll}
+                  min={2010}
+                  max={2025}
+                  step={1}
+                  allowOverlap={false}
+                  snapped
+                  selectedStyle={{ backgroundColor: colors.primary }}
+                  unselectedStyle={{ backgroundColor: '#E5E7EB' }}
+                  containerStyle={{ height: 40 }}
+                  trackStyle={{ height: 4 }}
+                  markerStyle={{
+                    backgroundColor: '#fff',
+                    height: 24,
+                    width: 24,
+                    borderWidth: 2,
+                    borderColor: colors.primary,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: 4,
+                  }}
+                />
+              </View>
             </View>
 
             {/* Features */}
@@ -208,6 +281,8 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 })}
               </View>
             </View>
+            
+            <View style={{ height: 40 }} />
           </ScrollView>
 
           {/* Footer */}
@@ -216,7 +291,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
               <Text style={styles.resetButtonText}>Limpiar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
-              <Text style={styles.applyButtonText}>Aplicar filtros</Text>
+              <Text style={styles.applyButtonText}>Ver resultados</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -237,7 +312,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    maxHeight: '92%',
+    height: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -249,14 +324,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
     color: '#032B3C',
+  },
+  closeButton: {
+    padding: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
   },
   content: {
     paddingHorizontal: 24,
@@ -266,7 +346,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#032B3C',
     marginBottom: 16,
@@ -275,6 +355,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+    marginBottom: 16,
   },
   priceBox: {
     flex: 1,
@@ -282,7 +363,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    padding: 16,
+    padding: 12,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -291,53 +372,51 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   priceLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
-    marginBottom: 6,
+    marginBottom: 4,
     fontWeight: '500',
   },
   priceValue: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#0B729D',
+    color: colors.primary,
   },
   priceDivider: {
-    width: 16,
+    width: 12,
     height: 2,
     backgroundColor: '#E5E7EB',
     borderRadius: 1,
   },
-  hint: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    marginTop: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
+  sliderContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
   },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
   optionChip: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   optionChipSelected: {
-    backgroundColor: '#0B729D',
-    borderColor: '#0B729D',
-    shadowColor: '#0B729D',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
   },
   optionText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
   },
@@ -373,9 +452,9 @@ const styles = StyleSheet.create({
     flex: 2,
     paddingVertical: 16,
     borderRadius: 16,
-    backgroundColor: '#0B729D',
+    backgroundColor: colors.primary,
     alignItems: 'center',
-    shadowColor: '#0B729D',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

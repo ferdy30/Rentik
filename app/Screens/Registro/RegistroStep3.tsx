@@ -1,4 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as Haptics from 'expo-haptics';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -7,6 +9,7 @@ import React, { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    ImageBackground,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -14,37 +17,24 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { Firebaseauth as auth, db, storage } from '../../../FirebaseConfig';
+import { StepIndicator } from '../../components/StepIndicator';
 import { colors } from '../../constants/colors';
+import { RootStackParamList } from '../../types/navigation';
 
+type Props = NativeStackScreenProps<RootStackParamList, 'RegistroStep3'>;
 type RoleType = 'arrendatario' | 'arrendador' | null;
 
-// Paso 3: Selección de Rol
-export default function RegistroStep3({ route, navigation }: any) {
+export default function RegistroStep3({ route, navigation }: Props) {
   const userData = route.params;
   const [selectedRole, setSelectedRole] = useState<RoleType>(null);
   const [loading, setLoading] = useState(false);
-
-  // Ordenar claves de un objeto (recursivo) para JSON determinístico
-  const sortObjectDeep = (value: any): any => {
-    if (Array.isArray(value)) return value.map(sortObjectDeep);
-    if (value && typeof value === 'object') {
-      return Object.keys(value)
-        .sort()
-        .reduce((acc: any, key) => {
-          acc[key] = sortObjectDeep((value as any)[key]);
-          return acc;
-        }, {} as any);
-    }
-    return value;
-  };
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const uploadLicensePhoto = async (uri: string, userId: string, side: 'front' | 'back') => {
     try {
-      // Comprimir antes de subir para mejorar rendimiento
       const compressed = await manipulateAsync(
         uri,
         [{ resize: { width: 1280 } }],
@@ -54,33 +44,12 @@ export default function RegistroStep3({ route, navigation }: any) {
       const blob = await response.blob();
       const filename = `licenses/${userId}/license_${side}.jpg`;
       const storageRef = ref(storage, filename);
-      const size = (blob as any)?.size ?? undefined;
-      console.log('[UPLOAD] start', { userId, side, size, path: storageRef.fullPath });
-      // Retry simple con backoff, ayuda contra race conditions de auth o fallas transitorias
-      const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
-      let lastError: any = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
-          lastError = null;
-          break;
-        } catch (err: any) {
-          lastError = err;
-          console.warn('[UPLOAD] attempt failed', { side, attempt, code: err?.code, message: err?.message });
-          if (attempt < 3) await sleep(400 * attempt);
-        }
-      }
-      if (lastError) throw lastError;
+      
+      await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
       const downloadURL = await getDownloadURL(storageRef);
-      console.log('[UPLOAD] success', { side, url: downloadURL });
       return downloadURL;
     } catch (error) {
-      const e: any = error;
-      console.error('Error uploading license photo:', {
-        code: e?.code,
-        message: e?.message,
-        serverResponse: e?.customData?.serverResponse,
-      });
+      console.error('Error uploading license photo:', error);
       throw error;
     }
   };
@@ -110,14 +79,7 @@ export default function RegistroStep3({ route, navigation }: any) {
       );
       const userId = userCredential.user.uid;
 
-  // Asegurar que el token esté disponible para Storage (evita race conditions con reglas)
-  await userCredential.user.getIdToken(true);
-      // Verificación rápida de sesión activa
-      if (!auth.currentUser || auth.currentUser.uid !== userId) {
-        console.log('[AUTH] Esperando sesión activa para Storage...');
-      }
-
-      // 2. Subir fotos de licencia primero
+      // 2. Subir fotos de licencia
       const licenseFrontURL = await uploadLicensePhoto(
         userData.licensePhotos.front,
         userId,
@@ -125,28 +87,7 @@ export default function RegistroStep3({ route, navigation }: any) {
       );
       const licenseBackURL = await uploadLicensePhoto(userData.licensePhotos.back, userId, 'back');
 
-      // 2.1 Subir un manifest.json con claves ordenadas a Storage
-      try {
-        const manifest = sortObjectDeep({
-          version: '1.0',
-          userId,
-          licensePhotos: {
-            back: licenseBackURL,
-            front: licenseFrontURL,
-          },
-          createdAt: new Date().toISOString(),
-        });
-        const manifestRef = ref(storage, `licenses/${userId}/manifest.json`);
-        const json = JSON.stringify(manifest, null, 2);
-        // React Native: usar Blob + uploadBytes para evitar errores de ArrayBuffer
-        const jsonBlob = new Blob([json], { type: 'application/json' });
-        await uploadBytes(manifestRef, jsonBlob, { contentType: 'application/json' });
-        console.log('[MANIFEST] manifest.json uploaded');
-      } catch (e) {
-        console.warn('[MANIFEST] failed to upload manifest.json', e);
-      }
-
-      // 3. Crear documento del usuario UNA SOLA VEZ con profileComplete: true
+      // 3. Crear documento del usuario
       await setDoc(doc(db, 'users', userId), {
         nombre: userData.nombre,
         apellido: userData.apellido,
@@ -154,14 +95,13 @@ export default function RegistroStep3({ route, navigation }: any) {
         telefono: `${userData.countryCode}${userData.telefono}`,
         fechaNacimiento: userData.fechaNacimiento,
         role: selectedRole,
-        licensePhotoURL: licenseFrontURL,
+        licenseData: userData.licenseData || {},
         licensePhotos: {
           front: licenseFrontURL,
           back: licenseBackURL,
         },
-        address: userData.address || null,
-        profileComplete: true, // Perfil completo después del registro
-        vehicleProfileComplete: false, // Arrendadores pueden agregar vehículos desde el Home
+        profileComplete: true,
+        vehicleProfileComplete: false,
         terminosAceptados: {
           aceptado: true,
           fecha: new Date().toISOString(),
@@ -172,14 +112,7 @@ export default function RegistroStep3({ route, navigation }: any) {
       });
 
       setLoading(false);
-
-      // 4. Navegación post-registro
-      // NO navegamos manualmente - el AuthContext detecta el cambio y reconstruye el stack automáticamente
-      // El usuario será redirigido según su rol:
-      // - Arrendador → PaymentSetup (si no tiene Stripe configurado)
-      // - Arrendatario → HomeArrendatario
-      // Ver AppNavigation para la lógica de guards
-      console.log('[REGISTRO] Registro completado, esperando reconstrucción del stack...');
+      // AuthContext will handle navigation
     } catch (error: any) {
       console.error('Error creating account:', error);
       Alert.alert(
@@ -196,27 +129,35 @@ export default function RegistroStep3({ route, navigation }: any) {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#032B3C" />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Elige tu Rol</Text>
+            <Text style={styles.headerSubtitle}>Paso 3 de 3</Text>
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <StepIndicator currentStep={3} totalSteps={3} labels={['Datos', 'Licencia', 'Rol']} />
+
       <KeyboardAvoidingView
         style={styles.content}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Header con progreso */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.primary} />
-            </TouchableOpacity>
-            <View style={styles.progressContainer}>
-              <View style={[styles.progressDot, styles.progressDotDone]} />
-              <View style={[styles.progressLine, styles.progressLineDone]} />
-              <View style={[styles.progressDot, styles.progressDotDone]} />
-              <View style={[styles.progressLine, styles.progressLineDone]} />
-              <View style={[styles.progressDot, styles.progressDotActive]} />
+          
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Cómo quieres usar Rentik?</Text>
+            <Text style={styles.subtitle}>
+              Selecciona el rol principal para tu cuenta. Podrás cambiarlo después.
+            </Text>
+            <View style={styles.timeIndicator}>
+              <Ionicons name="time-outline" size={14} color="#6B7280" />
+              <Text style={styles.timeText}>~2 minutos para completar tu perfil</Text>
             </View>
-            <Text style={styles.stepText}>Paso 3 de 3</Text>
-            <Ionicons name="people-outline" size={48} color={colors.primary} style={{ marginVertical: 8 }} />
-            <Text style={styles.title}>Elige tu Rol</Text>
-            <Text style={styles.subtitle}>¿Cómo quieres usar Rentik?</Text>
           </View>
 
           {/* Formulario */}
@@ -227,66 +168,113 @@ export default function RegistroStep3({ route, navigation }: any) {
                 styles.roleCard,
                 selectedRole === 'arrendatario' && styles.roleCardSelected,
               ]}
-              onPress={() => setSelectedRole('arrendatario')}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setSelectedRole('arrendatario');
+              }}
               disabled={loading}
+              activeOpacity={0.9}
             >
-              <View style={styles.roleContent}>
-                 <View style={[styles.iconContainer, selectedRole === 'arrendatario' && styles.iconContainerSelected]}>
-                    <Ionicons name="map" size={40} color={selectedRole === 'arrendatario' ? '#fff' : colors.primary} />
-                 </View>
-                 <View style={styles.textContainer}>
-                    <Text style={styles.roleTitle}>Viajero</Text>
-                    <Text style={styles.roleSubtitle}>Explora, reserva y viaja seguro con nuestra cobertura total incluida.</Text>
-                 </View>
-                 <View style={styles.radioContainer}>
-                    <View style={[styles.radioOuter, selectedRole === 'arrendatario' && styles.radioOuterSelected]}>
-                        {selectedRole === 'arrendatario' && <View style={styles.radioInner} />}
+              {/* Badge "Más Popular" */}
+              <View style={styles.popularBadge}>
+                <Ionicons name="star" size={12} color="#FFB800" />
+                <Text style={styles.badgeText}>Más Popular</Text>
+              </View>
+              
+              {/* Radio Button en esquina superior derecha */}
+              <View style={styles.radioContainerTop}>
+                <View style={[styles.radioOuter, selectedRole === 'arrendatario' && styles.radioOuterSelected]}>
+                    {selectedRole === 'arrendatario' && <View style={styles.radioInner} />}
+                </View>
+              </View>
+              
+              <ImageBackground
+                source={require('../../../assets/images/viajeroP.png')}
+                style={styles.roleImageBackground}
+                imageStyle={{ borderRadius: 20 }}
+              >
+                {/* Overlay gradiente */}
+                <View style={styles.imageGradientOverlay} />
+                
+                {/* Contenido en la parte inferior */}
+                <View style={styles.roleContentOverlay}>
+                  <Text style={styles.roleTitleOverlay}>Quiero Rentar</Text>
+                  <Text style={styles.roleSubtitleOverlay}>
+                      Encuentra el auto perfecto para tu viaje. Sin papeleos y seguro incluido.
+                  </Text>
+                  
+                  <View style={styles.featureListOverlay}>
+                    <View style={styles.featureItemOverlay}>
+                        <Ionicons name="shield-checkmark-outline" size={14} color="#fff" />
+                        <Text style={styles.featureTextOverlay}>Cobertura $50k</Text>
                     </View>
-                 </View>
-              </View>
-              {/* Visual cues instead of text heavy description */}
-              <View style={styles.visualFeatures}>
-                  <View style={styles.visualTag}>
-                      <Ionicons name="car-outline" size={16} color={colors.primary} />
-                      <Text style={styles.visualTagText}>Autos únicos</Text>
+                    <View style={styles.featureItemOverlay}>
+                        <Ionicons name="flash-outline" size={14} color="#fff" />
+                        <Text style={styles.featureTextOverlay}>Instantáneo</Text>
+                    </View>
+                    <View style={styles.featureItemOverlay}>
+                        <Ionicons name="car-outline" size={14} color="#fff" />
+                        <Text style={styles.featureTextOverlay}>500+ autos</Text>
+                    </View>
                   </View>
-                  <View style={styles.visualTag}>
-                      <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
-                      <Text style={styles.visualTagText}>Seguro incluido</Text>
-                  </View>
-              </View>
+                </View>
+              </ImageBackground>
             </TouchableOpacity>
 
             {/* Opción Host */}
             <TouchableOpacity
               style={[styles.roleCard, selectedRole === 'arrendador' && styles.roleCardSelected]}
-              onPress={() => setSelectedRole('arrendador')}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setSelectedRole('arrendador');
+              }}
               disabled={loading}
+              activeOpacity={0.9}
             >
-              <View style={styles.roleContent}>
-                 <View style={[styles.iconContainer, selectedRole === 'arrendador' && styles.iconContainerSelected]}>
-                    <Ionicons name="car-sport" size={40} color={selectedRole === 'arrendador' ? '#fff' : colors.primary} />
-                 </View>
-                 <View style={styles.textContainer}>
-                    <Text style={styles.roleTitle}>Host</Text>
-                    <Text style={styles.roleSubtitle}>Genera ingresos extra rentando tu vehículo a conductores verificados.</Text>
-                 </View>
-                 <View style={styles.radioContainer}>
-                    <View style={[styles.radioOuter, selectedRole === 'arrendador' && styles.radioOuterSelected]}>
-                        {selectedRole === 'arrendador' && <View style={styles.radioInner} />}
+              {/* Badge Verificación */}
+              <View style={styles.verificationBadge}>
+                <Ionicons name="shield-checkmark" size={12} color="#10B981" />
+                <Text style={styles.badgeTextGreen}>Verificación Requerida</Text>
+              </View>
+              
+              {/* Radio Button en esquina superior derecha */}
+              <View style={styles.radioContainerTop}>
+                <View style={[styles.radioOuter, selectedRole === 'arrendador' && styles.radioOuterSelected]}>
+                    {selectedRole === 'arrendador' && <View style={styles.radioInner} />}
+                </View>
+              </View>
+              
+              <ImageBackground
+                source={require('../../../assets/images/hostP.png')}
+                style={styles.roleImageBackground}
+                imageStyle={{ borderRadius: 20 }}
+              >
+                {/* Overlay gradiente */}
+                <View style={styles.imageGradientOverlay} />
+                
+                {/* Contenido en la parte inferior */}
+                <View style={styles.roleContentOverlay}>
+                  <Text style={styles.roleTitleOverlay}>Quiero ser Host</Text>
+                  <Text style={styles.roleSubtitleOverlay}>
+                      Convierte tu auto en un activo. Gana dinero con conductores verificados.
+                  </Text>
+                  
+                  <View style={styles.featureListOverlay}>
+                    <View style={styles.featureItemOverlay}>
+                        <Ionicons name="cash-outline" size={14} color="#fff" />
+                        <Text style={styles.featureTextOverlay}>Pagos semanales</Text>
                     </View>
-                 </View>
-              </View>
-               <View style={styles.visualFeatures}>
-                  <View style={styles.visualTag}>
-                      <Ionicons name="cash-outline" size={16} color={colors.primary} />
-                      <Text style={styles.visualTagText}>Gana dinero</Text>
+                    <View style={styles.featureItemOverlay}>
+                        <Ionicons name="people-outline" size={14} color="#fff" />
+                        <Text style={styles.featureTextOverlay}>15k+ hosts</Text>
+                    </View>
+                    <View style={styles.featureItemOverlay}>
+                        <Ionicons name="trending-up-outline" size={14} color="#fff" />
+                        <Text style={styles.featureTextOverlay}>$800/mes</Text>
+                    </View>
                   </View>
-                  <View style={styles.visualTag}>
-                      <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-                      <Text style={styles.visualTagText}>Tu horario</Text>
-                  </View>
-              </View>
+                </View>
+              </ImageBackground>
             </TouchableOpacity>
 
             {/* Términos y Condiciones */}
@@ -296,36 +284,31 @@ export default function RegistroStep3({ route, navigation }: any) {
               activeOpacity={0.7}
             >
               <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
-                {acceptedTerms && <Ionicons name="checkmark" size={18} color="#fff" />}
+                {acceptedTerms && <Ionicons name="checkmark" size={16} color="#fff" />}
               </View>
               <Text style={styles.termsText}>
-                Acepto los{' '}
-                <Text style={styles.termsLink}>Términos y Condiciones</Text>
-                {' '}y la{' '}
-                <Text style={styles.termsLink}>Política de Privacidad</Text>
+                Acepto los <Text style={styles.termsLink}>Términos y Condiciones</Text> y la <Text style={styles.termsLink}>Política de Privacidad</Text> de Rentik.
               </Text>
             </TouchableOpacity>
 
-            {/* Botón continuar */}
-            {loading ? (
-              <View style={styles.loaderContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>Creando tu cuenta...</Text>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  (!selectedRole || !acceptedTerms) && styles.buttonDisabled,
-                ]}
-                onPress={handleCreateAccount}
-                disabled={!selectedRole || !acceptedTerms}
-              >
-                <Text style={styles.buttonText}>Crear Cuenta</Text>
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              </TouchableOpacity>
-            )}
+            {/* Botón Crear Cuenta */}
+            <TouchableOpacity
+              style={[styles.button, (!selectedRole || !acceptedTerms) && styles.buttonDisabled]}
+              onPress={handleCreateAccount}
+              disabled={loading || !selectedRole || !acceptedTerms}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                    <Text style={styles.buttonText}>Crear Cuenta</Text>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                </>
+              )}
+            </TouchableOpacity>
+
           </View>
+          <View style={{ height: 100 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -333,137 +316,235 @@ export default function RegistroStep3({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   content: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  scrollContent: { paddingBottom: 40 },
   
-  // Header & Progress
-  header: { alignItems: 'center', marginBottom: 32 },
-  backButton: { position: 'absolute', left: 0, top: 0, padding: 8, zIndex: 10 },
-  progressContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20, marginTop: 10 },
-  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5E7EB' },
-  progressDotActive: { backgroundColor: colors.primary, transform: [{ scale: 1.2 }] },
-  progressDotDone: { backgroundColor: colors.primary },
-  progressLine: { width: 30, height: 2, backgroundColor: '#E5E7EB', marginHorizontal: 4 },
-  progressLineDone: { backgroundColor: colors.primary },
-  
-  stepText: { color: colors.primary, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-  title: { fontSize: 28, fontWeight: '700', color: '#111827', textAlign: 'center' },
-  subtitle: { fontSize: 16, color: '#6B7280', marginTop: 4, textAlign: 'center' },
-
-  formContainer: { gap: 20 },
-
-  // Role Card Styles - Redesigned
-  roleCard: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 20,
+    paddingBottom: 20,
+    backgroundColor: 'white',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowRadius: 8,
     elevation: 2,
   },
-  roleCardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: '#F0F9FF',
-    borderWidth: 2,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.1,
-    elevation: 4,
-  },
-  roleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  iconContainerSelected: {
-    backgroundColor: colors.primary,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  roleTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  roleSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  radioContainer: {
-    marginLeft: 8,
-  },
-  radioOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioOuterSelected: {
-    borderColor: colors.primary,
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.primary,
-  },
-  visualFeatures: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  visualTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 6,
-  },
-  visualTagText: {
-    fontSize: 12,
-    color: '#1E3A8A',
-    fontWeight: '600',
-  },
+  backButton: { padding: 8, marginLeft: -8 },
+  headerCenter: { alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#032B3C' },
+  headerSubtitle: { fontSize: 12, color: '#6B7280' },
 
-  // Terms
-  termsContainer: {
+  titleContainer: { padding: 24, paddingBottom: 0 },
+  title: { fontSize: 28, fontWeight: '800', color: '#032B3C', marginBottom: 12, letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, color: '#6B7280', lineHeight: 22 },
+  timeIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
+    gap: 6,
+  },
+  timeText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+
+  formContainer: { padding: 24 },
+
+  roleCard: {
+    borderRadius: 24,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+  },
+  roleCardSelected: {
+    borderColor: colors.primary,
+    borderWidth: 3,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 8,
+    transform: [{ scale: 1.02 }],
+  },
+  popularBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 16,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  verificationBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 16,
+    backgroundColor: '#D1FAE5',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  badgeTextGreen: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  
+  roleImageBackground: {
+    width: '100%',
+    height: 340,
+    justifyContent: 'flex-end',
+  },
+  
+  imageGradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  
+  roleContentOverlay: {
+    padding: 24,
+    paddingBottom: 28,
+  },
+  
+  roleTitleOverlay: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFFFFF',
     marginBottom: 8,
-    paddingHorizontal: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  
+  roleSubtitleOverlay: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    lineHeight: 20,
+    marginBottom: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  
+  featureListOverlay: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  
+  featureItemOverlay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  
+  featureTextOverlay: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 6,
+  },
+  
+  radioContainerTop: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 5,
+  },
+  roleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  radioOuter: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  radioOuterSelected: {
+    borderColor: colors.primary,
+    backgroundColor: 'white',
+  },
+  radioInner: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.primary,
+  },
+
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+    marginBottom: 24,
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
     borderWidth: 2,
     borderColor: '#D1D5DB',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginRight: 12,
-    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   checkboxChecked: {
     backgroundColor: colors.primary,
@@ -472,48 +553,36 @@ const styles = StyleSheet.create({
   termsText: {
     flex: 1,
     fontSize: 14,
-    color: '#4B5563',
+    color: '#6B7280',
     lineHeight: 20,
   },
   termsLink: {
     color: colors.primary,
     fontWeight: '600',
-    textDecorationLine: 'underline',
   },
+
   button: {
-    width: '100%',
-    height: 56,
     backgroundColor: colors.primary,
     borderRadius: 16,
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
     elevation: 6,
-    marginTop: 8,
+    gap: 8,
   },
   buttonDisabled: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#9CA3AF',
     shadowOpacity: 0,
     elevation: 0,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: 'white',
+    fontSize: 18,
     fontWeight: '700',
-  },
-  loaderContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
-    fontWeight: '500',
   },
 });
