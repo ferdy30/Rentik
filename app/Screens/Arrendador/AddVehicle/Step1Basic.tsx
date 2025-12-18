@@ -77,6 +77,10 @@ export default function Step1Basic() {
 	const [checkingPlaca, setCheckingPlaca] = useState(false);
 	const [placaDuplicada, setPlacaDuplicada] = useState(false);
 	
+	// Draft recovery modal
+	const [showDraftRecoveryModal, setShowDraftRecoveryModal] = useState(false);
+	const [draftData, setDraftData] = useState<{ step1: any; timestamp: string } | null>(null);
+	
 	// VIN scanning states
 	const [scanningVin, setScanningVin] = useState(false);
 	const [showVinModal, setShowVinModal] = useState(false);
@@ -97,16 +101,26 @@ export default function Step1Basic() {
 	const [showManualVin, setShowManualVin] = useState(false);
 	const [manualVin, setManualVin] = useState('');
 
-	// Cargar borrador
+	// Cargar borrador y mostrar modal de recuperación
 	useEffect(() => {
 		const loadDraft = async () => {
 			try {
 				const draft = await AsyncStorage.getItem('@add_vehicle_draft');
 				if (draft) {
 					const parsed = JSON.parse(draft);
-					if (parsed.step1) {
-						setFormData(parsed.step1);
-						setLastSaved(new Date(parsed.timestamp));
+					if (parsed.step1 && Object.keys(parsed.step1).length > 0) {
+						// Verificar si el draft es reciente (menos de 7 días)
+						const draftDate = new Date(parsed.timestamp);
+						const daysSinceDraft = (Date.now() - draftDate.getTime()) / (1000 * 60 * 60 * 24);
+						
+						if (daysSinceDraft < 7) {
+							// Mostrar modal de recuperación
+							setDraftData(parsed);
+							setShowDraftRecoveryModal(true);
+						} else {
+							// Borrador muy antiguo, eliminarlo
+							await AsyncStorage.removeItem('@add_vehicle_draft');
+						}
 					}
 				}
 			} catch (error) {
@@ -115,6 +129,25 @@ export default function Step1Basic() {
 		};
 		loadDraft();
 	}, []);
+
+	const handleRecoverDraft = () => {
+		if (draftData && draftData.step1) {
+			setFormData(draftData.step1);
+			setLastSaved(new Date(draftData.timestamp));
+			setShowDraftRecoveryModal(false);
+			Alert.alert('Borrador recuperado', 'Tus datos han sido restaurados. Puedes continuar donde lo dejaste.');
+		}
+	};
+
+	const handleDiscardDraft = async () => {
+		try {
+			await AsyncStorage.removeItem('@add_vehicle_draft');
+			setDraftData(null);
+			setShowDraftRecoveryModal(false);
+		} catch (error) {
+			console.log('Error discarding draft:', error);
+		}
+	};
 
 	// Animación de entrada
 	useEffect(() => {
@@ -250,22 +283,91 @@ export default function Step1Basic() {
 	};
 
 	// VIN Scanning Handlers
+	const validateVinChecksum = (vin: string): boolean => {
+		// Validación de VIN usando algoritmo de checksum (dígito de verificación)
+		const transliterate = 'ABCDEFGHJKLMNPRSTUVWXYZ';
+		const weights = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2];
+		const transliterationTable: { [key: string]: number } = {
+			'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5, 'F': 6, 'G': 7, 'H': 8,
+			'J': 1, 'K': 2, 'L': 3, 'M': 4, 'N': 5, 'P': 7, 'R': 9,
+			'S': 2, 'T': 3, 'U': 4, 'V': 5, 'W': 6, 'X': 7, 'Y': 8, 'Z': 9
+		};
+
+		let sum = 0;
+		for (let i = 0; i < 17; i++) {
+			const char = vin.charAt(i);
+			let value: number;
+
+			if (!isNaN(parseInt(char))) {
+				value = parseInt(char);
+			} else if (transliterationTable[char]) {
+				value = transliterationTable[char];
+			} else {
+				return false; // Carácter inválido
+			}
+
+			sum += value * weights[i];
+		}
+
+		const checkDigit = sum % 11;
+		const expectedChar = checkDigit === 10 ? 'X' : checkDigit.toString();
+		
+		return vin.charAt(8) === expectedChar;
+	};
+
+	const isVinFormatValid = (vin: string): { valid: boolean; error?: string } => {
+		// Longitud exacta de 17 caracteres
+		if (vin.length !== 17) {
+			return { valid: false, error: 'El VIN debe tener exactamente 17 caracteres' };
+		}
+
+		// Solo letras mayúsculas y números
+		if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+			return { valid: false, error: 'VIN contiene caracteres inválidos. No se permiten I, O, Q' };
+		}
+
+		// Validar checksum
+		if (!validateVinChecksum(vin)) {
+			return { valid: false, error: 'El dígito de verificación del VIN no es válido' };
+		}
+
+		return { valid: true };
+	};
+
 	const handleManualVinSubmit = async () => {
 		if (!manualVin || manualVin.length < 17) {
 			Alert.alert('Error', 'El VIN debe tener 17 caracteres');
+			return;
+		}
+
+		const vinUpper = manualVin.toUpperCase();
+		
+		// Validar formato y checksum
+		const validation = isVinFormatValid(vinUpper);
+		if (!validation.valid) {
+			Alert.alert('VIN Inválido', validation.error || 'El VIN no es válido');
 			return;
 		}
 		
 		setScanningVin(true);
 		try {
 			// Decode VIN to get vehicle info
-			const vehicleInfo = await decodeVin(manualVin);
+			const vehicleInfo = await decodeVin(vinUpper);
 
 			if (!vehicleInfo) {
 				Alert.alert(
 					'No se pudo decodificar',
-					'El VIN es válido pero no se encontró información del vehículo.',
-					[{ text: 'OK' }]
+					'El VIN es válido pero no se encontró información del vehículo. Podrás ingresar los datos manualmente.',
+					[
+						{ text: 'Cancelar', style: 'cancel' },
+						{ 
+							text: 'Continuar sin VIN', 
+							onPress: () => {
+								setManualVin('');
+								setShowManualVin(false);
+							}
+						}
+					]
 				);
 				setScanningVin(false);
 				return;
@@ -276,7 +378,7 @@ export default function Step1Basic() {
 
 			// Store VIN data
 			setVinData({
-				vin: manualVin,
+				vin: vinUpper,
 				marca: mappedMarca,
 				modelo: vehicleInfo.modelo,
 				anio: vehicleInfo.anio,
@@ -286,7 +388,7 @@ export default function Step1Basic() {
 			setShowVinModal(true);
 		} catch (error) {
 			console.error('Error processing manual VIN:', error);
-			Alert.alert('Error', 'Hubo un problema al procesar el VIN.');
+			Alert.alert('Error', 'Hubo un problema al procesar el VIN. Intenta de nuevo.');
 		} finally {
 			setScanningVin(false);
 		}
@@ -350,19 +452,25 @@ export default function Step1Basic() {
 				return;
 			}
 
-			// Validate VIN format
-			if (!isValidVinFormat(data.vin)) {
+			const vinUpper = data.vin.toUpperCase();
+
+			// Validate VIN format and checksum
+			const validation = isVinFormatValid(vinUpper);
+			if (!validation.valid) {
 				Alert.alert(
 					'VIN inválido',
-					'El VIN detectado no tiene un formato válido. Intenta de nuevo.',
-					[{ text: 'OK' }]
+					validation.error || 'El VIN detectado no es válido. Intenta ingresarlo manualmente.',
+					[
+						{ text: 'Cancelar', style: 'cancel' },
+						{ text: 'Ingresar manualmente', onPress: () => setShowManualVin(true) }
+					]
 				);
 				setScanningVin(false);
 				return;
 			}
 
 			// Decode VIN to get vehicle info
-			const vehicleInfo = await decodeVin(data.vin);
+			const vehicleInfo = await decodeVin(vinUpper);
 
 			if (!vehicleInfo) {
 				Alert.alert(
@@ -379,7 +487,7 @@ export default function Step1Basic() {
 
 			// Store VIN data
 			setVinData({
-				vin: data.vin,
+				vin: vinUpper,
 				marca: mappedMarca,
 				modelo: vehicleInfo.modelo,
 				anio: vehicleInfo.anio,
@@ -855,6 +963,92 @@ export default function Step1Basic() {
 								</TouchableOpacity>
 							))}
 						</ScrollView>
+					</View>
+				</View>
+			</Modal>
+
+			{/* Draft Recovery Modal */}
+			<Modal
+				visible={showDraftRecoveryModal}
+				transparent
+				animationType="fade"
+				onRequestClose={() => setShowDraftRecoveryModal(false)}
+			>
+				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }}>
+					<View style={{ backgroundColor: 'white', borderRadius: 20, padding: 24, margin: 20, maxWidth: 400, width: '90%' }}>
+						{/* Icon */}
+						<View style={{ alignItems: 'center', marginBottom: 16 }}>
+							<View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+								<Ionicons name="document-text" size={40} color="#0B729D" />
+							</View>
+							<Text style={{ fontSize: 22, fontWeight: '800', color: '#032B3C', textAlign: 'center', marginBottom: 8 }}>
+								Borrador Encontrado
+							</Text>
+							<Text style={{ fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 }}>
+								Encontramos un borrador guardado de un vehículo que estabas agregando.
+							</Text>
+						</View>
+
+						{/* Draft Info */}
+						{draftData && draftData.step1 && (
+							<View style={{ backgroundColor: '#F9FAFB', padding: 16, borderRadius: 12, marginBottom: 20 }}>
+								<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+									<Ionicons name="time-outline" size={16} color="#6B7280" />
+									<Text style={{ fontSize: 13, color: '#6B7280', marginLeft: 6 }}>
+										Guardado: {new Date(draftData.timestamp).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+									</Text>
+								</View>
+								{draftData.step1.marca && (
+									<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+										<Ionicons name="car-sport" size={16} color="#0B729D" />
+										<Text style={{ fontSize: 14, color: '#032B3C', marginLeft: 6, fontWeight: '600' }}>
+											{draftData.step1.marca} {draftData.step1.modelo} {draftData.step1.anio}
+										</Text>
+									</View>
+								)}
+								{draftData.step1.placa && (
+									<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+										<Ionicons name="card" size={16} color="#6B7280" />
+										<Text style={{ fontSize: 13, color: '#6B7280', marginLeft: 6 }}>
+											Placa: {draftData.step1.placa}
+										</Text>
+									</View>
+								)}
+							</View>
+						)}
+
+						{/* Actions */}
+						<View style={{ gap: 12 }}>
+							<TouchableOpacity
+								style={{
+									backgroundColor: '#0B729D',
+									padding: 16,
+									borderRadius: 12,
+									alignItems: 'center',
+									flexDirection: 'row',
+									justifyContent: 'center',
+								}}
+								onPress={handleRecoverDraft}
+							>
+								<Ionicons name="refresh" size={20} color="white" style={{ marginRight: 8 }} />
+								<Text style={{ fontSize: 16, fontWeight: '700', color: '#FFF' }}>
+									Recuperar Borrador
+								</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={{
+									backgroundColor: '#F3F4F6',
+									padding: 16,
+									borderRadius: 12,
+									alignItems: 'center',
+								}}
+								onPress={handleDiscardDraft}
+							>
+								<Text style={{ fontSize: 16, fontWeight: '600', color: '#6B7280' }}>
+									Comenzar Desde Cero
+								</Text>
+							</TouchableOpacity>
+						</View>
 					</View>
 				</View>
 			</Modal>

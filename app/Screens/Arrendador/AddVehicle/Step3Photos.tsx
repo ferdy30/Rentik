@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -49,6 +50,7 @@ export default function Step3Photos() {
 	});
 
 	const [additionalPhotos, setAdditionalPhotos] = useState<string[]>([]);
+	const [photoMetadata, setPhotoMetadata] = useState<{ [key: string]: { size: number; width: number; height: number; quality: 'excellent' | 'good' | 'acceptable' | 'poor' } }>({});
 
 	const [loadingPhoto, setLoadingPhoto] = useState<string | null>(null);
 	const [showPhotoOptions, setShowPhotoOptions] = useState<PhotoType | 'additional' | null>(null);
@@ -59,6 +61,90 @@ export default function Step3Photos() {
 	// Use hook-based permissions to avoid deprecated flows and improve UX
 	const [mediaPermission, requestMediaPermission] = ImagePicker.useMediaLibraryPermissions();
 	const [cameraPermission, requestCameraPermission] = ImagePicker.useCameraPermissions();
+
+	// Validar y comprimir imagen
+	const validateAndCompressImage = async (uri: string, type: PhotoType | 'additional'): Promise<{ uri: string; metadata: { size: number; width: number; height: number; quality: 'excellent' | 'good' | 'acceptable' | 'poor' } } | null> => {
+		try {
+			// 1. Obtener información de la imagen original
+			const response = await fetch(uri);
+			const blob = await response.blob();
+			const originalSize = blob.size;
+
+			// 2. Obtener dimensiones usando Image.getSize
+			const getImageDimensions = (): Promise<{ width: number; height: number }> => {
+				return new Promise((resolve, reject) => {
+					Image.getSize(
+						uri,
+						(width, height) => resolve({ width, height }),
+						(error) => reject(error)
+					);
+				});
+			};
+
+			const { width, height } = await getImageDimensions();
+
+			// 3. Validar resolución mínima (800x600)
+			if (width < 800 || height < 600) {
+				Alert.alert(
+					'Resolución muy baja',
+					`Esta imagen tiene ${width}x${height}px. Se recomienda mínimo 800x600px para mejor calidad.\n\n¿Deseas subirla de todas formas?`,
+					[
+						{ text: 'Cancelar', style: 'cancel', onPress: () => {} },
+						{ text: 'Subir igual', onPress: () => {} }
+					]
+				);
+				// Por ahora permitimos, pero advertimos
+			}
+
+			// 4. Comprimir imagen si es muy grande (> 2MB o > 2000px)
+			let finalUri = uri;
+			let finalSize = originalSize;
+			const needsCompression = originalSize > 2 * 1024 * 1024 || width > 2000 || height > 2000;
+
+			if (needsCompression) {
+				const manipResult = await ImageManipulator.manipulateAsync(
+					uri,
+					[
+						// Redimensionar si es muy grande
+						...(width > 2000 || height > 2000
+							? [{ resize: { width: Math.min(width, 2000) } }]
+							: [])
+					],
+					{ compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+				);
+
+				finalUri = manipResult.uri;
+
+				// Obtener nuevo tamaño
+				const compressedResponse = await fetch(finalUri);
+				const compressedBlob = await compressedResponse.blob();
+				finalSize = compressedBlob.size;
+
+				console.log(`📸 Imagen comprimida: ${(originalSize / 1024 / 1024).toFixed(2)}MB → ${(finalSize / 1024 / 1024).toFixed(2)}MB`);
+			}
+
+			// 5. Determinar calidad de la imagen
+			let quality: 'excellent' | 'good' | 'acceptable' | 'poor';
+			if (width >= 1920 && height >= 1080) quality = 'excellent';
+			else if (width >= 1280 && height >= 720) quality = 'good';
+			else if (width >= 800 && height >= 600) quality = 'acceptable';
+			else quality = 'poor';
+
+			return {
+				uri: finalUri,
+				metadata: {
+					size: finalSize,
+					width,
+					height,
+					quality
+				}
+			};
+		} catch (error) {
+			console.error('Error validating/compressing image:', error);
+			Alert.alert('Error', 'No se pudo procesar la imagen. Intenta con otra.');
+			return null;
+		}
+	};
 
 	const takePhoto = async (type: PhotoType | 'additional') => {
 		try {
@@ -77,14 +163,25 @@ export default function Step3Photos() {
 			
 			const result = await ImagePicker.launchCameraAsync({
 				allowsEditing: false,
-				quality: 0.8,
+				quality: 0.9, // Mayor calidad inicial antes de comprimir
 			});
 
 			if (!result.canceled && result.assets && result.assets.length > 0) {
+				// Validar y comprimir imagen
+				const processed = await validateAndCompressImage(result.assets[0].uri, type);
+				if (!processed) {
+					setLoadingPhoto(null);
+					return;
+				}
+
+				const photoId = type === 'additional' ? `additional_${Date.now()}` : type;
+
 				if (type === 'additional') {
-					setAdditionalPhotos((prev) => [...prev, result.assets[0].uri]);
+					setAdditionalPhotos((prev) => [...prev, processed.uri]);
+					setPhotoMetadata((prev) => ({ ...prev, [photoId]: processed.metadata }));
 				} else {
-					setPhotos((prev) => ({ ...prev, [type]: result.assets[0].uri }));
+					setPhotos((prev) => ({ ...prev, [type]: processed.uri }));
+					setPhotoMetadata((prev) => ({ ...prev, [type]: processed.metadata }));
 				}
 			}
 		} catch (error) {
@@ -114,14 +211,25 @@ export default function Step3Photos() {
 			const result = await ImagePicker.launchImageLibraryAsync({
 				mediaTypes: ['images'],
 				allowsEditing: false,
-				quality: 0.8,
+				quality: 0.9, // Mayor calidad inicial antes de comprimir
 			});
 
 			if (!result.canceled && result.assets && result.assets.length > 0) {
+				// Validar y comprimir imagen
+				const processed = await validateAndCompressImage(result.assets[0].uri, type);
+				if (!processed) {
+					setLoadingPhoto(null);
+					return;
+				}
+
+				const photoId = type === 'additional' ? `additional_${Date.now()}` : type;
+
 				if (type === 'additional') {
-					setAdditionalPhotos((prev) => [...prev, result.assets[0].uri]);
+					setAdditionalPhotos((prev) => [...prev, processed.uri]);
+					setPhotoMetadata((prev) => ({ ...prev, [photoId]: processed.metadata }));
 				} else {
-					setPhotos((prev) => ({ ...prev, [type]: result.assets[0].uri }));
+					setPhotos((prev) => ({ ...prev, [type]: processed.uri }));
+					setPhotoMetadata((prev) => ({ ...prev, [type]: processed.metadata }));
 				}
 			}
 		} catch (error) {
@@ -176,68 +284,100 @@ export default function Step3Photos() {
 		});
 	};
 
-	const renderPhotoInput = (type: PhotoType, label: string) => (
-		<View style={{ marginBottom: 20 }}>
-			<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-				<Text style={styles.label}>{label} *</Text>
-				{photos[type] && (
-					<View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-						<Ionicons name="checkmark-circle" size={16} color="#16A34A" />
-						<Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '600' }}>Listo</Text>
-					</View>
-				)}
+	const renderPhotoInput = (type: PhotoType, label: string) => {
+		const metadata = photoMetadata[type];
+		const getQualityColor = (quality?: 'excellent' | 'good' | 'acceptable' | 'poor') => {
+			if (!quality) return '#9CA3AF';
+			if (quality === 'excellent') return '#16A34A';
+			if (quality === 'good') return '#059669';
+			if (quality === 'acceptable') return '#F59E0B';
+			return '#DC2626';
+		};
+
+		const getQualityLabel = (quality?: 'excellent' | 'good' | 'acceptable' | 'poor') => {
+			if (!quality) return '';
+			if (quality === 'excellent') return 'Excelente';
+			if (quality === 'good') return 'Buena';
+			if (quality === 'acceptable') return 'Aceptable';
+			return 'Baja';
+		};
+
+		return (
+			<View style={{ marginBottom: 20 }}>
+				<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+					<Text style={styles.label}>{label} *</Text>
+					{photos[type] && (
+						<>
+							<View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+								<Ionicons name="checkmark-circle" size={16} color="#16A34A" />
+								<Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '600' }}>Listo</Text>
+							</View>
+							{metadata && (
+								<View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, backgroundColor: '#F9FAFB', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+									<Ionicons name="image" size={12} color={getQualityColor(metadata.quality)} />
+									<Text style={{ fontSize: 10, color: getQualityColor(metadata.quality), fontWeight: '600', marginLeft: 4 }}>
+										{getQualityLabel(metadata.quality)}
+									</Text>
+									<Text style={{ fontSize: 9, color: '#6B7280', marginLeft: 4 }}>
+										• {(metadata.size / 1024).toFixed(0)}KB
+									</Text>
+								</View>
+							)}
+						</>
+					)}
+				</View>
+				<TouchableOpacity 
+					style={[styles.photoPlaceholder, photos[type] ? { borderWidth: 0 } : {}]} 
+					onPress={() => setShowPhotoOptions(type)}
+					disabled={loadingPhoto === type}
+				>
+					{loadingPhoto === type ? (
+						<View style={{ alignItems: 'center' }}>
+							<ActivityIndicator size="large" color="#0B729D" />
+							<Text style={[styles.photoPlaceholderText, { marginTop: 12 }]}>Procesando imagen...</Text>
+						</View>
+					) : photos[type] ? (
+						<TouchableOpacity 
+							style={{ width: '100%', height: '100%', position: 'relative' }}
+							onPress={() => openGallery(Object.values(photos).filter(p => p !== null).indexOf(photos[type]!))}
+							activeOpacity={0.9}
+						>
+							<Image source={{ uri: photos[type]! }} style={styles.uploadedPhoto} />
+							<View style={styles.editPhotoOverlay}>
+								<Ionicons name="pencil" size={16} color="white" />
+							</View>
+							<View style={styles.photoCheckmark}>
+								<Ionicons name="checkmark-circle" size={32} color="#16A34A" />
+							</View>
+							<View style={styles.photoPreviewBadge}>
+								<Ionicons name="eye-outline" size={14} color="white" />
+							</View>
+						</TouchableOpacity>
+					) : (
+						<View style={{ alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+							{/* Guía visual (silueta) */}
+							<View style={{ position: 'absolute', opacity: 0.1, width: '80%', height: '80%', alignItems: 'center', justifyContent: 'center' }}>
+								<Ionicons 
+									name={
+										type === 'front' ? 'car-sport' : 
+										type === 'sideLeft' ? 'car-sport-outline' : 
+										type === 'sideRight' ? 'car-sport-outline' : 
+										type === 'interior' ? 'speedometer-outline' :
+										'card-outline'
+									} 
+									size={120} 
+									color="#032B3C" 
+									style={type === 'sideRight' ? { transform: [{ scaleX: -1 }] } : {}}
+								/>
+							</View>
+							<EmptyPhotoIllustration size={60} />
+							<Text style={[styles.photoPlaceholderText, { marginTop: 8 }]}>Agregar foto</Text>
+						</View>
+					)}
+				</TouchableOpacity>
 			</View>
-			<TouchableOpacity 
-				style={[styles.photoPlaceholder, photos[type] ? { borderWidth: 0 } : {}]} 
-				onPress={() => setShowPhotoOptions(type)}
-				disabled={loadingPhoto === type}
-			>
-				{loadingPhoto === type ? (
-					<View style={{ alignItems: 'center' }}>
-						<ActivityIndicator size="large" color="#0B729D" />
-						<Text style={[styles.photoPlaceholderText, { marginTop: 12 }]}>Cargando...</Text>
-					</View>
-				) : photos[type] ? (
-					<TouchableOpacity 
-						style={{ width: '100%', height: '100%', position: 'relative' }}
-						onPress={() => openGallery(Object.values(photos).filter(p => p !== null).indexOf(photos[type]!))}
-						activeOpacity={0.9}
-					>
-						<Image source={{ uri: photos[type]! }} style={styles.uploadedPhoto} />
-						<View style={styles.editPhotoOverlay}>
-							<Ionicons name="pencil" size={16} color="white" />
-						</View>
-						<View style={styles.photoCheckmark}>
-							<Ionicons name="checkmark-circle" size={32} color="#16A34A" />
-						</View>
-						<View style={styles.photoPreviewBadge}>
-							<Ionicons name="eye-outline" size={14} color="white" />
-						</View>
-					</TouchableOpacity>
-				) : (
-					<View style={{ alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-						{/* Guía visual (silueta) */}
-						<View style={{ position: 'absolute', opacity: 0.1, width: '80%', height: '80%', alignItems: 'center', justifyContent: 'center' }}>
-							<Ionicons 
-								name={
-									type === 'front' ? 'car-sport' : 
-									type === 'sideLeft' ? 'car-sport-outline' : 
-									type === 'sideRight' ? 'car-sport-outline' : 
-									type === 'interior' ? 'speedometer-outline' :
-									'card-outline'
-								} 
-								size={120} 
-								color="#032B3C" 
-								style={type === 'sideRight' ? { transform: [{ scaleX: -1 }] } : {}}
-							/>
-						</View>
-						<EmptyPhotoIllustration size={60} />
-						<Text style={[styles.photoPlaceholderText, { marginTop: 8 }]}>Agregar foto</Text>
-					</View>
-				)}
-			</TouchableOpacity>
-		</View>
-	);
+		);
+	};
 
 	return (
 		<View style={styles.container}>

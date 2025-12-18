@@ -127,6 +127,9 @@ export default function Step4Price() {
 	const [showDescriptionSuggestions, setShowDescriptionSuggestions] = useState(false);
 	const [suggestedDescriptionText, setSuggestedDescriptionText] = useState('');
 
+	// Preview modal
+	const [showPreviewModal, setShowPreviewModal] = useState(false);
+
 	// Disponibilidad
 	const [availableFrom, setAvailableFrom] = useState(new Date());
 	const [showDatePicker, setShowDatePicker] = useState(false);
@@ -297,10 +300,15 @@ export default function Step4Price() {
 		if (precioError || descripcionError || !locationData) {
 			setTouched({ precio: true, descripcion: true });
 			setErrors({ precio: precioError, descripcion: descripcionError });
-			Alert.alert('Campos incompletos', 'Por favor corrige los errores antes de publicar');
+			Alert.alert('Campos incompletos', 'Por favor corrige los errores antes de continuar');
 			return;
 		}
 
+		// Mostrar preview en lugar de publicar directamente
+		setShowPreviewModal(true);
+	};
+
+	const handleConfirmPublish = async () => {
 		const precio = parseFloat(formData.precio);
 
 		if (!user) {
@@ -310,6 +318,7 @@ export default function Step4Price() {
 
 		try {
 			setLoading(true);
+			setShowPreviewModal(false);
 			
 			// Calcular depósito
 			const calculatedDeposit = depositType === 'auto' 
@@ -1210,10 +1219,180 @@ export default function Step4Price() {
 							}}
 							onPress={handleFinish}
 						>
-							<Text style={{ fontSize: 18, fontWeight: '700', color: 'white', marginRight: 8 }}>Publicar Ahora</Text>
-							<Ionicons name="rocket-outline" size={24} color="white" />
+							<Ionicons name="eye-outline" size={24} color="white" style={{ marginRight: 8 }} />
+							<Text style={{ fontSize: 18, fontWeight: '700', color: 'white' }}>Vista Previa</Text>
 						</TouchableOpacity>
 					</ScrollView>
+				</View>
+			</Modal>
+
+			{/* Preview Modal */}
+			<Modal
+				visible={showPreviewModal}
+				animationType="slide"
+				presentationStyle="pageSheet"
+				onRequestClose={() => setShowPreviewModal(false)}
+			>
+				<View style={{ flex: 1, backgroundColor: 'white' }}>
+					{/* Header */}
+					<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingTop: Platform.OS === 'ios' ? 60 : 16, backgroundColor: '#0B729D' }}>
+						<TouchableOpacity onPress={() => setShowPreviewModal(false)}>
+							<Ionicons name="close" size={28} color="white" />
+						</TouchableOpacity>
+						<View style={{ alignItems: 'center' }}>
+							<Text style={{ fontSize: 18, fontWeight: '700', color: 'white' }}>Vista Previa</Text>
+							<Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>Así verán tu vehículo</Text>
+						</View>
+						<View style={{ width: 28 }} />
+					</View>
+
+					<ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+						{/* Vehicle Images */}
+						{vehicleData.photos?.front && (
+							<View style={{ height: 280, backgroundColor: '#F3F4F6' }}>
+								<Image 
+									source={{ uri: vehicleData.photos.front }} 
+									style={{ width: '100%', height: '100%' }}
+									resizeMode="cover"
+								/>
+								<View style={{ position: 'absolute', top: 16, left: 16, backgroundColor: '#0B729D', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+									<Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>NUEVO</Text>
+								</View>
+							</View>
+						)}
+
+						<View style={{ padding: 20 }}>
+							{/* Title & Price */}
+							<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+								<View style={{ flex: 1 }}>
+									<Text style={{ fontSize: 24, fontWeight: '800', color: '#032B3C', marginBottom: 4 }}>
+										{vehicleData.marca} {vehicleData.modelo}
+									</Text>
+									<Text style={{ fontSize: 16, color: '#6B7280' }}>{vehicleData.anio}</Text>
+								</View>
+								<View style={{ alignItems: 'flex-end' }}>
+									<Text style={{ fontSize: 28, fontWeight: '800', color: '#0B729D' }}>
+										${formData.precio}
+									</Text>
+									<Text style={{ fontSize: 14, color: '#6B7280' }}>por día</Text>
+								</View>
+							</View>
+
+							{/* Specs */}
+							<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+								<View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
+									<Ionicons name="speedometer-outline" size={18} color="#6B7280" />
+									<Text style={{ fontSize: 13, color: '#374151', marginLeft: 6, fontWeight: '600' }}>{vehicleData.transmision}</Text>
+								</View>
+								<View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
+									<Ionicons name="water-outline" size={18} color="#6B7280" />
+									<Text style={{ fontSize: 13, color: '#374151', marginLeft: 6, fontWeight: '600' }}>{vehicleData.combustible}</Text>
+								</View>
+								<View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
+									<Ionicons name="people-outline" size={18} color="#6B7280" />
+									<Text style={{ fontSize: 13, color: '#374151', marginLeft: 6, fontWeight: '600' }}>{vehicleData.pasajeros} pasajeros</Text>
+								</View>
+								<View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
+									<Ionicons name="car-outline" size={18} color="#6B7280" />
+									<Text style={{ fontSize: 13, color: '#374151', marginLeft: 6, fontWeight: '600' }}>{vehicleData.tipo}</Text>
+								</View>
+							</View>
+
+							{/* Description */}
+							<View style={{ marginBottom: 20 }}>
+								<Text style={{ fontSize: 18, fontWeight: '700', color: '#032B3C', marginBottom: 12 }}>Descripción</Text>
+								<Text style={{ fontSize: 15, color: '#4B5563', lineHeight: 22 }}>
+									{formData.descripcion}
+								</Text>
+							</View>
+
+							{/* Location */}
+							{locationData && (
+								<View style={{ marginBottom: 20, backgroundColor: '#F9FAFB', padding: 16, borderRadius: 12 }}>
+									<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+										<Ionicons name="location" size={20} color="#0B729D" />
+										<Text style={{ fontSize: 16, fontWeight: '700', color: '#032B3C', marginLeft: 8 }}>Ubicación</Text>
+									</View>
+									<Text style={{ fontSize: 14, color: '#6B7280' }}>
+										{locationData.address}
+									</Text>
+								</View>
+							)}
+
+							{/* Features */}
+							<View style={{ marginBottom: 20 }}>
+								<Text style={{ fontSize: 18, fontWeight: '700', color: '#032B3C', marginBottom: 12 }}>Características</Text>
+								<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+									{rules.petsAllowed && (
+										<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+											<Ionicons name="checkmark-circle" size={20} color="#16A34A" />
+											<Text style={{ fontSize: 14, color: '#374151', marginLeft: 6 }}>Mascotas permitidas</Text>
+										</View>
+									)}
+									{!rules.smokingAllowed && (
+										<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+											<Ionicons name="checkmark-circle" size={20} color="#16A34A" />
+											<Text style={{ fontSize: 14, color: '#374151', marginLeft: 6 }}>No fumar</Text>
+										</View>
+									)}
+									{rules.outOfCityAllowed && (
+										<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+											<Ionicons name="checkmark-circle" size={20} color="#16A34A" />
+											<Text style={{ fontSize: 14, color: '#374151', marginLeft: 6 }}>Viajes fuera de ciudad</Text>
+										</View>
+									)}
+									{airportDelivery && (
+										<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+											<Ionicons name="airplane" size={20} color="#16A34A" />
+											<Text style={{ fontSize: 14, color: '#374151', marginLeft: 6 }}>Entrega en aeropuerto</Text>
+										</View>
+									)}
+								</View>
+							</View>
+						</View>
+					</ScrollView>
+
+					{/* Action Buttons */}
+					<View style={{ padding: 20, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: 'white', paddingBottom: Platform.OS === 'ios' ? 40 : 20 }}>
+						<TouchableOpacity
+							style={{
+								backgroundColor: '#0B729D',
+								padding: 18,
+								borderRadius: 12,
+								flexDirection: 'row',
+								alignItems: 'center',
+								justifyContent: 'center',
+								marginBottom: 12,
+								shadowColor: '#0B729D',
+								shadowOffset: { width: 0, height: 4 },
+								shadowOpacity: 0.3,
+								shadowRadius: 8,
+								elevation: 6,
+							}}
+							onPress={handleConfirmPublish}
+							disabled={loading}
+						>
+							{loading ? (
+								<ActivityIndicator color="white" />
+							) : (
+								<>
+									<Ionicons name="rocket-outline" size={24} color="white" style={{ marginRight: 8 }} />
+									<Text style={{ fontSize: 18, fontWeight: '700', color: 'white' }}>Publicar Ahora</Text>
+								</>
+							)}
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={{
+								backgroundColor: '#F3F4F6',
+								padding: 16,
+								borderRadius: 12,
+								alignItems: 'center',
+							}}
+							onPress={() => setShowPreviewModal(false)}
+						>
+							<Text style={{ fontSize: 16, fontWeight: '600', color: '#6B7280' }}>Editar</Text>
+						</TouchableOpacity>
+					</View>
 				</View>
 			</Modal>
 

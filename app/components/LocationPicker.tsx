@@ -170,6 +170,50 @@ export default function LocationPicker({
         Alert.alert('Error', 'No se pudieron obtener los detalles de la ubicación.');
         return null;
       }
+
+      // Validar que la dirección sea completa (no solo ciudad/país)
+      const addressComponents = result.address_components || [];
+      const hasStreet = addressComponents.some((comp: any) => 
+        comp.types.includes('street_number') || comp.types.includes('route')
+      );
+      const hasLocality = addressComponents.some((comp: any) => 
+        comp.types.includes('locality') || comp.types.includes('administrative_area_level_2')
+      );
+      
+      // Advertir si la dirección es muy genérica
+      if (!hasStreet) {
+        Alert.alert(
+          'Dirección incompleta',
+          'Esta ubicación es muy genérica. Para mejor precisión, selecciona una dirección con calle y número.',
+          [
+            { text: 'Entiendo', style: 'cancel' },
+            { text: 'Continuar igual', onPress: () => {} }
+          ]
+        );
+      }
+
+      // Validar que la ubicación esté en El Salvador (o región configurada)
+      const country = addressComponents.find((comp: any) => 
+        comp.types.includes('country')
+      );
+      
+      if (country && country.short_name !== 'SV') {
+        const confirmContinue = await new Promise((resolve) => {
+          Alert.alert(
+            'Ubicación fuera del país',
+            `Esta ubicación está en ${country.long_name}. Solo operamos en El Salvador actualmente.`,
+            [
+              { text: 'Cancelar', onPress: () => resolve(false), style: 'cancel' },
+              { text: 'Continuar', onPress: () => resolve(true) }
+            ]
+          );
+        });
+        
+        if (!confirmContinue) {
+          setLoading(false);
+          return null;
+        }
+      }
       
       const { lat, lng } = result.geometry.location;
       
@@ -188,7 +232,7 @@ export default function LocationPicker({
         formattedAddress: result.formatted_address,
       });
 
-      // Notificar al padre
+      // Notificar al padre con información completa
       onLocationSelected({
         address: result.formatted_address,
         coordinates: { latitude: lat, longitude: lng },
