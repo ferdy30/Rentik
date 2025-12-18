@@ -2,13 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { doc, getDoc } from 'firebase/firestore';
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     Linking,
     Platform,
     ScrollView,
+    Share,
     StatusBar,
     StyleSheet,
     Text,
@@ -28,6 +29,9 @@ export default function TripDetails() {
     const { reservation } = route.params as { reservation: Reservation };
     const [loadingChat, setLoadingChat] = useState(false);
     const [showTimeline, setShowTimeline] = useState(true);
+    const [hostInfo, setHostInfo] = useState<any>(null);
+    const [loadingHost, setLoadingHost] = useState(true);
+    const [loadingAction, setLoadingAction] = useState(false);
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -42,8 +46,278 @@ export default function TripDetails() {
 
     const statusColors = getStatusColor(reservation.status);
 
+    useEffect(() => {
+        const fetchHostInfo = async () => {
+            if (!reservation.arrendadorId) return;
+            
+            try {
+                const hostDoc = await getDoc(doc(db, 'users', reservation.arrendadorId));
+                if (hostDoc.exists()) {
+                    const data = hostDoc.data();
+                    
+                    // Handle createdAt - it might be a Timestamp or undefined
+                    let memberSince = new Date();
+                    if (data.createdAt) {
+                        try {
+                            memberSince = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+                        } catch (e) {
+                            memberSince = new Date();
+                        }
+                    }
+                    
+                    setHostInfo({
+                        nombre: data.nombre || 'Anfitrión',
+                        photoURL: data.photoURL || null,
+                        rating: data.rating || 4.8,
+                        completedTrips: data.completedTrips || 0,
+                        memberSince,
+                        telefono: data.telefono,
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching host info:', error);
+            } finally {
+                setLoadingHost(false);
+            }
+        };
+
+        fetchHostInfo();
+    }, [reservation.arrendadorId]);
+
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'pending': return 'time';
+            case 'confirmed': return 'checkmark-circle';
+            case 'completed': return 'trophy';
+            case 'cancelled': return 'close-circle';
+            case 'denied': return 'ban';
+            default: return 'information-circle';
+        }
+    };
+
+    const getStatusMessage = (status: string) => {
+        switch (status) {
+            case 'pending': return '⏳ Reserva pendiente';
+            case 'confirmed': return '✅ Reserva confirmada';
+            case 'completed': return '🎉 Viaje completado';
+            case 'cancelled': return '❌ Reserva cancelada';
+            case 'denied': return '🚫 Reserva denegada';
+            default: return 'Estado desconocido';
+        }
+    };
+
+    const getStatusSubtitle = (status: string, res: Reservation) => {
+        const startDate = res.startDate?.toDate();
+        const now = new Date();
+        const daysUntil = startDate ? Math.ceil((startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+        
+        switch (status) {
+            case 'pending': return 'Esperando confirmación del anfitrión';
+            case 'confirmed': return daysUntil > 0 ? `Tu viaje comienza en ${daysUntil} día${daysUntil !== 1 ? 's' : ''}` : 'Tu viaje está listo para comenzar';
+            case 'completed': return '¡Gracias por usar Rentik!';
+            case 'cancelled': return res.cancelReason || 'La reserva fue cancelada';
+            case 'denied': return res.denialReason || 'El anfitrión no pudo aceptar tu reserva';
+            default: return '';
+        }
+    };
+
+    const formatFriendlyDate = (date: Date) => {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const diffTime = targetDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return 'Hoy';
+        if (diffDays === 1) return 'Mañana';
+        if (diffDays === -1) return 'Ayer';
+        if (diffDays > 1 && diffDays <= 7) return `En ${diffDays} días`;
+        
+        return date.toLocaleDateString('es-ES', { 
+            day: 'numeric', 
+            month: 'short',
+            year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+        });
+    };
+
+    const formatTime = (timestamp: any) => {
+        if (!timestamp) return '--:--';
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
+    const getTimeRemaining = () => {
+        const startDate = reservation.startDate?.toDate();
+        const endDate = reservation.endDate?.toDate();
+        const now = new Date();
+
+        if (!startDate || !endDate) return null;
+
+        if (reservation.status === 'completed') {
+            return {
+                type: 'completed',
+                message: 'Viaje completado',
+                icon: 'checkmark-circle',
+                color: '#10B981'
+            };
+        }
+
+        const hoursUntilStart = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const hoursUntilEnd = (endDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+        if (hoursUntilStart > 0) {
+            const days = Math.floor(hoursUntilStart / 24);
+            const hours = Math.floor(hoursUntilStart % 24);
+            return {
+                type: 'upcoming',
+                message: days > 0 ? `Faltan ${days}d ${hours}h` : `Faltan ${hours} horas`,
+                icon: 'time',
+                color: '#F59E0B'
+            };
+        }
+
+        if (hoursUntilEnd > 0) {
+            const days = Math.floor(hoursUntilEnd / 24);
+            const hours = Math.floor(hoursUntilEnd % 24);
+            return {
+                type: 'active',
+                message: days > 0 ? `${days}d ${hours}h restantes` : `${hours} horas restantes`,
+                icon: 'car-sport',
+                color: '#0B729D'
+            };
+        }
+
+        return {
+            type: 'ended',
+            message: 'Viaje finalizado',
+            icon: 'flag',
+            color: '#6B7280'
+        };
+    };
+
     const handleCallEmergency = () => {
-        Alert.alert('Emergencia', 'Llamando al 911...');
+        Alert.alert(
+            '🚨 Emergencia',
+            '¿Qué tipo de ayuda necesitas?',
+            [
+                {
+                    text: '911 - Emergencia',
+                    onPress: () => Linking.openURL('tel:911'),
+                    style: 'destructive'
+                },
+                {
+                    text: 'Asistencia vial',
+                    onPress: () => {
+                        // Número de asistencia vial de ejemplo
+                        Linking.openURL('tel:22220000');
+                    }
+                },
+                {
+                    text: 'Contactar anfitrión',
+                    onPress: () => {
+                        if (hostInfo?.telefono) {
+                            Linking.openURL(`tel:${hostInfo.telefono}`);
+                        } else {
+                            Alert.alert('Error', 'Teléfono del anfitrión no disponible');
+                        }
+                    }
+                },
+                {
+                    text: 'Cancelar',
+                    style: 'cancel'
+                }
+            ]
+        );
+    };
+
+    const handleAddToCalendar = () => {
+        const startDate = reservation.startDate?.toDate();
+        const endDate = reservation.endDate?.toDate();
+        
+        if (!startDate || !endDate) {
+            Alert.alert('Error', 'Fechas no disponibles');
+            return;
+        }
+
+        const title = `Rentik: ${reservation.vehicleSnapshot?.marca} ${reservation.vehicleSnapshot?.modelo}`;
+        const location = reservation.isDelivery ? reservation.deliveryAddress : reservation.pickupLocation;
+        const details = `Reserva ID: ${reservation.id}\nVehículo: ${reservation.vehicleSnapshot?.marca} ${reservation.vehicleSnapshot?.modelo}\nTotal: $${reservation.totalPrice}`;
+        
+        // Format dates for calendar (YYYYMMDDTHHMMSS)
+        const formatCalendarDate = (date: Date) => {
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(date.getHours())}${pad(date.getMinutes())}00`;
+        };
+
+        const startFormatted = formatCalendarDate(startDate);
+        const endFormatted = formatCalendarDate(endDate);
+
+        const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startFormatted}/${endFormatted}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location || '')}`;
+        
+        Linking.openURL(calendarUrl);
+    };
+
+    const handleShareDetails = async () => {
+        try {
+            const startDate = reservation.startDate?.toDate();
+            const endDate = reservation.endDate?.toDate();
+            
+            const message = `🚗 Detalles de mi Reserva Rentik\n\n` +
+                `Vehículo: ${reservation.vehicleSnapshot?.marca} ${reservation.vehicleSnapshot?.modelo} ${reservation.vehicleSnapshot?.anio}\n` +
+                `Fechas: ${startDate?.toLocaleDateString('es-ES')} - ${endDate?.toLocaleDateString('es-ES')}\n` +
+                `Horario: ${formatTime(reservation.pickupTime)} - ${formatTime(reservation.returnTime)}\n` +
+                `Ubicación: ${reservation.isDelivery ? reservation.deliveryAddress : reservation.pickupLocation}\n` +
+                `Total: $${reservation.totalPrice.toFixed(2)}\n` +
+                `ID: ${reservation.id.slice(0, 8).toUpperCase()}\n\n` +
+                `Estado: ${reservation.status.toUpperCase()}`;
+
+            await Share.share({
+                message,
+                title: 'Detalles de Reserva Rentik'
+            });
+        } catch (error) {
+            console.error('Error sharing:', error);
+        }
+    };
+
+    const handleReportProblem = () => {
+        Alert.alert(
+            'Reportar problema',
+            '¿Qué tipo de problema deseas reportar?',
+            [
+                {
+                    text: 'Problema con el vehículo',
+                    onPress: () => {
+                        Alert.alert(
+                            'Reportar problema',
+                            'Tu reporte ha sido enviado. Un agente de soporte se comunicará contigo pronto.',
+                            [{ text: 'OK' }]
+                        );
+                    }
+                },
+                {
+                    text: 'Problema con la reserva',
+                    onPress: () => {
+                        Alert.alert(
+                            'Reportar problema',
+                            'Tu reporte ha sido enviado. Un agente de soporte se comunicará contigo pronto.',
+                            [{ text: 'OK' }]
+                        );
+                    }
+                },
+                {
+                    text: 'Contactar soporte',
+                    onPress: () => {
+                        // Email o teléfono de soporte
+                        Linking.openURL('mailto:soporte@rentik.com?subject=Problema con reserva ' + reservation.id.slice(0, 8));
+                    }
+                },
+                {
+                    text: 'Cancelar',
+                    style: 'cancel'
+                }
+            ]
+        );
     };
 
     const handleChat = async () => {
@@ -109,6 +383,31 @@ export default function TripDetails() {
             Alert.alert('Error', 'Solo puedes hacer check-in en reservas confirmadas.');
             return;
         }
+
+        // Verificar que el check-in esté dentro de la ventana permitida (24h antes hasta hora de inicio)
+        const startDate = reservation.startDate?.toDate();
+        const now = new Date();
+        
+        if (!startDate) {
+            Alert.alert('Error', 'Fecha de inicio no disponible.');
+            return;
+        }
+
+        const hoursUntilStart = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursUntilStart > 24) {
+            const daysUntil = Math.ceil(hoursUntilStart / 24);
+            Alert.alert(
+                'Check-in no disponible', 
+                `El check-in estará disponible 24 horas antes de tu reserva.\n\nPuedes hacer check-in en ${daysUntil} día${daysUntil !== 1 ? 's' : ''}.`
+            );
+            return;
+        }
+
+        if (hoursUntilStart < 0) {
+            Alert.alert('Error', 'El periodo de check-in ha expirado.');
+            return;
+        }
         
         navigation.navigate('CheckInStart', { reservation });
     };
@@ -127,6 +426,7 @@ export default function TripDetails() {
                 {
                     text: 'Continuar',
                     onPress: () => {
+                        setLoadingAction(true);
                         // Navigate to vehicle details with the same vehicle
                         const vehicle = {
                             id: reservation.vehicleId,
@@ -138,6 +438,7 @@ export default function TripDetails() {
                             propietarioId: reservation.arrendadorId,
                         };
                         navigation.navigate('Details', { vehicle });
+                        setTimeout(() => setLoadingAction(false), 500);
                     }
                 }
             ]
@@ -182,6 +483,10 @@ export default function TripDetails() {
         return steps;
     };
 
+    const timelineSteps = useMemo(() => getTimelineSteps(), [reservation.startDate, reservation.endDate, reservation.status, reservation.checkIn, reservation.checkOut, reservation.createdAt]);
+
+    const timeRemainingInfo = useMemo(() => getTimeRemaining(), [reservation.startDate, reservation.endDate, reservation.status]);
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -192,19 +497,64 @@ export default function TripDetails() {
                     <Ionicons name="arrow-back" size={24} color="#111827" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Detalles del Viaje</Text>
-                <TouchableOpacity style={styles.helpButton} onPress={() => Alert.alert('Ayuda', 'Contactar soporte')}>
-                    <Ionicons name="help-circle-outline" size={24} color="#111827" />
+                <TouchableOpacity 
+                    style={styles.menuButton} 
+                    onPress={() => {
+                        Alert.alert(
+                            'Opciones',
+                            'Selecciona una acción',
+                            [
+                                {
+                                    text: '📅 Agregar al calendario',
+                                    onPress: handleAddToCalendar
+                                },
+                                {
+                                    text: '👥 Compartir detalles',
+                                    onPress: handleShareDetails
+                                },
+                                {
+                                    text: '⚠️ Reportar problema',
+                                    onPress: handleReportProblem
+                                },
+                                {
+                                    text: 'Cancelar',
+                                    style: 'cancel'
+                                }
+                            ]
+                        );
+                    }}
+                >
+                    <Ionicons name="ellipsis-horizontal" size={24} color="#111827" />
                 </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Status Banner */}
                 <View style={[styles.statusBanner, { backgroundColor: statusColors.bg }]}>
-                    <Ionicons name="information-circle" size={20} color={statusColors.text} />
-                    <Text style={[styles.statusText, { color: statusColors.text }]}>
-                        Estado: {reservation.status.toUpperCase()}
-                    </Text>
+                    <View style={styles.statusIconContainer}>
+                        <Ionicons name={getStatusIcon(reservation.status)} size={24} color={statusColors.text} />
+                    </View>
+                    <View style={styles.statusTextContainer}>
+                        <Text style={[styles.statusTitle, { color: statusColors.text }]}>
+                            {getStatusMessage(reservation.status)}
+                        </Text>
+                        <Text style={[styles.statusSubtitle, { color: statusColors.text }]}>
+                            {getStatusSubtitle(reservation.status, reservation)}
+                        </Text>
+                    </View>
                 </View>
+
+                {/* Time Remaining Counter */}
+                {(reservation.status === 'confirmed' || reservation.status === 'completed') && timeRemainingInfo && (
+                    <View style={[styles.timeCounter, { backgroundColor: `${timeRemainingInfo.color}15` }]}>
+                        <View style={[styles.timeCounterIcon, { backgroundColor: timeRemainingInfo.color }]}>
+                            <Ionicons name={timeRemainingInfo.icon as any} size={20} color="#fff" />
+                        </View>
+                        <Text style={[styles.timeCounterText, { color: timeRemainingInfo.color }]}>
+                            {timeRemainingInfo.message}
+                        </Text>
+                    </View>
+                )}
 
                 {/* Timeline */}
                 {(reservation.status === 'confirmed' || reservation.status === 'completed') && (
@@ -213,7 +563,10 @@ export default function TripDetails() {
                             style={styles.timelineHeader}
                             onPress={() => setShowTimeline(!showTimeline)}
                         >
-                            <Text style={styles.sectionTitle}>Progreso del viaje</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="time-outline" size={20} color="#0B729D" />
+                                <Text style={styles.sectionTitle}>Progreso del viaje</Text>
+                            </View>
                             <Ionicons 
                                 name={showTimeline ? 'chevron-up' : 'chevron-down'} 
                                 size={20} 
@@ -223,7 +576,7 @@ export default function TripDetails() {
                         
                         {showTimeline && (
                             <View style={styles.timeline}>
-                                {getTimelineSteps().map((step, index) => (
+                                {timelineSteps.map((step, index) => (
                                     <View key={index} style={styles.timelineItem}>
                                         <View style={styles.timelineIconContainer}>
                                             <View style={[
@@ -233,25 +586,42 @@ export default function TripDetails() {
                                             ]}>
                                                 <Ionicons 
                                                     name={step.icon as any} 
-                                                    size={18} 
+                                                    size={20} 
                                                     color={step.completed || step.active ? '#fff' : '#9CA3AF'} 
                                                 />
                                             </View>
-                                            {index < getTimelineSteps().length - 1 && (
+                                            {index < timelineSteps.length - 1 && (
                                                 <View style={[
                                                     styles.timelineLine,
                                                     step.completed && styles.timelineLineCompleted
                                                 ]} />
                                             )}
                                         </View>
-                                        <View style={styles.timelineContent}>
-                                            <Text style={[
-                                                styles.timelineTitle,
-                                                step.completed && styles.timelineTitleCompleted,
-                                                step.active && styles.timelineTitleActive,
-                                            ]}>
-                                                {step.title}
-                                            </Text>
+                                        <View style={[
+                                            styles.timelineCard,
+                                            step.completed && styles.timelineCardCompleted,
+                                            step.active && styles.timelineCardActive,
+                                        ]}>
+                                            <View style={styles.timelineCardHeader}>
+                                                <Text style={[
+                                                    styles.timelineTitle,
+                                                    step.completed && styles.timelineTitleCompleted,
+                                                    step.active && styles.timelineTitleActive,
+                                                ]}>
+                                                    {step.title}
+                                                </Text>
+                                                {step.completed && (
+                                                    <View style={styles.completedBadge}>
+                                                        <Text style={styles.completedBadgeText}>✓</Text>
+                                                    </View>
+                                                )}
+                                                {step.active && !step.completed && (
+                                                    <View style={styles.activeBadge}>
+                                                        <View style={styles.pulseDot} />
+                                                        <Text style={styles.activeBadgeText}>En progreso</Text>
+                                                    </View>
+                                                )}
+                                            </View>
                                             {step.date && (
                                                 <Text style={styles.timelineDate}>
                                                     {step.date.toLocaleDateString('es-ES', { 
@@ -276,45 +646,126 @@ export default function TripDetails() {
                         source={{ uri: reservation.vehicleSnapshot?.imagen }} 
                         style={styles.vehicleImage}
                         contentFit="cover"
+                        transition={200}
                     />
                     <View style={styles.vehicleInfo}>
                         <Text style={styles.vehicleBrand}>{reservation.vehicleSnapshot?.marca}</Text>
                         <Text style={styles.vehicleModel}>
-                            {reservation.vehicleSnapshot?.modelo} {reservation.vehicleSnapshot?.anio}
+                            {reservation.vehicleSnapshot?.modelo}
                         </Text>
-                        <Text style={styles.reservationId}>ID: {reservation.id.slice(0, 8)}</Text>
+                        <Text style={styles.vehicleYear}>{reservation.vehicleSnapshot?.anio}</Text>
+                        <View style={styles.reservationIdContainer}>
+                            <Ionicons name="document-text-outline" size={12} color="#9CA3AF" />
+                            <Text style={styles.reservationId}>ID: {reservation.id.slice(0, 8).toUpperCase()}</Text>
+                        </View>
                     </View>
                 </View>
 
-                {/* Action Buttons (Dynamic based on status) */}
-                {reservation.status === 'confirmed' && (
-                    <View style={styles.actionButtons}>
-                        <TouchableOpacity style={styles.primaryButton} onPress={handleCheckIn}>
-                            <Ionicons name="qr-code-outline" size={20} color="#fff" />
-                            <Text style={styles.primaryButtonText}>Iniciar Check-in</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                            style={[styles.secondaryButton, loadingChat && styles.buttonDisabled]} 
-                            onPress={handleChat}
-                            disabled={loadingChat}
-                        >
-                            {loadingChat ? (
-                                <ActivityIndicator size="small" color="#0B729D" />
-                            ) : (
-                                <>
-                                    <Ionicons name="chatbubble-outline" size={20} color="#0B729D" />
-                                    <Text style={styles.secondaryButtonText}>Chat con anfitrión</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
+                {/* Host Info */}
+                {!loadingHost && hostInfo && (
+                    <View style={styles.hostCard}>
+                        <Text style={styles.hostCardTitle}>Tu anfitrión</Text>
+                        <View style={styles.hostContent}>
+                            <View style={styles.hostImageContainer}>
+                                {hostInfo.photoURL ? (
+                                    <Image 
+                                        source={{ uri: hostInfo.photoURL }} 
+                                        style={styles.hostImage}
+                                        contentFit="cover"
+                                        transition={200}
+                                    />
+                                ) : (
+                                    <View style={styles.hostImagePlaceholder}>
+                                        <Ionicons name="person" size={32} color="#9CA3AF" />
+                                    </View>
+                                )}
+                                <View style={styles.hostVerifiedBadge}>
+                                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                </View>
+                            </View>
+                            <View style={styles.hostDetails}>
+                                <Text style={styles.hostName}>{hostInfo.nombre}</Text>
+                                <View style={styles.hostStats}>
+                                    <View style={styles.hostStat}>
+                                        <Ionicons name="star" size={14} color="#F59E0B" />
+                                        <Text style={styles.hostStatText}>{hostInfo.rating.toFixed(1)}</Text>
+                                    </View>
+                                    <Text style={styles.hostStatDivider}>•</Text>
+                                    <View style={styles.hostStat}>
+                                        <Ionicons name="car-sport" size={14} color="#6B7280" />
+                                        <Text style={styles.hostStatText}>{hostInfo.completedTrips} viajes</Text>
+                                    </View>
+                                    <Text style={styles.hostStatDivider}>•</Text>
+                                    <Text style={styles.hostMemberSince}>
+                                        Desde {hostInfo.memberSince.getFullYear()}
+                                    </Text>
+                                </View>
+                                {hostInfo.telefono && (
+                                    <TouchableOpacity 
+                                        style={styles.hostCallButton}
+                                        onPress={() => Linking.openURL(`tel:${hostInfo.telefono}`)}
+                                    >
+                                        <Ionicons name="call" size={16} color="#0B729D" />
+                                        <Text style={styles.hostCallText}>Llamar</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
                     </View>
                 )}
 
+                {/* Action Buttons (Dynamic based on status) */}
+                {reservation.status === 'confirmed' && (() => {
+                    const startDate = reservation.startDate?.toDate();
+                    const now = new Date();
+                    const hoursUntilStart = startDate ? (startDate.getTime() - now.getTime()) / (1000 * 60 * 60) : 999;
+                    const canCheckIn = hoursUntilStart <= 24 && hoursUntilStart >= 0;
+
+                    return (
+                        <View style={styles.actionButtons}>
+                            <TouchableOpacity 
+                                style={[styles.primaryButton, !canCheckIn && styles.buttonDisabled]} 
+                                onPress={handleCheckIn}
+                                disabled={!canCheckIn}
+                            >
+                                <Ionicons name="qr-code-outline" size={20} color="#fff" />
+                                <Text style={styles.primaryButtonText}>
+                                    {canCheckIn ? 'Iniciar Check-in' : `Check-in en ${Math.ceil(hoursUntilStart / 24)}d`}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.secondaryButton, loadingChat && styles.buttonDisabled]} 
+                                onPress={handleChat}
+                                disabled={loadingChat}
+                            >
+                                {loadingChat ? (
+                                    <ActivityIndicator size="small" color="#0B729D" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="chatbubble-outline" size={20} color="#0B729D" />
+                                        <Text style={styles.secondaryButtonText}>Chat</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    );
+                })()}
+
                 {reservation.status === 'completed' && (
                     <View style={styles.actionButtons}>
-                        <TouchableOpacity style={styles.primaryButton} onPress={handleRepeatBooking}>
-                            <Ionicons name="repeat-outline" size={20} color="#fff" />
-                            <Text style={styles.primaryButtonText}>Repetir reserva</Text>
+                        <TouchableOpacity 
+                            style={[styles.primaryButton, loadingAction && styles.buttonDisabled]} 
+                            onPress={handleRepeatBooking}
+                            disabled={loadingAction}
+                        >
+                            {loadingAction ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <>
+                                    <Ionicons name="repeat-outline" size={20} color="#fff" />
+                                    <Text style={styles.primaryButtonText}>Repetir reserva</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                         <TouchableOpacity 
                             style={[styles.secondaryButton, loadingChat && styles.buttonDisabled]} 
@@ -326,7 +777,7 @@ export default function TripDetails() {
                             ) : (
                                 <>
                                     <Ionicons name="chatbubble-outline" size={20} color="#0B729D" />
-                                    <Text style={styles.secondaryButtonText}>Chat con anfitrión</Text>
+                                    <Text style={styles.secondaryButtonText}>Chat</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -344,7 +795,10 @@ export default function TripDetails() {
                         <View style={styles.infoContent}>
                             <Text style={styles.infoLabel}>Fechas</Text>
                             <Text style={styles.infoValue}>
-                                {reservation.startDate.toDate().toLocaleDateString()} - {reservation.endDate.toDate().toLocaleDateString()}
+                                {formatFriendlyDate(reservation.startDate.toDate())} - {formatFriendlyDate(reservation.endDate.toDate())}
+                            </Text>
+                            <Text style={styles.infoSubtext}>
+                                {reservation.startDate.toDate().toLocaleDateString('es-ES', { weekday: 'long' })} al {reservation.endDate.toDate().toLocaleDateString('es-ES', { weekday: 'long' })}
                             </Text>
                         </View>
                     </View>
@@ -356,9 +810,18 @@ export default function TripDetails() {
                         <View style={styles.infoContent}>
                             <Text style={styles.infoLabel}>Horario</Text>
                             <Text style={styles.infoValue}>
-                                {reservation.pickupTime ? new Date(reservation.pickupTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'} - 
-                                {reservation.returnTime ? new Date(reservation.returnTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}
+                                {formatTime(reservation.pickupTime)} - {formatTime(reservation.returnTime)}
                             </Text>
+                            {reservation.pickupTime && (() => {
+                                const pickupDate = new Date(reservation.pickupTime);
+                                const returnDate = new Date(reservation.returnTime);
+                                const duration = (returnDate.getTime() - pickupDate.getTime()) / (1000 * 60 * 60);
+                                return (
+                                    <Text style={styles.infoSubtext}>
+                                        Duración total: {Math.floor(duration / 24)}d {Math.floor(duration % 24)}h
+                                    </Text>
+                                );
+                            })()}
                         </View>
                     </View>
 
@@ -426,62 +889,254 @@ export default function TripDetails() {
                 {/* Price Breakdown */}
                 {reservation.priceBreakdown && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Resumen de pago</Text>
-                        <View style={{ gap: 8 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#4B5563' }}>Renta ({reservation.priceBreakdown.days} días)</Text>
-                                <Text style={{ fontWeight: '600' }}>${(reservation.priceBreakdown.pricePerDay * reservation.priceBreakdown.days).toFixed(2)}</Text>
+                        <View style={styles.priceHeader}>
+                            <Ionicons name="receipt-outline" size={20} color="#0B729D" />
+                            <Text style={styles.sectionTitle}>Resumen de pago</Text>
+                        </View>
+                        <View style={styles.priceCard}>
+                            <View style={styles.priceRow}>
+                                <View style={styles.priceLabel}>
+                                    <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+                                    <Text style={styles.priceLabelText}>Renta ({reservation.priceBreakdown.days} días × ${reservation.priceBreakdown.pricePerDay})</Text>
+                                </View>
+                                <Text style={styles.priceValue}>${(reservation.priceBreakdown.pricePerDay * reservation.priceBreakdown.days).toFixed(2)}</Text>
                             </View>
                             {reservation.priceBreakdown.extrasTotal > 0 && (
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={{ color: '#4B5563' }}>Extras</Text>
-                                    <Text style={{ fontWeight: '600' }}>${reservation.priceBreakdown.extrasTotal.toFixed(2)}</Text>
+                                <View style={styles.priceRow}>
+                                    <View style={styles.priceLabel}>
+                                        <Ionicons name="add-circle-outline" size={16} color="#6B7280" />
+                                        <Text style={styles.priceLabelText}>Extras</Text>
+                                    </View>
+                                    <Text style={styles.priceValue}>${reservation.priceBreakdown.extrasTotal.toFixed(2)}</Text>
                                 </View>
                             )}
                             {reservation.priceBreakdown.deliveryFee > 0 && (
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={{ color: '#4B5563' }}>Delivery</Text>
-                                    <Text style={{ fontWeight: '600' }}>${reservation.priceBreakdown.deliveryFee.toFixed(2)}</Text>
+                                <View style={styles.priceRow}>
+                                    <View style={styles.priceLabel}>
+                                        <Ionicons name="car-sport-outline" size={16} color="#6B7280" />
+                                        <Text style={styles.priceLabelText}>Delivery</Text>
+                                    </View>
+                                    <Text style={styles.priceValue}>${reservation.priceBreakdown.deliveryFee.toFixed(2)}</Text>
                                 </View>
                             )}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#4B5563' }}>Tarifa de servicio</Text>
-                                <Text style={{ fontWeight: '600' }}>${reservation.priceBreakdown.serviceFee.toFixed(2)}</Text>
+                            <View style={styles.priceRow}>
+                                <View style={styles.priceLabel}>
+                                    <Ionicons name="shield-checkmark-outline" size={16} color="#6B7280" />
+                                    <Text style={styles.priceLabelText}>Tarifa de servicio</Text>
+                                </View>
+                                <Text style={styles.priceValue}>${reservation.priceBreakdown.serviceFee.toFixed(2)}</Text>
                             </View>
-                            <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 4 }} />
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ fontWeight: '700', fontSize: 16 }}>Total</Text>
-                                <Text style={{ fontWeight: '700', fontSize: 16, color: '#0B729D' }}>${reservation.priceBreakdown.total.toFixed(2)}</Text>
+                            <View style={styles.priceDivider} />
+                            <View style={styles.priceTotalRow}>
+                                <Text style={styles.priceTotalLabel}>Total pagado</Text>
+                                <View style={styles.priceTotalBadge}>
+                                    <Text style={styles.priceTotalValue}>${reservation.priceBreakdown.total.toFixed(2)}</Text>
+                                </View>
                             </View>
                         </View>
                     </View>
                 )}
 
+                {/* Important Info Section */}
+                <View style={styles.section}>
+                    <View style={styles.importantHeader}>
+                        <Ionicons name="information-circle" size={20} color="#0B729D" />
+                        <Text style={styles.sectionTitle}>Información importante</Text>
+                    </View>
+
+                    {/* Cancellation Policy */}
+                    <View style={styles.policyCard}>
+                        <View style={styles.policyHeader}>
+                            <Ionicons name="calendar-outline" size={18} color="#DC2626" />
+                            <Text style={styles.policyTitle}>Política de cancelación</Text>
+                        </View>
+                        <Text style={styles.policyText}>
+                            Cancelación gratuita hasta 48 horas antes del inicio. Cancelaciones con menos de 48h tienen una penalización del 20% del total.
+                        </Text>
+                        {reservation.status === 'confirmed' && (() => {
+                            const startDate = reservation.startDate?.toDate();
+                            if (!startDate) return null;
+                            const hoursUntilStart = (startDate.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+                            const canCancelFree = hoursUntilStart > 48;
+                            return (
+                                <View style={[styles.policyBadge, { backgroundColor: canCancelFree ? '#DCFCE7' : '#FEE2E2' }]}>
+                                    <Ionicons 
+                                        name={canCancelFree ? "checkmark-circle" : "alert-circle"} 
+                                        size={14} 
+                                        color={canCancelFree ? '#166534' : '#991B1B'} 
+                                    />
+                                    <Text style={[styles.policyBadgeText, { color: canCancelFree ? '#166534' : '#991B1B' }]}>
+                                        {canCancelFree ? 'Cancelación gratuita disponible' : 'Cancelación con penalización'}
+                                    </Text>
+                                </View>
+                            );
+                        })()}
+                    </View>
+
+                    {/* Mileage */}
+                    <View style={styles.infoRow}>
+                        <View style={styles.iconBox}>
+                            <Ionicons name="speedometer-outline" size={20} color="#0B729D" />
+                        </View>
+                        <View style={styles.infoContent}>
+                            <Text style={styles.infoLabel}>Kilometraje incluido</Text>
+                            <Text style={styles.infoValue}>
+                                {reservation.priceBreakdown?.days ? `${reservation.priceBreakdown.days * 200} km` : 'Ilimitado'}
+                            </Text>
+                            <Text style={styles.infoSubtext}>
+                                Costo adicional: $0.15 por km extra
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Fuel */}
+                    <View style={styles.infoRow}>
+                        <View style={styles.iconBox}>
+                            <Ionicons name="water-outline" size={20} color="#0B729D" />
+                        </View>
+                        <View style={styles.infoContent}>
+                            <Text style={styles.infoLabel}>Combustible</Text>
+                            <Text style={styles.infoValue}>Tanque lleno al recoger y devolver</Text>
+                            <Text style={styles.infoSubtext}>
+                                El vehículo debe devolverse con el mismo nivel de combustible
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Required Documents */}
+                    <View style={styles.documentsCard}>
+                        <View style={styles.documentsHeader}>
+                            <Ionicons name="document-text" size={18} color="#0B729D" />
+                            <Text style={styles.documentsTitle}>Documentos requeridos</Text>
+                        </View>
+                        <View style={styles.documentsList}>
+                            <View style={styles.documentItem}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                <Text style={styles.documentText}>Licencia de conducir vigente</Text>
+                            </View>
+                            <View style={styles.documentItem}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                <Text style={styles.documentText}>DUI o pasaporte</Text>
+                            </View>
+                            <View style={styles.documentItem}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                <Text style={styles.documentText}>Tarjeta de crédito o débito</Text>
+                            </View>
+                            <View style={styles.documentItem}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                <Text style={styles.documentText}>Comprobante de reserva (digital)</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
                 {/* Map */}
                 <View style={styles.mapSection}>
-                    <Text style={styles.sectionTitle}>Ubicación</Text>
-                    <View style={styles.mapContainer}>
-                        <MapView
-                            provider={PROVIDER_GOOGLE}
-                            style={styles.map}
-                            initialRegion={{
-                                latitude: 13.6929, // TODO: Use real coords
-                                longitude: -89.2182,
-                                latitudeDelta: 0.01,
-                                longitudeDelta: 0.01,
-                            }}
-                            scrollEnabled={false}
-                        >
-                            <Marker
-                                coordinate={{ latitude: 13.6929, longitude: -89.2182 }}
-                                title="Punto de encuentro"
-                            />
-                        </MapView>
+                    <View style={styles.mapHeader}>
+                        <Ionicons name="location" size={20} color="#0B729D" />
+                        <Text style={styles.sectionTitle}>Ubicación de recogida</Text>
                     </View>
-                    <TouchableOpacity style={styles.directionsButton} onPress={() => Linking.openURL('https://maps.google.com')}>
-                        <Text style={styles.directionsText}>Cómo llegar</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#0B729D" />
-                    </TouchableOpacity>
+                    
+                    {/* Location Address Card */}
+                    <View style={styles.locationCard}>
+                        <View style={styles.locationIconWrapper}>
+                            <Ionicons name="location" size={24} color="#0B729D" />
+                        </View>
+                        <View style={styles.locationTextWrapper}>
+                            <Text style={styles.locationTitle}>
+                                {reservation.isDelivery ? 'Dirección de entrega' : 'Punto de recogida'}
+                            </Text>
+                            <Text style={styles.locationAddress}>
+                                {reservation.isDelivery 
+                                    ? reservation.deliveryAddress 
+                                    : (reservation.pickupLocation || 'San Salvador, El Salvador')}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.mapContainer}>
+                        {reservation.pickupCoordinates ? (
+                            <MapView
+                                provider={PROVIDER_GOOGLE}
+                                style={styles.map}
+                                initialRegion={{
+                                    latitude: reservation.pickupCoordinates.latitude,
+                                    longitude: reservation.pickupCoordinates.longitude,
+                                    latitudeDelta: 0.01,
+                                    longitudeDelta: 0.01,
+                                }}
+                                scrollEnabled={true}
+                                zoomEnabled={true}
+                            >
+                                <Marker
+                                    coordinate={{
+                                        latitude: reservation.pickupCoordinates.latitude,
+                                        longitude: reservation.pickupCoordinates.longitude
+                                    }}
+                                    title={reservation.isDelivery ? "Punto de entrega" : "Punto de recogida"}
+                                    description={reservation.isDelivery ? reservation.deliveryAddress : reservation.pickupLocation}
+                                >
+                                    <View style={styles.customMarker}>
+                                        <Ionicons name="location" size={40} color="#0B729D" />
+                                    </View>
+                                </Marker>
+                            </MapView>
+                        ) : (
+                            <View style={styles.mapPlaceholder}>
+                                <Ionicons name="map-outline" size={64} color="#D1D5DB" />
+                                <Text style={styles.mapPlaceholderTitle}>Mapa no disponible</Text>
+                                <Text style={styles.mapPlaceholderSubtitle}>
+                                    Usa la dirección de arriba para ubicarte
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                    
+                    <View style={styles.directionsActions}>
+                        {reservation.pickupCoordinates ? (
+                            <>
+                                <TouchableOpacity 
+                                    style={styles.directionsButton} 
+                                    onPress={() => {
+                                        const coords = reservation.pickupCoordinates;
+                                        Linking.openURL(
+                                            `https://www.google.com/maps/dir/?api=1&destination=${coords.latitude},${coords.longitude}&travelmode=driving`
+                                        );
+                                    }}
+                                >
+                                    <Ionicons name="navigate" size={18} color="#fff" />
+                                    <Text style={styles.directionsButtonText}>Cómo llegar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={styles.directionsButtonSecondary}
+                                    onPress={() => {
+                                        const coords = reservation.pickupCoordinates;
+                                        Linking.openURL(
+                                            `https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`
+                                        );
+                                    }}
+                                >
+                                    <Ionicons name="location-outline" size={18} color="#0B729D" />
+                                    <Text style={styles.directionsButtonSecondaryText}>Ver en mapa</Text>
+                                </TouchableOpacity>
+                            </>
+                        ) : (
+                            <TouchableOpacity 
+                                style={styles.directionsButton} 
+                                onPress={() => {
+                                    const address = reservation.isDelivery 
+                                        ? reservation.deliveryAddress 
+                                        : (reservation.pickupLocation || 'San Salvador, El Salvador');
+                                    Linking.openURL(
+                                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+                                    );
+                                }}
+                            >
+                                <Ionicons name="search" size={18} color="#fff" />
+                                <Text style={styles.directionsButtonText}>Buscar en Google Maps</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
 
                 {/* Emergency */}
@@ -521,6 +1176,11 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#111827',
     },
+    menuButton: {
+        padding: 8,
+        borderRadius: 12,
+        backgroundColor: '#F3F4F6',
+    },
     helpButton: {
         padding: 8,
     },
@@ -530,46 +1190,193 @@ const styles = StyleSheet.create({
     statusBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
+        padding: 16,
         paddingHorizontal: 20,
-        gap: 8,
+        gap: 12,
+    },
+    statusIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    statusTextContainer: {
+        flex: 1,
+    },
+    statusTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    statusSubtitle: {
+        fontSize: 13,
+        fontWeight: '500',
+        opacity: 0.9,
     },
     statusText: {
         fontSize: 14,
         fontWeight: '600',
     },
+    timeCounter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        marginHorizontal: 20,
+        marginTop: 16,
+        borderRadius: 12,
+        gap: 12,
+    },
+    timeCounterIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    timeCounterText: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
     vehicleCard: {
         flexDirection: 'row',
         padding: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomWidth: 8,
+        borderBottomColor: '#F9FAFB',
     },
     vehicleImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 12,
+        width: 120,
+        height: 120,
+        borderRadius: 16,
         marginRight: 16,
         backgroundColor: '#F3F4F6',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
     vehicleInfo: {
         flex: 1,
         justifyContent: 'center',
     },
     vehicleBrand: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#6B7280',
-        fontWeight: '500',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 4,
     },
     vehicleModel: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 2,
+    },
+    vehicleYear: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0B729D',
+        marginBottom: 8,
+    },
+    reservationIdContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    reservationId: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        fontWeight: '600',
+    },
+    hostCard: {
+        padding: 20,
+        borderBottomWidth: 8,
+        borderBottomColor: '#F9FAFB',
+    },
+    hostCardTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 16,
+    },
+    hostContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    hostImageContainer: {
+        position: 'relative',
+        marginRight: 16,
+    },
+    hostImage: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: '#F3F4F6',
+    },
+    hostImagePlaceholder: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: '#F3F4F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    hostVerifiedBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 2,
+    },
+    hostDetails: {
+        flex: 1,
+    },
+    hostName: {
         fontSize: 18,
         fontWeight: '700',
         color: '#111827',
-        marginBottom: 4,
+        marginBottom: 6,
     },
-    reservationId: {
+    hostStats: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    hostStat: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    hostStatText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    hostStatDivider: {
+        marginHorizontal: 8,
+        color: '#D1D5DB',
         fontSize: 12,
-        color: '#9CA3AF',
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    hostMemberSince: {
+        fontSize: 13,
+        color: '#6B7280',
+    },
+    hostCallButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: '#F0F9FF',
+        borderRadius: 8,
+        gap: 6,
+    },
+    hostCallText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#0B729D',
     },
     actionButtons: {
         flexDirection: 'row',
@@ -644,28 +1451,208 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#111827',
     },
+    infoSubtext: {
+        fontSize: 12,
+        color: '#9CA3AF',
+        marginTop: 2,
+    },
+    importantHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    policyCard: {
+        backgroundColor: '#FEF2F2',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
+    policyHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8,
+    },
+    policyTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    policyText: {
+        fontSize: 13,
+        color: '#4B5563',
+        lineHeight: 20,
+        marginBottom: 12,
+    },
+    policyBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        padding: 8,
+        borderRadius: 8,
+        alignSelf: 'flex-start',
+    },
+    policyBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    documentsCard: {
+        backgroundColor: '#F0F9FF',
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    documentsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    documentsTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    documentsList: {
+        gap: 10,
+    },
+    documentItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    documentText: {
+        fontSize: 13,
+        color: '#4B5563',
+        fontWeight: '500',
+    },
     mapSection: {
         padding: 20,
     },
+    mapHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    locationCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0F9FF',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    locationIconWrapper: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#0B729D',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    locationTextWrapper: {
+        flex: 1,
+    },
+    locationTitle: {
+        fontSize: 12,
+        color: '#0369A1',
+        fontWeight: '600',
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    locationAddress: {
+        fontSize: 15,
+        color: '#075985',
+        fontWeight: '600',
+        lineHeight: 20,
+    },
     mapContainer: {
-        height: 180,
+        height: 220,
         borderRadius: 16,
         overflow: 'hidden',
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
     map: {
         width: '100%',
         height: '100%',
     },
+    customMarker: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mapPlaceholder: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F9FAFB',
+        padding: 20,
+    },
+    mapPlaceholderTitle: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#6B7280',
+        fontWeight: '700',
+    },
+    mapPlaceholderSubtitle: {
+        marginTop: 6,
+        fontSize: 13,
+        color: '#9CA3AF',
+        textAlign: 'center',
+        paddingHorizontal: 20,
+    },
+    mapPlaceholderText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: '#9CA3AF',
+        fontWeight: '500',
+    },
+    directionsActions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
     directionsButton: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 12,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
+        padding: 14,
+        backgroundColor: '#0B729D',
         borderRadius: 12,
         gap: 8,
+    },
+    directionsButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    directionsButtonSecondary: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 14,
+        backgroundColor: '#F0F9FF',
+        borderRadius: 12,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    directionsButtonSecondaryText: {
+        color: '#0B729D',
+        fontWeight: '600',
+        fontSize: 14,
     },
     directionsText: {
         color: '#0B729D',
@@ -698,28 +1685,34 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
     },
     timeline: {
         paddingLeft: 4,
     },
     timelineItem: {
         flexDirection: 'row',
-        marginBottom: 24,
+        marginBottom: 20,
     },
     timelineIconContainer: {
         alignItems: 'center',
         marginRight: 16,
+        zIndex: 1,
     },
     timelineIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         backgroundColor: '#F3F4F6',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: '#E5E7EB',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 3,
     },
     timelineIconCompleted: {
         backgroundColor: '#10B981',
@@ -730,32 +1723,147 @@ const styles = StyleSheet.create({
         borderColor: '#0B729D',
     },
     timelineLine: {
-        width: 2,
+        width: 3,
         flex: 1,
         backgroundColor: '#E5E7EB',
-        marginTop: 4,
+        marginTop: 6,
+        marginLeft: 1,
     },
     timelineLineCompleted: {
         backgroundColor: '#10B981',
     },
-    timelineContent: {
+    timelineCard: {
         flex: 1,
-        paddingTop: 8,
+        backgroundColor: '#F9FAFB',
+        borderRadius: 12,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        marginTop: 6,
+    },
+    timelineCardCompleted: {
+        backgroundColor: '#ECFDF5',
+        borderColor: '#A7F3D0',
+    },
+    timelineCardActive: {
+        backgroundColor: '#EFF6FF',
+        borderColor: '#BFDBFE',
+    },
+    timelineCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
     },
     timelineTitle: {
         fontSize: 15,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#6B7280',
-        marginBottom: 4,
+        flex: 1,
     },
     timelineTitleCompleted: {
-        color: '#10B981',
+        color: '#059669',
     },
     timelineTitleActive: {
         color: '#0B729D',
     },
+    completedBadge: {
+        backgroundColor: '#10B981',
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    completedBadgeText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    activeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#DBEAFE',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+    },
+    pulseDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#0B729D',
+    },
+    activeBadgeText: {
+        color: '#0B729D',
+        fontSize: 10,
+        fontWeight: '600',
+    },
     timelineDate: {
-        fontSize: 13,
+        fontSize: 12,
         color: '#9CA3AF',
+        fontWeight: '500',
+    },
+    priceHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    priceCard: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    priceRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    priceLabel: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flex: 1,
+    },
+    priceLabelText: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    priceValue: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#111827',
+    },
+    priceDivider: {
+        height: 1,
+        backgroundColor: '#E5E7EB',
+        marginVertical: 12,
+    },
+    priceTotalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    priceTotalLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    priceTotalBadge: {
+        backgroundColor: '#0B729D',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 12,
+    },
+    priceTotalValue: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#fff',
     },
 });
