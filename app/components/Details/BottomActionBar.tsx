@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface BottomActionBarProps {
   price: number;
@@ -8,7 +8,6 @@ interface BottomActionBarProps {
 }
 
 export default function BottomActionBar({ price, onBookPress }: BottomActionBarProps) {
-  const [showTooltip, setShowTooltip] = useState(false);
   const scaleAnim = new Animated.Value(1);
 
   const handlePressIn = () => {
@@ -32,30 +31,10 @@ export default function BottomActionBar({ price, onBookPress }: BottomActionBarP
           <Text style={styles.pricePerDay}>${price}</Text>
           <Text style={styles.currency}>/día</Text>
         </View>
-        <Pressable 
-          style={styles.tooltipTrigger}
-          onPress={() => setShowTooltip(!showTooltip)}
-        >
-          <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
-          <Text style={styles.priceInfo}>Ver desglose de precio</Text>
-        </Pressable>
-        
-        {showTooltip && (
-          <View style={styles.tooltip}>
-            <View style={styles.tooltipRow}>
-              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-              <Text style={styles.tooltipText}>Seguro básico incluido</Text>
-            </View>
-            <View style={styles.tooltipRow}>
-              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-              <Text style={styles.tooltipText}>Kilometraje ilimitado</Text>
-            </View>
-            <View style={styles.tooltipRow}>
-              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-              <Text style={styles.tooltipText}>Asistencia 24/7</Text>
-            </View>
-          </View>
-        )}
+        <View style={styles.priceDetails}>
+          <Ionicons name="shield-checkmark" size={14} color="#10B981" />
+          <Text style={styles.priceInfo}>Seguro incluido • Km ilimitado</Text>
+        </View>
       </View>
       
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -66,7 +45,7 @@ export default function BottomActionBar({ price, onBookPress }: BottomActionBarP
           onPressOut={handlePressOut}
           activeOpacity={1}
         >
-          <Text style={styles.bookButtonText}>Reservar ahora</Text>
+          <Text style={styles.bookButtonText}>Reservar</Text>
           <Ionicons name="arrow-forward" size={20} color="#fff" />
         </TouchableOpacity>
       </Animated.View>
@@ -101,7 +80,7 @@ const styles = StyleSheet.create({
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   pricePerDay: {
     fontSize: 28,
@@ -114,41 +93,14 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginLeft: 2,
   },
-  tooltipTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  priceInfo: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  tooltip: {
-    position: 'absolute',
-    bottom: 50,
-    left: 0,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    minWidth: 240,
-  },
-  tooltipRow: {
+  priceDetails: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  tooltipText: {
+  priceInfo: {
     fontSize: 12,
-    color: '#374151',
+    color: '#6B7280',
     fontWeight: '500',
   },
   bookButton: {

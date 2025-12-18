@@ -473,21 +473,33 @@ export default function BookingStep2Location() {
                             {deliveryCoords && deliveryCost > 0 && (
                                 <View style={styles.deliveryCostCard}>
                                     <View style={styles.deliveryCostHeader}>
-                                        <Ionicons name="car-outline" size={20} color="#0B729D" />
-                                        <Text style={styles.deliveryCostTitle}>Costo de delivery</Text>
-                                    </View>
-                                    <View style={styles.deliveryCostDetails}>
-                                        <View style={styles.deliveryCostRow}>
-                                            <Text style={styles.deliveryCostLabel}>Distancia:</Text>
-                                            <Text style={styles.deliveryCostValue}>{deliveryDistance}</Text>
+                                        <View style={styles.deliveryIconCircle}>
+                                            <Ionicons name="car-outline" size={20} color="#0B729D" />
                                         </View>
-                                        <View style={styles.deliveryCostRow}>
-                                            <Text style={styles.deliveryCostLabel}>Tarifa:</Text>
-                                            <Text style={styles.deliveryCostPrice}>${deliveryCost}</Text>
+                                        <View style={styles.deliveryCostHeaderText}>
+                                            <Text style={styles.deliveryCostTitle}>Detalles de entrega</Text>
+                                            <Text style={styles.deliveryCostSubtitle}>El anfitrión llevará el auto a ti</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.deliveryCostDetailsGrid}>
+                                        <View style={styles.deliveryCostDetailCard}>
+                                            <Ionicons name="navigate-circle-outline" size={24} color="#3B82F6" />
+                                            <Text style={styles.deliveryCostDetailLabel}>Distancia</Text>
+                                            <Text style={styles.deliveryCostDetailValue}>{deliveryDistance}</Text>
+                                        </View>
+                                        <View style={styles.deliveryCostDetailCard}>
+                                            <Ionicons name="time-outline" size={24} color="#F59E0B" />
+                                            <Text style={styles.deliveryCostDetailLabel}>Tiempo est.</Text>
+                                            <Text style={styles.deliveryCostDetailValue}>~{Math.ceil(parseFloat(deliveryDistance) / 40 * 60)} min</Text>
+                                        </View>
+                                        <View style={styles.deliveryCostDetailCard}>
+                                            <Ionicons name="cash-outline" size={24} color="#10B981" />
+                                            <Text style={styles.deliveryCostDetailLabel}>Tarifa</Text>
+                                            <Text style={styles.deliveryCostDetailValuePrice}>${deliveryCost}</Text>
                                         </View>
                                     </View>
                                     <View style={styles.deliveryCostInfo}>
-                                        <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
+                                        <Ionicons name="checkmark-circle" size={16} color="#10B981" />
                                         <Text style={styles.deliveryCostInfoText}>
                                             Incluye entrega y recogida del vehículo
                                         </Text>
@@ -863,60 +875,97 @@ const styles = StyleSheet.create({
         color: '#6B7280',
     },
     deliveryCostCard: {
-        backgroundColor: '#F0F9FF',
+        backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        padding: 16,
+        padding: 20,
         marginTop: 16,
-        borderWidth: 1,
-        borderColor: '#0B729D',
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 3,
     },
     deliveryCostHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        marginBottom: 12,
+        marginBottom: 16,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    deliveryIconCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#E0F2FE',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    deliveryCostHeaderText: {
+        flex: 1,
     },
     deliveryCostTitle: {
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '700',
-        color: '#111827',
+        color: '#1E293B',
+        marginBottom: 2,
     },
-    deliveryCostDetails: {
-        gap: 8,
-        marginBottom: 12,
-    },
-    deliveryCostRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    deliveryCostLabel: {
-        fontSize: 14,
-        color: '#6B7280',
+    deliveryCostSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
         fontWeight: '500',
     },
-    deliveryCostValue: {
-        fontSize: 14,
-        color: '#111827',
-        fontWeight: '600',
+    deliveryCostDetailsGrid: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 16,
     },
-    deliveryCostPrice: {
-        fontSize: 18,
-        color: '#0B729D',
+    deliveryCostDetailCard: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    deliveryCostDetailLabel: {
+        fontSize: 11,
+        color: '#64748B',
+        fontWeight: '600',
+        marginTop: 6,
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    deliveryCostDetailValue: {
+        fontSize: 15,
+        color: '#1E293B',
         fontWeight: '700',
+    },
+    deliveryCostDetailValuePrice: {
+        fontSize: 17,
+        color: '#10B981',
+        fontWeight: '800',
     },
     deliveryCostInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#BFDBFE',
+        gap: 8,
+        backgroundColor: '#ECFDF5',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
     },
     deliveryCostInfoText: {
         flex: 1,
-        fontSize: 12,
-        color: '#6B7280',
+        fontSize: 13,
+        color: '#065F46',
+        fontWeight: '600',
     },
     footer: {
         position: 'absolute',

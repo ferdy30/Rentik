@@ -25,6 +25,8 @@ export default function BookingStep4Confirmation() {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [priceDetailsExpanded, setPriceDetailsExpanded] = useState(true);
     const [extras, setExtras] = useState({
         babySeat: false,
         insurance: false,
@@ -68,6 +70,11 @@ export default function BookingStep4Confirmation() {
     const handleConfirm = async () => {
         if (!user) {
             Alert.alert('Error', 'Debes iniciar sesión para reservar.');
+            return;
+        }
+
+        if (!termsAccepted) {
+            Alert.alert('Términos requeridos', 'Debes aceptar los términos y condiciones para continuar.');
             return;
         }
 
@@ -408,12 +415,24 @@ export default function BookingStep4Confirmation() {
 
                 {/* Price Breakdown */}
                 <View style={styles.priceSection}>
-                    <View style={styles.priceSectionHeader}>
-                        <Ionicons name="calculator-outline" size={22} color="#0B729D" />
-                        <Text style={styles.sectionTitle}>Detalles del precio</Text>
-                    </View>
+                    <TouchableOpacity 
+                        style={styles.priceSectionHeader}
+                        onPress={() => setPriceDetailsExpanded(!priceDetailsExpanded)}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.priceSectionHeaderLeft}>
+                            <Ionicons name="calculator-outline" size={22} color="#0B729D" />
+                            <Text style={styles.sectionTitle}>Detalles del precio</Text>
+                        </View>
+                        <Ionicons 
+                            name={priceDetailsExpanded ? "chevron-up" : "chevron-down"} 
+                            size={24} 
+                            color="#0B729D" 
+                        />
+                    </TouchableOpacity>
                     
-                    <View style={styles.priceBreakdownCard}>
+                    {priceDetailsExpanded && (
+                        <View style={styles.priceBreakdownCard}>
                         <View style={styles.priceRow}>
                             <View style={styles.priceRowLeft}>
                                 <Text style={styles.priceLabel}>${vehicle.precio} × {days} día{days > 1 ? 's' : ''}</Text>
@@ -466,6 +485,16 @@ export default function BookingStep4Confirmation() {
                                 <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
                                 <Text style={styles.totalSubtext}>Pago seguro con Stripe</Text>
                             </View>
+                        </View>
+                    </View>
+                    )}
+                    
+                    {/* Always show total */}
+                    <View style={styles.totalSummaryRow}>
+                        <Text style={styles.totalSummaryLabel}>Total a pagar</Text>
+                        <View style={styles.totalSummaryRight}>
+                            <Text style={styles.totalSummaryValue}>${total.toFixed(2)}</Text>
+                            <Text style={styles.totalSummarySubtext}>Para {days} día{days > 1 ? 's' : ''}</Text>
                         </View>
                     </View>
                 </View>
@@ -529,10 +558,30 @@ export default function BookingStep4Confirmation() {
             </ScrollView>
 
             <View style={styles.footer}>
+                {/* Terms and Conditions Checkbox */}
                 <TouchableOpacity 
-                    style={[styles.confirmButton, loading && styles.disabledButton]} 
+                    style={styles.termsContainer}
+                    onPress={() => setTermsAccepted(!termsAccepted)}
+                    activeOpacity={0.7}
+                >
+                    <View style={[styles.termsCheckbox, termsAccepted && styles.termsCheckboxChecked]}>
+                        {termsAccepted && <Ionicons name="checkmark" size={18} color="#fff" />}
+                    </View>
+                    <Text style={styles.termsText}>
+                        Acepto los{' '}
+                        <Text style={styles.termsLink}>términos y condiciones</Text>
+                        {' '}y la{' '}
+                        <Text style={styles.termsLink}>política de privacidad</Text>
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={[
+                        styles.confirmButton, 
+                        (loading || !termsAccepted) && styles.disabledButton
+                    ]} 
                     onPress={handleConfirm}
-                    disabled={loading}
+                    disabled={loading || !termsAccepted}
                 >
                     {loading ? (
                         <ActivityIndicator color="#fff" />
@@ -1091,5 +1140,73 @@ const styles = StyleSheet.create({
     checkboxSelected: {
         backgroundColor: '#0B729D',
         borderColor: '#0B729D',
+    },
+    priceSectionHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flex: 1,
+    },
+    totalSummaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        backgroundColor: '#F0F9FF',
+        borderRadius: 12,
+        marginTop: 12,
+        borderWidth: 1.5,
+        borderColor: '#0B729D',
+    },
+    totalSummaryLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    totalSummaryRight: {
+        alignItems: 'flex-end',
+    },
+    totalSummaryValue: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#0B729D',
+        marginBottom: 2,
+    },
+    totalSummarySubtext: {
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    termsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        paddingHorizontal: 4,
+    },
+    termsCheckbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#D1D5DB',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+        backgroundColor: '#FFFFFF',
+    },
+    termsCheckboxChecked: {
+        backgroundColor: '#10B981',
+        borderColor: '#10B981',
+    },
+    termsText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#64748B',
+        lineHeight: 18,
+    },
+    termsLink: {
+        color: '#0B729D',
+        fontWeight: '600',
+        textDecorationLine: 'underline',
     },
 });

@@ -14,8 +14,8 @@ export default function VehicleFeatures({ features }: VehicleFeaturesProps) {
       <Text style={styles.sectionTitle}>Características</Text>
       <View style={styles.featuresList}>
         {displayFeatures.map((feat: string, index: number) => (
-          <View key={index} style={styles.featureRow}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="#0B729D" />
+          <View key={index} style={styles.featureChip}>
+            <Ionicons name="checkmark-circle" size={18} color="#10B981" />
             <Text style={styles.featureText}>{feat}</Text>
           </View>
         ))}
@@ -32,15 +32,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   featuresList: {
-    gap: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  featureRow: {
+  featureChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
   },
   featureText: {
-    fontSize: 16,
-    color: '#374151',
+    fontSize: 14,
+    color: '#065F46',
+    fontWeight: '600',
   },
 });

@@ -326,6 +326,8 @@ export default function Step4Price() {
 				availableFrom: availableFrom.toISOString(),
 				flexibleHours,
 				deliveryHours,
+				airportDelivery,
+				airportFee: airportDelivery ? parseFloat(airportFee) || 0 : 0,
 				rules,
 				discounts: {
 					weekly: parseFloat(discounts.weekly) || 0,

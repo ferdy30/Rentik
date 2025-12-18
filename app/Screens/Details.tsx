@@ -11,6 +11,7 @@ import VehicleCarousel from '../components/Details/VehicleCarousel';
 import VehicleDescription from '../components/Details/VehicleDescription';
 import VehicleFeatures from '../components/Details/VehicleFeatures';
 import VehicleHeader from '../components/Details/VehicleHeader';
+import VehicleLocationMap from '../components/Details/VehicleLocationMap';
 import VehiclePolicies from '../components/Details/VehiclePolicies';
 import VehicleSpecs from '../components/Details/VehicleSpecs';
 import type { RootStackParamList } from '../types/navigation';
@@ -156,18 +157,13 @@ export default function Details() {
 
           <View style={styles.divider} />
 
-          {/* Ubicación de recogida */}
-          {vehicle.pickupLocation ? (
-            <View style={{ gap: 8 }}>
-              <Text style={styles.sectionTitle}>Recogida</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="location-outline" size={18} color="#6B7280" />
-                <Text style={{ fontSize: 14, color: '#374151' }}>{vehicle.pickupLocation}</Text>
-              </View>
-            </View>
-          ) : null}
+          {/* Ubicación con mapa */}
+          <VehicleLocationMap 
+            coordinates={vehicle.coordinates}
+            ubicacion={vehicle.ubicacion}
+          />
 
-          {vehicle.pickupLocation && <View style={styles.divider} />}
+          <View style={styles.divider} />
 
           {loadingHost ? (
             <View style={{ paddingVertical: 12 }}>

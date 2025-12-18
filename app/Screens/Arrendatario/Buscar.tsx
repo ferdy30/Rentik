@@ -1,22 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Image,
-  Modal,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Image,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useToast } from '../../../context/ToastContext';
 import EmptyState from '../../components/EmptyState';
 import FilterModal, { type FilterOptions } from '../../components/FilterModal';
@@ -37,8 +40,8 @@ const CATEGORIES = [
 ];
 
 const PROMOTIONS = [
-  { id: '1', title: 'Explora El Salvador', subtitle: 'Viaja con libertad', image: 'https://images.unsplash.com/photo-1632780779804-15e0762bd37e?w=900&auto=format&fit=crop&q=60' },
-  { id: '2', title: 'Tu Aventura Espera', subtitle: 'Descubre nuevos destinos', image: 'https://images.unsplash.com/photo-1690384451505-2aef8ae1b0ef?w=900&auto=format&fit=crop&q=60' },
+  { id: '1', title: 'Explora El Salvador', subtitle: 'Viaja con libertad', image: 'https://cdn.pixabay.com/photo/2020/03/27/22/06/santa-ana-4975147_1280.jpg' },
+  { id: '2', title: 'Tu Aventura Espera', subtitle: 'Descubre nuevos destinos', image: 'https://cdn.pixabay.com/photo/2022/06/13/14/58/road-7260175_1280.jpg' },
   { id: '3', title: 'Viaja Seguro', subtitle: 'Atención 24/7 para ti', image: 'https://media.istockphoto.com/id/1469729479/es/foto/atardecer-en-la-playa.jpg?s=612x612&w=0&k=20&c=sk24uTMckudyN9oeLoNRUTjgWgMi6ymtpFpx6EcTCHA=' },
 ];
 
@@ -73,6 +76,10 @@ export default function BuscarScreen() {
   // Loading indicator for GPS omitted to avoid warnings
   const [selectedRadius, setSelectedRadius] = useState<number | null>(null); // null = sin filtro
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [activePromoIndex, setActivePromoIndex] = useState(0);
+  const promoScrollRef = useRef<ScrollView>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const promoIndexRef = useRef(0);
 
   const requestLocationPermission = useCallback(async () => {
     try {
@@ -129,6 +136,36 @@ export default function BuscarScreen() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Auto-play Carousel
+  useEffect(() => {
+    if (searchQuery || selectedCategory !== 'all') return;
+
+    const interval = setInterval(() => {
+      const nextIndex = (promoIndexRef.current + 1) % PROMOTIONS.length;
+      const scrollWidth = Dimensions.get('window').width * 0.78 + 12;
+      
+      promoScrollRef.current?.scrollTo({ 
+        x: nextIndex * scrollWidth, 
+        animated: true 
+      });
+      
+      promoIndexRef.current = nextIndex;
+      setActivePromoIndex(nextIndex);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [searchQuery, selectedCategory]);
+
+  const handleCategoryPress = (id: string) => {
+    Haptics.selectionAsync();
+    setSelectedCategory(id);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setDebouncedSearchQuery('');
+  };
+
   const loadVehicles = useCallback(async (reset: boolean = false) => {
     try {
       if (reset) {
@@ -158,6 +195,8 @@ export default function BuscarScreen() {
         precio: v.precio,
         ubicacion: v.ubicacion,
         coordinates: v.coordinates, // Agregar coordenadas
+        airportDelivery: v.airportDelivery || false, // Campo de entrega en aeropuerto
+        airportFee: v.airportFee || 0,
         imagen: v.photos?.front || 'https://via.placeholder.com/400',
         imagenes: v.photos ? [v.photos.front, v.photos.sideLeft, v.photos.sideRight, v.photos.interior].filter(Boolean) : [],
         rating: v.rating || 0,
@@ -203,7 +242,11 @@ export default function BuscarScreen() {
     // Category filter
     if (selectedCategory !== 'all') {
       if (selectedCategory === 'airport') {
-        if (!vehicle.ubicacion.toLowerCase().includes('aeropuerto')) return false;
+        // Mostrar vehículos que tienen entrega en aeropuerto habilitada
+        // O que tienen "aeropuerto" en la ubicación como fallback
+        if (!vehicle.airportDelivery && !vehicle.ubicacion.toLowerCase().includes('aeropuerto')) {
+          return false;
+        }
       }
       if (selectedCategory === 'near_me') {
         // Filtrar solo vehículos que tengan coordenadas
@@ -401,6 +444,11 @@ export default function BuscarScreen() {
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={clearSearch}>
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
           </View>
           <TouchableOpacity style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
             <Ionicons name="options-outline" size={20} color="#0B729D" />
@@ -424,6 +472,23 @@ export default function BuscarScreen() {
             )}
           </TouchableOpacity>
         </View>
+        
+        {/* Quick Filters Chips */}
+        {activeFilterCount > 0 && (
+          <View style={styles.activeFiltersContainer}>
+            {advancedFilters.vehicleTypes.map(type => (
+              <View key={type} style={styles.activeFilterChip}>
+                <Text style={styles.activeFilterText}>{type}</Text>
+              </View>
+            ))}
+            {advancedFilters.transmision.map(trans => (
+              <View key={trans} style={styles.activeFilterChip}>
+                <Text style={styles.activeFilterText}>{trans}</Text>
+              </View>
+            ))}
+             {/* Add more if needed, or just a summary */}
+          </View>
+        )}
       </View>
 
       {locationError && (
@@ -464,7 +529,7 @@ export default function BuscarScreen() {
                 styles.categoryChip,
                 selectedCategory === cat.id && styles.categoryChipActive
               ]}
-              onPress={() => setSelectedCategory(cat.id)}
+              onPress={() => handleCategoryPress(cat.id)}
             >
               <Ionicons 
                 name={cat.icon as any} 
@@ -520,16 +585,41 @@ export default function BuscarScreen() {
           {/* Promotions Carousel */}
           {!searchQuery && selectedCategory === 'all' && (
             <View style={styles.promoContainer}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 12 }}>
-                <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0, flex: 1 }]}>Viaja con Nosotros</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 8, paddingHorizontal: 16 }}>
+                <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0, marginLeft: 0, flex: 1, fontSize: 18 }]}>Viaja con Nosotros</Text>
                 <Ionicons name="car-sport" size={20} color="#0B729D" />
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promoList}>
+              <ScrollView 
+                ref={promoScrollRef}
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.promoList}
+                onScroll={Animated.event(
+                  [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                  { 
+                    useNativeDriver: false,
+                    listener: (event: any) => {
+                      const offsetX = event.nativeEvent.contentOffset.x;
+                      const scrollWidth = Dimensions.get('window').width * 0.78 + 12;
+                      const index = Math.round(offsetX / scrollWidth);
+                      if (index >= 0 && index < PROMOTIONS.length && index !== promoIndexRef.current) {
+                        promoIndexRef.current = index;
+                        setActivePromoIndex(index);
+                      }
+                    }
+                  }
+                )}
+                scrollEventThrottle={16}
+                pagingEnabled={true}
+                snapToInterval={Dimensions.get('window').width * 0.78 + 12}
+                decelerationRate="fast"
+              >
                 {PROMOTIONS.map((promo) => (
                   <TouchableOpacity key={promo.id} style={styles.promoCard} activeOpacity={0.9}>
                     <Image source={{ uri: promo.image }} style={styles.promoImage} />
                     <LinearGradient
-                      colors={['transparent', 'rgba(0,0,0,0.8)']}
+                      colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.9)']}
+                      locations={[0, 0.5, 1]}
                       style={styles.promoGradient}
                     />
                     <View style={styles.promoContent}>
@@ -539,6 +629,18 @@ export default function BuscarScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+              {/* Pagination Dots */}
+              <View style={styles.paginationContainer}>
+                {PROMOTIONS.map((_, index) => (
+                  <View 
+                    key={index} 
+                    style={[
+                      styles.paginationDot, 
+                      activePromoIndex === index && styles.paginationDotActive
+                    ]} 
+                  />
+                ))}
+              </View>
             </View>
           )}
 
@@ -560,7 +662,7 @@ export default function BuscarScreen() {
             </View>
           ) : (
             <>
-              {/* Recommended Section - Only show if no search/filter active */}
+              {/* Recommended Section */}
               {recommended.length > 0 && !searchQuery && selectedCategory === 'all' && (
                 <>
                   <Text style={styles.sectionTitle}>Recomendados para ti</Text>
@@ -581,7 +683,7 @@ export default function BuscarScreen() {
                 </>
               )}
 
-              {/* All Vehicles Section */}
+              {/* All Vehicles Title */}
               <View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
                   <Text style={styles.sectionTitle}>
@@ -600,6 +702,8 @@ export default function BuscarScreen() {
                   </Text>
                 )}
               </View>
+
+              {/* Vehicles Grid */}
               <View style={styles.grid}>
                 {vehiclesWithDistance.map((vehicle) => (
                   <VehicleCard
@@ -660,25 +764,43 @@ export default function BuscarScreen() {
                     longitude: vehicle.coordinates!.longitude,
                   }}
                   onPress={() => navigation.getParent()?.navigate('Details', { vehicle })}
+                  tracksViewChanges={false} // Optimización de rendimiento
                 >
-                  <View style={{
-                    backgroundColor: '#0B729D',
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 20,
-                    borderWidth: 2,
-                    borderColor: '#fff',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.25,
-                    shadowRadius: 4,
-                    elevation: 5,
-                  }}>
-                    <Text style={{ fontWeight: '700', fontSize: 14, color: '#fff' }}>${vehicle.precio}</Text>
-                    {vehicle.distanceText && (
-                      <Text style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{vehicle.distanceText}</Text>
-                    )}
+                  {/* Wrapper con padding para evitar recortes en Android por sombras/elevation */}
+                  <View style={{ padding: 6 }}>
+                    <View style={{
+                      backgroundColor: '#0B729D',
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 20,
+                      borderWidth: 2,
+                      borderColor: '#fff',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 4,
+                      elevation: 6,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: 60,
+                    }}>
+                      <Text style={{ fontWeight: '700', fontSize: 14, color: '#fff' }}>${vehicle.precio}</Text>
+                      {vehicle.distanceText && (
+                        <Text style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{vehicle.distanceText}</Text>
+                      )}
+                    </View>
                   </View>
+                  <Callout tooltip onPress={() => navigation.getParent()?.navigate('Details', { vehicle })}>
+                    <View style={styles.calloutContainer}>
+                      <Image source={{ uri: vehicle.imagen }} style={styles.calloutImage} />
+                      <Text style={styles.calloutTitle} numberOfLines={1}>{vehicle.marca} {vehicle.modelo}</Text>
+                      <Text style={styles.calloutPrice}>${vehicle.precio}/día</Text>
+                      <View style={styles.calloutRating}>
+                        <Ionicons name="star" size={12} color="#F59E0B" />
+                        <Text style={styles.calloutRatingText}>{vehicle.rating} ({vehicle.reviewCount})</Text>
+                      </View>
+                    </View>
+                  </Callout>
                 </Marker>
               ))}
           </MapView>

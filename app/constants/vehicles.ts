@@ -22,6 +22,8 @@ export interface Vehicle {
   badges?: ('Nuevo' | 'Más rentado' | 'Descuento' | 'Disponible hoy' | 'Verificado')[];
   disponible: boolean;
   propietarioId: string;
+  airportDelivery?: boolean; // Si se puede entregar en aeropuerto
+  airportFee?: number; // Tarifa adicional por entrega en aeropuerto
 }
 
 export const MOCK_VEHICLES: Vehicle[] = [

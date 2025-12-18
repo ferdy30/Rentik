@@ -1,5 +1,4 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import {
@@ -22,6 +21,189 @@ import { colors } from '../../constants/colors';
 import { RootStackParamList } from '../../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegistroStep1'>;
+
+// Componente personalizado de calendario
+interface CustomDatePickerProps {
+  selectedDate: Date | null;
+  onDateChange: (date: Date) => void;
+  maximumDate: Date;
+  minimumDate: Date;
+}
+
+function CustomDatePicker({ selectedDate, onDateChange, maximumDate, minimumDate }: CustomDatePickerProps) {
+  const [displayMonth, setDisplayMonth] = useState<Date>(selectedDate || new Date());
+  const [showYearPicker, setShowYearPicker] = useState(false);
+
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const handlePrevMonth = () => {
+    setDisplayMonth(new Date(displayMonth.getFullYear(), displayMonth.getMonth() - 1));
+  };
+
+  const handleNextMonth = () => {
+    setDisplayMonth(new Date(displayMonth.getFullYear(), displayMonth.getMonth() + 1));
+  };
+
+  const handleYearChange = (year: number) => {
+    setDisplayMonth(new Date(year, displayMonth.getMonth()));
+    setShowYearPicker(false);
+  };
+
+  const handleMonthChange = (month: number) => {
+    setDisplayMonth(new Date(displayMonth.getFullYear(), month));
+  };
+
+  const handleDayPress = (day: number) => {
+    const newDate = new Date(displayMonth.getFullYear(), displayMonth.getMonth(), day);
+    onDateChange(newDate);
+  };
+
+  const daysInMonth = getDaysInMonth(displayMonth);
+  const firstDay = getFirstDayOfMonth(displayMonth);
+  const days = [];
+
+  // Empty cells
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null);
+  }
+
+  // Days
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push(i);
+  }
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 85 }, (_, i) => currentYear - 84 + i).reverse();
+  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  return (
+    <View style={styles.customCalendar}>
+      {/* Header con año y mes */}
+      <View style={styles.calendarHeaderControl}>
+        <TouchableOpacity
+          style={styles.yearMonthSelector}
+          onPress={() => setShowYearPicker(!showYearPicker)}
+        >
+          <Text style={styles.yearText}>{displayMonth.getFullYear()}</Text>
+          <Ionicons name={showYearPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#0B729D" />
+        </TouchableOpacity>
+
+        {!showYearPicker && (
+          <View style={styles.monthNavigator}>
+            <TouchableOpacity onPress={handlePrevMonth}>
+              <Ionicons name="chevron-back" size={20} color="#0B729D" />
+            </TouchableOpacity>
+            <Text style={styles.monthText}>
+              {displayMonth.toLocaleDateString('es-ES', { month: 'long' })}
+            </Text>
+            <TouchableOpacity onPress={handleNextMonth}>
+              <Ionicons name="chevron-forward" size={20} color="#0B729D" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* Selector de año */}
+      {showYearPicker ? (
+        <ScrollView style={styles.yearPickerContainer} showsVerticalScrollIndicator={false}>
+          {years.map((year) => (
+            <TouchableOpacity
+              key={year}
+              style={[
+                styles.yearOption,
+                displayMonth.getFullYear() === year && styles.yearOptionSelected,
+              ]}
+              onPress={() => handleYearChange(year)}
+            >
+              <Text
+                style={[
+                  styles.yearOptionText,
+                  displayMonth.getFullYear() === year && styles.yearOptionTextSelected,
+                ]}
+              >
+                {year}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : (
+        <>
+          {/* Selector de meses */}
+          <View style={styles.monthsGrid}>
+            {months.map((month, index) => (
+              <TouchableOpacity
+                key={month}
+                style={[
+                  styles.monthButton,
+                  displayMonth.getMonth() === index && styles.monthButtonActive,
+                ]}
+                onPress={() => handleMonthChange(index)}
+              >
+                <Text
+                  style={[
+                    styles.monthButtonText,
+                    displayMonth.getMonth() === index && styles.monthButtonTextActive,
+                  ]}
+                >
+                  {month}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Calendario de días */}
+          <View style={styles.calendarDayLabels}>
+            {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'].map((day) => (
+              <Text key={day} style={styles.calendarDayLabel}>
+                {day}
+              </Text>
+            ))}
+          </View>
+
+          <View style={styles.calendarGrid}>
+            {days.map((day, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.calendarDay,
+                  day && {
+                    backgroundColor:
+                      selectedDate && selectedDate.getDate() === day && displayMonth.getMonth() === selectedDate.getMonth() && displayMonth.getFullYear() === selectedDate.getFullYear()
+                        ? '#0B729D'
+                        : '#F3F4F6',
+                  },
+                ]}
+                onPress={() => day && handleDayPress(day)}
+                disabled={!day}
+              >
+                <Text
+                  style={[
+                    styles.calendarDayText,
+                    day &&
+                    selectedDate &&
+                    selectedDate.getDate() === day &&
+                    displayMonth.getMonth() === selectedDate.getMonth() &&
+                    displayMonth.getFullYear() === selectedDate.getFullYear()
+                      ? styles.calendarDayTextSelected
+                      : null,
+                  ]}
+                >
+                  {day}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
 
 // Paso 1: Información Personal
 export default function RegistroStep1({ navigation }: Props) {
@@ -125,13 +307,13 @@ export default function RegistroStep1({ navigation }: Props) {
         if (!value) error = 'Fecha obligatoria';
         else {
           const today = new Date();
-          const age = today.getFullYear() - value.getFullYear();
-          const m = today.getMonth() - value.getMonth();
-          if (m < 0 || (m === 0 && today.getDate() < value.getDate())) {
-            if (age - 1 < 18) error = 'Debes ser mayor de 18 años';
-          } else {
-            if (age < 18) error = 'Debes ser mayor de 18 años';
-          }
+          const birthDate = new Date(value);
+          const age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          const dayDiff = today.getDate() - birthDate.getDate();
+          const actualAge = (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) ? age - 1 : age;
+          
+          if (actualAge < 18) error = 'Debes ser mayor de 18 años';
         }
         break;
     }
@@ -579,58 +761,98 @@ export default function RegistroStep1({ navigation }: Props) {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Date Picker Modal - Mejor UX para iOS */}
+      {/* Custom Date Picker - Elegante y moderno */}
       <Modal
         visible={showDatePicker}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowDatePicker(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: Platform.OS === 'ios' ? 40 : 20 }]}>
-            <View style={styles.modalHeader}>
+        <TouchableOpacity
+          style={styles.datePickerOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDatePicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.datePickerCard}
+            activeOpacity={1}
+          >
+            <View style={styles.datePickerHeader}>
               <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                <Text style={{ color: '#6B7280', fontSize: 16 }}>Cancelar</Text>
+                <Ionicons name="close" size={22} color="#6B7280" />
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Fecha de Nacimiento</Text>
-              <TouchableOpacity onPress={() => {
-                if (birthday) {
-                  const age = new Date().getFullYear() - birthday.getFullYear();
-                  if (age < 18) {
+              <Text style={styles.datePickerTitle}>Fecha de Nacimiento</Text>
+              <View style={{ width: 22 }} />
+            </View>
+
+            <ScrollView 
+              style={styles.datePickerScrollView}
+              contentContainerStyle={styles.datePickerContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {birthday ? (
+                <View style={styles.selectedDateDisplay}>
+                  <Ionicons name="calendar-clear" size={32} color="#10B981" />
+                  <View style={{ marginLeft: 12 }}>
+                    <Text style={styles.selectedDateLabel}>Fecha seleccionada</Text>
+                    <Text style={styles.selectedDateValue}>
+                      {birthday.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </Text>
+                    <Text style={styles.selectedDateAge}>
+                      {new Date().getFullYear() - birthday.getFullYear()} años
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.selectDatePrompt}>
+                  <Ionicons name="calendar-outline" size={28} color="#9CA3AF" />
+                  <Text style={styles.selectDateText}>Selecciona tu fecha de nacimiento</Text>
+                </View>
+              )}
+
+              <CustomDatePicker
+                selectedDate={birthday}
+                onDateChange={(date) => {
+                  const age = new Date().getFullYear() - date.getFullYear();
+                  const monthDiff = new Date().getMonth() - date.getMonth();
+                  const dayDiff = new Date().getDate() - date.getDate();
+                  const actualAge = (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) ? age - 1 : age;
+                  
+                  if (actualAge < 18) {
                     Alert.alert('Edad mínima', 'Debes tener al menos 18 años para registrarte.');
                     return;
                   }
-                }
-                setShowDatePicker(false);
-              }}>
-                <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '600' }}>Listo</Text>
+                  setBirthday(date);
+                }}
+                maximumDate={new Date()}
+                minimumDate={new Date(1940, 0, 1)}
+              />
+            </ScrollView>
+
+            <View style={styles.datePickerActions}>
+              <TouchableOpacity
+                style={styles.datePickerCancelButton}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.datePickerCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.datePickerConfirmButtonNew, !birthday && styles.datePickerConfirmButtonDisabled]}
+                onPress={() => {
+                  if (birthday) {
+                    setShowDatePicker(false);
+                  } else {
+                    Alert.alert('Selecciona una fecha', 'Por favor selecciona tu fecha de nacimiento.');
+                  }
+                }}
+                disabled={!birthday}
+              >
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Text style={styles.datePickerConfirmNewText}>Confirmar</Text>
               </TouchableOpacity>
             </View>
-            
-            {birthday && (
-              <View style={{ padding: 16, backgroundColor: '#F0F9FF', marginHorizontal: 20, borderRadius: 12, marginBottom: 10 }}>
-                <Text style={{ fontSize: 14, color: '#1E40AF', textAlign: 'center' }}>
-                  Edad: {new Date().getFullYear() - birthday.getFullYear()} años
-                </Text>
-              </View>
-            )}
-            
-            <DateTimePicker
-              value={birthday || new Date(2000, 0, 1)}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              maximumDate={new Date()}
-              minimumDate={new Date(1940, 0, 1)}
-              onChange={(event, selectedDate) => {
-                if (selectedDate) {
-                  setBirthday(selectedDate);
-                }
-              }}
-              textColor="#1F2937"
-              style={{ height: 200 }}
-            />
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -791,5 +1013,355 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F9FAFB',
+  },
+  datePickerModalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    maxHeight: '75%',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  agePreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    padding: 16,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    marginTop: 12,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#BAE6FD',
+  },
+  ageIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  agePreviewDate: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0B729D',
+    marginBottom: 2,
+  },
+  agePreviewAge: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  datePickerContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  datePickerConfirmButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    marginHorizontal: 20,
+    marginTop: 16,
+    paddingVertical: 16,
+    borderRadius: 14,
+    gap: 8,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  datePickerConfirmText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  datePickerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  datePickerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  datePickerScrollView: {
+    maxHeight: 500,
+  },
+  datePickerContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 16,
+  },
+  selectedDateDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+  },
+  selectedDateLabel: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '600',
+    marginBottom: 3,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  selectedDateValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#065F46',
+    marginBottom: 2,
+  },
+  selectedDateAge: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  selectDatePrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    gap: 10,
+  },
+  selectDateText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  customCalendar: {
+    gap: 12,
+  },
+  calendarHeaderControl: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  yearMonthSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  yearText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0B729D',
+  },
+  monthNavigator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  monthText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+    minWidth: 60,
+    textAlign: 'center',
+    textTransform: 'capitalize',
+  },
+  yearPickerContainer: {
+    maxHeight: 200,
+    borderRadius: 10,
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: 6,
+  },
+  yearOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginHorizontal: 6,
+    borderRadius: 8,
+    marginVertical: 1,
+  },
+  yearOptionSelected: {
+    backgroundColor: '#0B729D',
+  },
+  yearOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  yearOptionTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  monthsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginBottom: 10,
+  },
+  monthButton: {
+    width: '23%',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  monthButtonActive: {
+    backgroundColor: '#0B729D',
+    borderColor: '#0B729D',
+  },
+  monthButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  monthButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 12,
+  },
+  calendarMonthYear: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    textTransform: 'capitalize',
+  },
+  calendarDayLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 6,
+  },
+  calendarDayLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    width: '14.28%',
+    textAlign: 'center',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+  },
+  calendarDay: {
+    width: '14.28%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  calendarDayText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  calendarDayTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  datePickerActions: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 12,
+  },
+  datePickerCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+  },
+  datePickerCancelText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  datePickerConfirmButtonNew: {
+    flex: 1.5,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  datePickerConfirmButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  datePickerConfirmNewText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

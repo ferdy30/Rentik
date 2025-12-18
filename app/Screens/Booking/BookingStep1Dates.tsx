@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Image } from 'expo-image';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     Alert,
@@ -240,6 +241,18 @@ export default function BookingStep1Dates() {
         return `${days} días - Alquiler mensual (25% desc.)`;
     };
 
+    const calculateEstimatedTotal = () => {
+        const days = getDurationInDays();
+        if (days === 0) return 0;
+        const basePrice = days * vehicle.precio;
+        // Apply discount based on duration
+        if (days >= 30) return basePrice * 0.75;
+        if (days >= 15) return basePrice * 0.80;
+        if (days >= 8) return basePrice * 0.85;
+        if (days >= 4) return basePrice * 0.90;
+        return basePrice;
+    };
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -255,6 +268,23 @@ export default function BookingStep1Dates() {
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Vehicle Mini Summary */}
+                <View style={styles.vehicleSummaryCard}>
+                    <Image 
+                        source={{ uri: vehicle.imagenes?.[0] || vehicle.imagen }} 
+                        style={styles.vehicleSummaryImage}
+                        contentFit="cover"
+                    />
+                    <View style={styles.vehicleSummaryInfo}>
+                        <Text style={styles.vehicleSummaryTitle}>{vehicle.marca} {vehicle.modelo}</Text>
+                        <Text style={styles.vehicleSummarySubtitle}>{vehicle.anio}</Text>
+                        <View style={styles.vehicleSummaryPrice}>
+                            <Text style={styles.vehiclePriceAmount}>${vehicle.precio}</Text>
+                            <Text style={styles.vehiclePriceUnit}>/día</Text>
+                        </View>
+                    </View>
+                </View>
+
                 <Text style={styles.stepTitle}>Paso 1 de 4</Text>
                 <Text style={styles.title}>Elige las fechas</Text>
                 <Text style={styles.subtitle}>
@@ -437,6 +467,42 @@ export default function BookingStep1Dates() {
                     </Text>
                 </View>
 
+                {/* Dynamic Price Summary */}
+                {startDate && endDate && (
+                    <View style={styles.priceSummaryCard}>
+                        <View style={styles.priceSummaryHeader}>
+                            <Ionicons name="calculator-outline" size={20} color="#0B729D" />
+                            <Text style={styles.priceSummaryTitle}>Resumen de precio</Text>
+                        </View>
+                        <View style={styles.priceSummaryRow}>
+                            <Text style={styles.priceSummaryLabel}>
+                                ${vehicle.precio} x {getDurationInDays()} {getDurationInDays() === 1 ? 'día' : 'días'}
+                            </Text>
+                            <Text style={styles.priceSummaryValue}>
+                                ${(vehicle.precio * getDurationInDays()).toFixed(2)}
+                            </Text>
+                        </View>
+                        {getDurationInDays() >= 4 && (
+                            <View style={styles.priceSummaryRow}>
+                                <Text style={[styles.priceSummaryLabel, { color: '#10B981' }]}>
+                                    Descuento por duración
+                                </Text>
+                                <Text style={[styles.priceSummaryValue, { color: '#10B981' }]}>
+                                    -${((vehicle.precio * getDurationInDays()) - calculateEstimatedTotal()).toFixed(2)}
+                                </Text>
+                            </View>
+                        )}
+                        <View style={styles.priceSummaryDivider} />
+                        <View style={styles.priceSummaryRow}>
+                            <Text style={styles.priceSummaryTotalLabel}>Total estimado</Text>
+                            <Text style={styles.priceSummaryTotal}>${calculateEstimatedTotal().toFixed(2)}</Text>
+                        </View>
+                        <Text style={styles.priceSummaryNote}>
+                            * Los extras y tarifas de servicio se agregarán en el siguiente paso
+                        </Text>
+                    </View>
+                )}
+
                 <View style={{ height: 20 }} />
             </ScrollView>
 
@@ -484,6 +550,57 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: 24,
+    },
+    vehicleSummaryCard: {
+        flexDirection: 'row',
+        backgroundColor: '#F9FAFB',
+        borderRadius: 16,
+        padding: 12,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    vehicleSummaryImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 12,
+        backgroundColor: '#E5E7EB',
+    },
+    vehicleSummaryInfo: {
+        flex: 1,
+        marginLeft: 12,
+        justifyContent: 'center',
+    },
+    vehicleSummaryTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#111827',
+        marginBottom: 2,
+    },
+    vehicleSummarySubtitle: {
+        fontSize: 13,
+        color: '#6B7280',
+        marginBottom: 8,
+    },
+    vehicleSummaryPrice: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+    },
+    vehiclePriceAmount: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#0B729D',
+    },
+    vehiclePriceUnit: {
+        fontSize: 13,
+        color: '#6B7280',
+        fontWeight: '600',
+        marginLeft: 2,
     },
     stepTitle: {
         fontSize: 14,
@@ -722,5 +839,61 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 18,
         fontWeight: '700',
+    },
+    priceSummaryCard: {
+        backgroundColor: '#F0F9FF',
+        borderRadius: 16,
+        padding: 16,
+        marginTop: 24,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    priceSummaryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    priceSummaryTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    priceSummaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    priceSummaryLabel: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    priceSummaryValue: {
+        fontSize: 14,
+        color: '#111827',
+        fontWeight: '600',
+    },
+    priceSummaryDivider: {
+        height: 1,
+        backgroundColor: '#BFDBFE',
+        marginVertical: 12,
+    },
+    priceSummaryTotalLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    priceSummaryTotal: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: '#0B729D',
+    },
+    priceSummaryNote: {
+        fontSize: 11,
+        color: '#6B7280',
+        fontStyle: 'italic',
+        marginTop: 8,
     },
 });

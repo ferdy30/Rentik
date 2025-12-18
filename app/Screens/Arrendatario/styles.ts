@@ -1,7 +1,7 @@
 import { Dimensions, Platform, StatusBar, StyleSheet } from 'react-native';
 
-const { width } = Dimensions.get('window');
-export const CARD_WIDTH = (width - (16 * 3)) / 2; // (ancho total - (margenes laterales * 2 + espacio entre tarjetas)) / 2
+const { width, height } = Dimensions.get('window');
+export const CARD_WIDTH = (width - 22) / 2; // 2 columnas: 8px padding izq + 8px padding der + 6px gap
 
 export const styles = StyleSheet.create({
   container: {
@@ -128,38 +128,49 @@ export const styles = StyleSheet.create({
   // Content
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#1F2937',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 20,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+    letterSpacing: -0.3,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    gap: 16,
+    marginBottom: 8,
+    rowGap: 12,
+    columnGap: 6,
+    paddingHorizontal: 8,
   },
 
   // Promotions
   promoContainer: {
-    marginBottom: 16,
-    marginTop: 10,
+    marginBottom: 28,
+    marginTop: 12,
+    paddingHorizontal: 0,
   },
   promoList: {
     gap: 12,
-    paddingHorizontal: 0,
+    paddingHorizontal: 8,
   },
   promoCard: {
-    width: width * 0.85,
-    height: width * 0.4,
-    borderRadius: 12,
+    width: width * 0.78,
+    height: width * 0.40,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 0,
+    flexShrink: 0,
   },
   promoImage: {
     width: '100%',
@@ -172,22 +183,32 @@ export const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: '100%',
+    zIndex: 1,
   },
   promoContent: {
     position: 'absolute',
     bottom: 16,
     left: 16,
-    right: 16,    zIndex: 2,
+    right: 16,
+    zIndex: 2,
   },
   promoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#fff',
     marginBottom: 4,
+    letterSpacing: -0.3,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   promoSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
+    color: 'rgba(255,255,255,0.95)',
+    fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 
   // Map
@@ -239,5 +260,85 @@ export const styles = StyleSheet.create({
   },
   filterTextActive: {
     color: '#fff',
+  },
+  
+  // New Styles
+  activeFiltersContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  activeFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  activeFilterText: {
+    fontSize: 12,
+    color: '#1D4ED8',
+    marginRight: 4,
+    fontWeight: '500',
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#D1D5DB',
+  },
+  paginationDotActive: {
+    backgroundColor: '#0B729D',
+    width: 24,
+  },
+  calloutContainer: {
+    width: 200,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  calloutImage: {
+    width: '100%',
+    height: 100,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  calloutTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  calloutPrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0B729D',
+  },
+  calloutRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  calloutRatingText: {
+    fontSize: 12,
+    color: '#4B5563',
+    marginLeft: 4,
   },
 });

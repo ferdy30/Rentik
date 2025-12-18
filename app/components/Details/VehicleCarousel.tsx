@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import React, { useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -52,22 +52,18 @@ export default function VehicleCarousel({ images, onBackPress, onSharePress, onI
         style={styles.backButton} 
         onPress={onBackPress}
       >
-        <Ionicons name="arrow-back" size={24} color="white" />
+        <Ionicons name="arrow-back" size={24} color="#1F2937" />
       </TouchableOpacity>
 
       {/* Share Button */}
       <TouchableOpacity style={styles.shareButton} onPress={onSharePress}>
-        <Ionicons name="share-outline" size={24} color="white" />
+        <Ionicons name="share-outline" size={24} color="#1F2937" />
       </TouchableOpacity>
 
-      {/* Dots Indicator */}
+      {/* Dots Indicator with Counter */}
       <View style={styles.dotsContainer}>
-        {images.map((_: any, idx: number) => (
-          <View
-            key={idx}
-            style={[styles.dot, idx === imageIndex && styles.dotActive]}
-          />
-        ))}
+        <Ionicons name="image-outline" size={14} color="#fff" />
+        <Text style={styles.imageCounter}>{imageIndex + 1}/{images.length}</Text>
       </View>
     </View>
   );
@@ -75,44 +71,63 @@ export default function VehicleCarousel({ images, onBackPress, onSharePress, onI
 
 const styles = StyleSheet.create({
   imageContainer: {
-    height: 300,
+    height: 380,
     width: '100%',
     position: 'relative',
+    backgroundColor: '#000',
   },
   image: {
     width: SCREEN_WIDTH,
-    height: 300,
+    height: 380,
   },
   backButton: {
     position: 'absolute',
     top: 50,
     left: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   shareButton: {
     position: 'absolute',
     top: 50,
     right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   dotsContainer: {
     position: 'absolute',
-    bottom: 20,
-    left: 0,
-    right: 0,
+    bottom: 24,
+    right: 24,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
+    gap: 6,
+  },
+  imageCounter: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   dot: {
     width: 8,
