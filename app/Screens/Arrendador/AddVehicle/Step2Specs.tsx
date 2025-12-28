@@ -6,6 +6,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
     Animated,
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StatusBar,
     Text,
@@ -246,7 +248,11 @@ export default function Step2Specs() {
 				</View>
 			</View>
 
-			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+			<KeyboardAvoidingView
+				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+				style={{ flex: 1 }}
+			>
+				<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 				<View style={{ marginBottom: 8 }}>
 					<Text style={styles.sectionTitle}>Características del Vehículo</Text>
 					<Text style={{ fontSize: 14, color: '#6B7280', marginTop: 4, lineHeight: 20 }}>
@@ -482,6 +488,7 @@ export default function Step2Specs() {
 					<Ionicons name="arrow-forward" size={20} color="white" />
 				</TouchableOpacity>
 			</View>
+			</KeyboardAvoidingView>
 		</View>
 	);
 }

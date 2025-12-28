@@ -348,7 +348,7 @@ export default function MisAutosScreen({ navigation }: MisAutosScreenProps) {
                 activeOpacity={0.7}
               >
                 <Image 
-                  source={{ uri: car.photos?.front || 'https://via.placeholder.com/150' }} 
+                  source={{ uri: car.photos?.front || car.imagen || (car.imagenes && car.imagenes[0]) || 'https://via.placeholder.com/150' }} 
                   style={[styles.carImage, viewMode === 'grid' && styles.carImageGrid]} 
                 />
                 <View style={[styles.statusBadge, styles.statusBadgeAbsolute, car.status === 'active' ? styles.statusActive : styles.statusRented]}>

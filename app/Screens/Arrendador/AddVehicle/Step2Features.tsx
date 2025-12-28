@@ -5,7 +5,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -316,7 +318,10 @@ export default function Step2Features() {
                 animationType="slide"
                 onRequestClose={() => setShowCustomModal(false)}
             >
-                <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                <KeyboardAvoidingView 
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}
+                >
                     <View style={{ backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                             <Text style={{ fontSize: 18, fontWeight: '700', color: '#032B3C' }}>
@@ -360,7 +365,7 @@ export default function Step2Features() {
                             </Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
     );

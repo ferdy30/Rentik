@@ -124,11 +124,7 @@ export default function Step4Price() {
 		percentage: number;
 	} | null>(null);
 
-	const [showDescriptionSuggestions, setShowDescriptionSuggestions] = useState(false);
 	const [suggestedDescriptionText, setSuggestedDescriptionText] = useState('');
-
-	// Preview modal
-	const [showPreviewModal, setShowPreviewModal] = useState(false);
 
 	// Disponibilidad
 	const [availableFrom, setAvailableFrom] = useState(new Date());
@@ -293,21 +289,6 @@ export default function Step4Price() {
 		);
 	};
 
-	const handleFinish = async () => {
-		const precioError = validateField('precio', formData.precio);
-		const descripcionError = validateField('descripcion', formData.descripcion);
-
-		if (precioError || descripcionError || !locationData) {
-			setTouched({ precio: true, descripcion: true });
-			setErrors({ precio: precioError, descripcion: descripcionError });
-			Alert.alert('Campos incompletos', 'Por favor corrige los errores antes de continuar');
-			return;
-		}
-
-		// Mostrar preview en lugar de publicar directamente
-		setShowPreviewModal(true);
-	};
-
 	const handleConfirmPublish = async () => {
 		const precio = parseFloat(formData.precio);
 
@@ -333,17 +314,30 @@ export default function Step4Price() {
 				coordinates: locationData.coordinates,
 				placeId: locationData.placeId,
 				availableFrom: availableFrom.toISOString(),
+				blockedDates: blockedDates || [],
 				flexibleHours,
 				deliveryHours,
 				airportDelivery,
 				airportFee: airportDelivery ? parseFloat(airportFee) || 0 : 0,
+				mileageLimit: mileageLimit || 'unlimited',
+				dailyKm: mileageLimit === 'limited' ? (parseInt(dailyKm) || null) : null,
+				advanceNotice: parseInt(advanceNotice || '12'),
+				minTripDuration: parseInt(minTripDuration || '1'),
+				maxTripDuration: parseInt(maxTripDuration || '30'),
 				rules,
 				discounts: {
 					weekly: parseFloat(discounts.weekly) || 0,
 					monthly: parseFloat(discounts.monthly) || 0,
 				},
 				deposit: calculatedDeposit,
+				protectionPlan: protectionPlan || 'standard',
 			};
+
+			console.log('📸 Fotos a publicar:', {
+				photos: finalData.photos,
+				additionalPhotos: finalData.additionalPhotos,
+				totalPhotos: finalData.additionalPhotos ? Object.keys(finalData.photos || {}).length + finalData.additionalPhotos.length : Object.keys(finalData.photos || {}).length
+			});
 
 			await addVehicle(finalData, user.uid);
 
@@ -397,7 +391,7 @@ export default function Step4Price() {
 			</View>
 
 			<KeyboardAvoidingView
-				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 				style={{ flex: 1 }}
 			>
 				<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -544,7 +538,6 @@ export default function Step4Price() {
 									style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3E8FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 }}
 									onPress={() => {
 										setFormData({ ...formData, descripcion: suggestedDescriptionText });
-										setShowDescriptionSuggestions(true);
 									}}
 								>
 									<Ionicons name="sparkles" size={14} color="#8B5CF6" style={{ marginRight: 4 }} />
@@ -1106,7 +1099,6 @@ export default function Step4Price() {
 
 					<View style={{ height: 100 }} />
 				</ScrollView>
-			</KeyboardAvoidingView>
 
 			{/* Footer */}
 			<View style={styles.footer}>
@@ -1125,106 +1117,7 @@ export default function Step4Price() {
 					)}
 				</TouchableOpacity>
 			</View>
-
-			{/* Modal de Vista Previa */}
-			<Modal
-				visible={showPreviewModal}
-				animationType="slide"
-				onRequestClose={() => setShowPreviewModal(false)}
-			>
-				<View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
-					<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingTop: Platform.OS === 'ios' ? 50 : 16 }}>
-						<TouchableOpacity onPress={() => setShowPreviewModal(false)}>
-							<Ionicons name="close" size={28} color="#374151" />
-						</TouchableOpacity>
-						<Text style={{ fontSize: 18, fontWeight: '700', color: '#032B3C' }}>Vista Previa</Text>
-						<View style={{ width: 28 }} />
-					</View>
-					
-					<ScrollView contentContainerStyle={{ padding: 16 }}>
-						{/* Card de Preview */}
-						<View style={{ backgroundColor: 'white', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, marginBottom: 24 }}>
-							<Image 
-								source={{ uri: vehicleData?.photos?.front || 'https://via.placeholder.com/400x250' }} 
-								style={{ width: '100%', height: 220 }} 
-							/>
-							<View style={{ padding: 16 }}>
-								<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-									<View>
-										<Text style={{ fontSize: 20, fontWeight: '800', color: '#032B3C' }}>
-											{vehicleData?.marca} {vehicleData?.modelo} {vehicleData?.anio}
-										</Text>
-										<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-											<Ionicons name="star" size={16} color="#F59E0B" />
-											<Text style={{ fontSize: 14, fontWeight: '600', color: '#374151', marginLeft: 4 }}>Nuevo</Text>
-											<Text style={{ fontSize: 14, color: '#6B7280', marginLeft: 4 }}>• 0 viajes</Text>
-										</View>
-									</View>
-									<View style={{ alignItems: 'flex-end' }}>
-										<Text style={{ fontSize: 20, fontWeight: '700', color: '#0B729D' }}>${formData.precio}</Text>
-										<Text style={{ fontSize: 12, color: '#6B7280' }}>/día</Text>
-									</View>
-								</View>
-								
-								<View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 12 }} />
-								
-								<Text style={{ fontSize: 14, color: '#4B5563', lineHeight: 20 }} numberOfLines={3}>
-									{formData.descripcion || 'Sin descripción'}
-								</Text>
-
-								<View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 8 }}>
-									<View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-										<Text style={{ fontSize: 12, color: '#374151' }}>{vehicleData?.transmision}</Text>
-									</View>
-									<View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-										<Text style={{ fontSize: 12, color: '#374151' }}>{vehicleData?.combustible}</Text>
-									</View>
-									<View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-										<Text style={{ fontSize: 12, color: '#374151' }}>{vehicleData?.pasajeros} Pasajeros</Text>
-									</View>
-								</View>
-							</View>
-						</View>
-
-						<View style={{ backgroundColor: '#EFF6FF', padding: 16, borderRadius: 12, marginBottom: 24 }}>
-							<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-								<Ionicons name="shield-checkmark" size={24} color="#0B729D" style={{ marginRight: 8 }} />
-								<Text style={{ fontSize: 16, fontWeight: '700', color: '#032B3C' }}>Tu Ganancia Estimada</Text>
-							</View>
-							<Text style={{ fontSize: 14, color: '#4B5563', marginBottom: 12 }}>
-								Con el Plan {PROTECTION_PLANS[protectionPlan].name} ({PROTECTION_PLANS[protectionPlan].commission}% comisión):
-							</Text>
-							<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white', padding: 12, borderRadius: 8 }}>
-								<Text style={{ fontSize: 16, color: '#374151' }}>Por día de renta:</Text>
-								<Text style={{ fontSize: 20, fontWeight: '700', color: '#16A34A' }}>
-									${(parseFloat(formData.precio || '0') * (1 - PROTECTION_PLANS[protectionPlan].commission / 100)).toFixed(2)}
-								</Text>
-							</View>
-						</View>
-
-						<TouchableOpacity
-							style={{
-								backgroundColor: '#0B729D',
-								padding: 18,
-								borderRadius: 12,
-								flexDirection: 'row',
-								alignItems: 'center',
-								justifyContent: 'center',
-								marginBottom: 30,
-								shadowColor: '#0B729D',
-								shadowOffset: { width: 0, height: 4 },
-								shadowOpacity: 0.3,
-								shadowRadius: 8,
-								elevation: 6,
-							}}
-							onPress={handleFinish}
-						>
-							<Ionicons name="eye-outline" size={24} color="white" style={{ marginRight: 8 }} />
-							<Text style={{ fontSize: 18, fontWeight: '700', color: 'white' }}>Vista Previa</Text>
-						</TouchableOpacity>
-					</ScrollView>
-				</View>
-			</Modal>
+			</KeyboardAvoidingView>
 
 			{/* Preview Modal */}
 			<Modal

@@ -145,9 +145,104 @@ export default function Details() {
 
           <View style={styles.divider} />
 
-          <VehicleDescription description={vehicle.descripcion} />
+			{/* Información Adicional */}
+			{(vehicle.color || vehicle.kilometraje || vehicle.condicion || vehicle.mileageLimit === 'limited') && (
+				<>
+					<View style={{ marginBottom: 24 }}>
+						<Text style={styles.sectionTitle}>Información Adicional</Text>
+						{vehicle.color && (
+							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+								<Ionicons name="color-palette" size={20} color="#6B7280" style={{ marginRight: 12, width: 24 }} />
+								<Text style={{ fontSize: 15, color: '#4B5563', flex: 1 }}>Color</Text>
+								<Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>{vehicle.color}</Text>
+							</View>
+						)}
+						{vehicle.kilometraje && (
+							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+								<Ionicons name="speedometer" size={20} color="#6B7280" style={{ marginRight: 12, width: 24 }} />
+								<Text style={{ fontSize: 15, color: '#4B5563', flex: 1 }}>Kilometraje</Text>
+								<Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>{vehicle.kilometraje?.toLocaleString()} km</Text>
+							</View>
+						)}
+						{vehicle.condicion && (
+							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+								<Ionicons name="star" size={20} color="#6B7280" style={{ marginRight: 12, width: 24 }} />
+								<Text style={{ fontSize: 15, color: '#4B5563', flex: 1 }}>Condición</Text>
+								<Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>{vehicle.condicion}</Text>
+							</View>
+						)}
+						{vehicle.mileageLimit === 'limited' && vehicle.dailyKm && (
+							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
+								<Ionicons name="warning" size={20} color="#F59E0B" style={{ marginRight: 12, width: 24 }} />
+								<Text style={{ fontSize: 15, color: '#4B5563', flex: 1 }}>Límite diario</Text>
+								<Text style={{ fontSize: 15, fontWeight: '600', color: '#F59E0B' }}>{vehicle.dailyKm} km/día</Text>
+							</View>
+						)}
+					</View>
+					<View style={styles.divider} />
+				</>
+			)}
 
-          <View style={styles.divider} />
+			<VehicleDescription description={vehicle.descripcion} />
+
+			<View style={styles.divider} />
+
+			{/* Reglas y Descuentos */}
+			{(vehicle.rules || vehicle.discounts) && (
+				<>
+					<View style={{ marginBottom: 24 }}>
+						<Text style={styles.sectionTitle}>Reglas</Text>
+						{vehicle.rules?.petsAllowed !== undefined && (
+							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
+								<Ionicons 
+									name={vehicle.rules.petsAllowed ? "checkmark-circle" : "close-circle"} 
+									size={22} 
+									color={vehicle.rules.petsAllowed ? "#10B981" : "#EF4444"} 
+									style={{ marginRight: 10 }}
+								/>
+								<Text style={{ fontSize: 15, color: '#374151' }}>Mascotas {vehicle.rules.petsAllowed ? 'permitidas' : 'no permitidas'}</Text>
+							</View>
+						)}
+						{vehicle.rules?.smokingAllowed !== undefined && (
+							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
+								<Ionicons 
+									name={vehicle.rules.smokingAllowed ? "checkmark-circle" : "close-circle"} 
+									size={22} 
+									color={vehicle.rules.smokingAllowed ? "#10B981" : "#EF4444"} 
+									style={{ marginRight: 10 }}
+								/>
+								<Text style={{ fontSize: 15, color: '#374151' }}>Fumar {vehicle.rules.smokingAllowed ? 'permitido' : 'no permitido'}</Text>
+							</View>
+						)}
+						{vehicle.rules?.outOfCityAllowed !== undefined && (
+							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
+								<Ionicons 
+									name={vehicle.rules.outOfCityAllowed ? "checkmark-circle" : "close-circle"} 
+									size={22} 
+									color={vehicle.rules.outOfCityAllowed ? "#10B981" : "#EF4444"} 
+									style={{ marginRight: 10 }}
+								/>
+								<Text style={{ fontSize: 15, color: '#374151' }}>Viajes fuera de ciudad {vehicle.rules.outOfCityAllowed ? 'permitidos' : 'no permitidos'}</Text>
+							</View>
+						)}
+						
+						{(vehicle.discounts?.weekly > 0 || vehicle.discounts?.monthly > 0) && (
+							<View style={{ backgroundColor: '#EFF6FF', padding: 14, borderRadius: 12, marginTop: 12, flexDirection: 'row', alignItems: 'center' }}>
+								<Ionicons name="pricetag" size={20} color="#0B729D" style={{ marginRight: 10 }} />
+								<View>
+									{vehicle.discounts.weekly > 0 && (
+										<Text style={{ fontSize: 14, fontWeight: '600', color: '#0B729D' }}>{vehicle.discounts.weekly}% descuento semanal</Text>
+									)}
+									{vehicle.discounts.monthly > 0 && (
+										<Text style={{ fontSize: 14, fontWeight: '600', color: '#0B729D' }}>{vehicle.discounts.monthly}% descuento mensual</Text>
+									)}
+								</View>
+							</View>
+						)}
+					</View>
+					<View style={styles.divider} />
+				</>
+			)}
 
           <VehicleFeatures features={vehicle.caracteristicas} />
 

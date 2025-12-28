@@ -7,23 +7,23 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-	ActivityIndicator,
-	Alert,
-	Animated,
-	KeyboardAvoidingView,
-	Modal,
-	Platform,
-	ScrollView,
-	StatusBar,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { db, functions } from '../../../../FirebaseConfig';
 import { StepIndicator } from '../../../components/StepIndicator';
 import type { ArrendadorStackParamList } from '../../../navigation/ArrendadorStack';
-import { decodeVin, isValidVinFormat, mapMakeToMarca } from '../../../services/vin';
+import { decodeVin, mapMakeToMarca } from '../../../services/vin';
 import { styles } from './styles';
 
 const MARCAS = ['Toyota', 'Honda', 'Nissan', 'Mazda', 'Hyundai', 'Kia', 'Ford', 'Chevrolet', 'Volkswagen', 'Mitsubishi', 'Jeep'];
@@ -631,7 +631,7 @@ export default function Step1Basic() {
 			</View>
 
 			<KeyboardAvoidingView
-				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 				style={{ flex: 1 }}
 			>
 				<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

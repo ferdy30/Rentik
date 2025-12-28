@@ -30,11 +30,15 @@ export interface VehicleData {
     sideRight: string;
     interior: string;
   };
+  imagen?: string;
+  imagenes?: string[];
   createdAt: Date;
   rating: number;
   trips: number;
   status: 'active' | 'inactive' | 'rented';
 }
+
+import { Platform } from 'react-native';
 
 /**
  * Sube una imagen a Firebase Storage y retorna la URL de descarga
@@ -46,26 +50,45 @@ export const uploadImage = async (uri: string, path: string): Promise<string> =>
       throw new Error('URI de imagen inválida');
     }
 
-    const response = await fetch(uri);
-    
-    if (!response.ok) {
-      throw new Error(`Error al cargar imagen: ${response.status}`);
-    }
+    let blob: Blob;
 
-    const blob = await response.blob();
-    
-    // Validar tamaño de imagen (máximo 5MB)
-    if (blob.size > 5 * 1024 * 1024) {
-      throw new Error('La imagen es muy grande. El tamaño máximo es 5MB');
+    if (Platform.OS === 'ios') {
+        // En iOS, fetch funciona bien y es más nativo
+        const response = await fetch(uri);
+        if (!response.ok) throw new Error(`Error al cargar imagen: ${response.status}`);
+        blob = await response.blob();
+    } else {
+        // En Android, XMLHttpRequest es más robusto para URIs locales (file:// y content://)
+        blob = await new Promise<Blob>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.onload = function () {
+                resolve(xhr.response);
+            };
+            xhr.onerror = function (e) {
+                console.error('XHR Error:', e);
+                reject(new TypeError('Network request failed'));
+            };
+            xhr.responseType = 'blob';
+            xhr.open('GET', uri, true);
+            xhr.send(null);
+        });
     }
-
-    // Validar tipo de archivo
-    if (!blob.type.startsWith('image/')) {
-      throw new Error('El archivo debe ser una imagen');
+    
+    // Validar tamaño de imagen (máximo 10MB para ser seguros, aunque 5MB es buen límite)
+    if (blob.size > 10 * 1024 * 1024) {
+      throw new Error('La imagen es muy grande. El tamaño máximo es 10MB');
     }
 
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, blob);
+    
+    // Cerrar el blob para liberar memoria
+    // @ts-ignore
+    if (blob.close) {
+        // @ts-ignore
+        blob.close();
+    }
+
     return await getDownloadURL(storageRef);
   } catch (error: any) {
     console.error('Error uploading image:', error);
@@ -91,38 +114,115 @@ export const addVehicle = async (vehicleData: Omit<VehicleData, 'id' | 'createdA
       throw new Error('La descripción es muy corta');
     }
 
-    // 1. Subir fotos en paralelo
+    // 1. Subir fotos en paralelo (incluir fotos adicionales)
     const timestamp = Date.now();
-    const photoPromises = Object.entries(vehicleData.photos).map(async ([key, uri]) => {
-      if (uri) {
-        const path = `vehicles/${userId}/${timestamp}/${key}.jpg`;
-        const url = await uploadImage(uri, path);
-        return { key, url };
-      }
-      return null;
-    });
-
-    const results = await Promise.all(photoPromises);
     
-    const photoUrls: any = {};
-    results.forEach(result => {
-      if (result) {
-        photoUrls[result.key] = result.url;
-      }
-    });
+    // Objeto para mapear las URLs de las fotos obligatorias
+    const uploadedPhotos: { [key: string]: string } = {};
+    const allPhotoUrls: string[] = [];
+
+    // Función auxiliar para subir y rastrear
+    const uploadAndTrack = async (key: string, uri: string) => {
+        if (!uri) return;
+        try {
+            const path = `vehicles/${userId}/${timestamp}/${key}.jpg`;
+            const url = await uploadImage(uri, path);
+            uploadedPhotos[key] = url;
+            allPhotoUrls.push(url);
+            return url;
+        } catch (e) {
+            console.error(`Error uploading ${key}:`, e);
+            return null;
+        }
+    };
+
+    const uploadPromises: Promise<any>[] = [];
+
+    // Subir fotos obligatorias con sus claves específicas
+    if (vehicleData.photos?.front) uploadPromises.push(uploadAndTrack('front', vehicleData.photos.front));
+    if (vehicleData.photos?.sideLeft) uploadPromises.push(uploadAndTrack('sideLeft', vehicleData.photos.sideLeft));
+    if (vehicleData.photos?.sideRight) uploadPromises.push(uploadAndTrack('sideRight', vehicleData.photos.sideRight));
+    if (vehicleData.photos?.interior) uploadPromises.push(uploadAndTrack('interior', vehicleData.photos.interior));
+    
+    // Subir fotos adicionales
+    const additionalPhotos = (vehicleData as any).additionalPhotos;
+    if (additionalPhotos && Array.isArray(additionalPhotos)) {
+        additionalPhotos.forEach((uri: string, index: number) => {
+             uploadPromises.push(uploadAndTrack(`additional_${index}`, uri));
+        });
+    }
+
+    await Promise.all(uploadPromises);
+
+    console.log('🎉 Todas las fotos subidas:', allPhotoUrls.length, 'URLs');
 
     // 2. Guardar datos en Firestore
     const newVehicle = {
-      ...vehicleData,
-      photos: photoUrls,
+      marca: vehicleData.marca,
+      modelo: vehicleData.modelo,
+      anio: parseInt(vehicleData.anio),
+      placa: vehicleData.placa,
+      tipo: vehicleData.tipo,
+      transmision: vehicleData.transmision,
+      combustible: vehicleData.combustible,
+      pasajeros: parseInt(vehicleData.pasajeros),
+      puertas: parseInt(vehicleData.puertas),
+      color: vehicleData.color,
+      kilometraje: parseInt(vehicleData.kilometraje),
+      condicion: vehicleData.condicion,
+      caracteristicas: vehicleData.caracteristicas || [],
+      
+      precio: parseFloat(vehicleData.precio),
+      descripcion: vehicleData.descripcion,
+      ubicacion: vehicleData.ubicacion,
+      coordinates: vehicleData.coordinates,
+      placeId: vehicleData.placeId,
+      
+      availableFrom: vehicleData.availableFrom,
+      blockedDates: vehicleData.blockedDates || [],
+      
+      flexibleHours: vehicleData.flexibleHours,
+      deliveryHours: vehicleData.deliveryHours,
+      airportDelivery: vehicleData.airportDelivery,
+      airportFee: vehicleData.airportFee || 0,
+      
+      mileageLimit: vehicleData.mileageLimit || 'unlimited',
+      dailyKm: vehicleData.dailyKm || null,
+      advanceNotice: parseInt(vehicleData.advanceNotice || '12'),
+      minTripDuration: parseInt(vehicleData.minTripDuration || '1'),
+      maxTripDuration: parseInt(vehicleData.maxTripDuration || '30'),
+      
+      rules: vehicleData.rules || {},
+      discounts: vehicleData.discounts || {},
+      deposit: vehicleData.deposit,
+      protectionPlan: vehicleData.protectionPlan || 'standard',
+      
+      photos: {
+        front: uploadedPhotos.front || '',
+        sideLeft: uploadedPhotos.sideLeft || '',
+        sideRight: uploadedPhotos.sideRight || '',
+        interior: uploadedPhotos.interior || '',
+      },
+      imagenes: allPhotoUrls,
+      imagen: uploadedPhotos.front || allPhotoUrls[0] || '',
+      
       arrendadorId: userId,
       createdAt: new Date(),
       rating: 0,
+      reviewCount: 0,
       trips: 0,
+      disponible: true,
       status: 'active',
     };
 
+    console.log('💾 Guardando en Firestore:', {
+      imagenes: newVehicle.imagenes,
+      imagen: newVehicle.imagen,
+      totalImagenes: newVehicle.imagenes.length
+    });
+
     const docRef = await addDoc(collection(db, 'vehicles'), newVehicle);
+    console.log('✅ Vehículo guardado con ID:', docRef.id);
     return docRef.id;
   } catch (error) {
     console.error('Error adding vehicle:', error);

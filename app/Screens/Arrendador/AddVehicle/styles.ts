@@ -1,4 +1,6 @@
-import { StyleSheet } from 'react-native';
+import { Platform, StatusBar, StyleSheet } from 'react-native';
+
+const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
 
 export const styles = StyleSheet.create({
 	container: {
@@ -10,7 +12,7 @@ export const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		paddingHorizontal: 16,
-		paddingTop: 60,
+		paddingTop: STATUSBAR_HEIGHT + 10,
 		paddingBottom: 16,
 		backgroundColor: '#FFFFFF',
 		borderBottomWidth: 1,

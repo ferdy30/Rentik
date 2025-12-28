@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import React, { useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -42,18 +42,19 @@ export default function Step3Photos() {
 	const { vehicleData } = route.params || {};
 
 	const [photos, setPhotos] = useState<{ [key in PhotoType]: string | null }>({
-		front: null,
-		sideLeft: null,
-		sideRight: null,
-		interior: null,
-		tarjetaCirculacion: null,
+		front: vehicleData?.photos?.front || null,
+		sideLeft: vehicleData?.photos?.sideLeft || null,
+		sideRight: vehicleData?.photos?.sideRight || null,
+		interior: vehicleData?.photos?.interior || null,
+		tarjetaCirculacion: vehicleData?.photos?.tarjetaCirculacion || null,
 	});
 
-	const [additionalPhotos, setAdditionalPhotos] = useState<string[]>([]);
+	const [additionalPhotos, setAdditionalPhotos] = useState<string[]>(vehicleData?.additionalPhotos || []);
 	const [photoMetadata, setPhotoMetadata] = useState<{ [key: string]: { size: number; width: number; height: number; quality: 'excellent' | 'good' | 'acceptable' | 'poor' } }>({});
 
 	const [loadingPhoto, setLoadingPhoto] = useState<string | null>(null);
 	const [showPhotoOptions, setShowPhotoOptions] = useState<PhotoType | 'additional' | null>(null);
+	const [queuedAction, setQueuedAction] = useState<{kind: 'pick' | 'camera', type: PhotoType | 'additional'} | null>(null);
 
 	const [galleryVisible, setGalleryVisible] = useState(false);
 	const [galleryStartIndex, setGalleryStartIndex] = useState(0);
@@ -62,68 +63,66 @@ export default function Step3Photos() {
 	const [mediaPermission, requestMediaPermission] = ImagePicker.useMediaLibraryPermissions();
 	const [cameraPermission, requestCameraPermission] = ImagePicker.useCameraPermissions();
 
+	// Ejecutar acción encolada cuando se cierra el modal (compatible con Android/iOS)
+	useEffect(() => {
+		if (showPhotoOptions === null && queuedAction) {
+			const { kind, type } = queuedAction;
+			setQueuedAction(null);
+			
+			// Esperar un poco para asegurar que el modal se cerró visualmente
+			setTimeout(() => {
+				if (kind === 'pick') {
+					pickImage(type);
+				} else {
+					takePhoto(type);
+				}
+			}, 500);
+		}
+	}, [showPhotoOptions, queuedAction]);
+
+	const ensurePermission = async (kind: 'camera' | 'media') => {
+		const current = kind === 'camera' ? cameraPermission : mediaPermission;
+		if (current?.status === 'granted') return true;
+
+		const request = kind === 'camera' ? await requestCameraPermission() : await requestMediaPermission();
+		if (request?.status === 'granted') return true;
+
+		Alert.alert(
+			'Permiso denegado',
+			kind === 'camera'
+				? 'Necesitamos acceso a tu cámara para tomar fotos.'
+				: 'Necesitamos acceso a tu galería para subir las fotos.'
+		);
+		setShowPhotoOptions(null);
+		return false;
+	};
+
 	// Validar y comprimir imagen
 	const validateAndCompressImage = async (uri: string, type: PhotoType | 'additional'): Promise<{ uri: string; metadata: { size: number; width: number; height: number; quality: 'excellent' | 'good' | 'acceptable' | 'poor' } } | null> => {
 		try {
-			// 1. Obtener información de la imagen original
-			const response = await fetch(uri);
-			const blob = await response.blob();
-			const originalSize = blob.size;
+			console.log(`🔄 Iniciando procesamiento de imagen: ${uri}`);
+			
+			// 1. Procesar imagen - solo comprimir, sin resize forzado
+			const manipResult = await ImageManipulator.manipulateAsync(
+				uri,
+				[],
+				{ 
+					compress: 0.8, 
+					format: ImageManipulator.SaveFormat.JPEG,
+					base64: false
+				}
+			);
 
-			// 2. Obtener dimensiones usando Image.getSize
-			const getImageDimensions = (): Promise<{ width: number; height: number }> => {
-				return new Promise((resolve, reject) => {
-					Image.getSize(
-						uri,
-						(width, height) => resolve({ width, height }),
-						(error) => reject(error)
-					);
-				});
-			};
+			const finalUri = manipResult.uri;
+			const width = manipResult.width;
+			const height = manipResult.height;
 
-			const { width, height } = await getImageDimensions();
+			console.log(`✅ Imagen procesada: ${width}x${height}px`);
 
-			// 3. Validar resolución mínima (800x600)
-			if (width < 800 || height < 600) {
-				Alert.alert(
-					'Resolución muy baja',
-					`Esta imagen tiene ${width}x${height}px. Se recomienda mínimo 800x600px para mejor calidad.\n\n¿Deseas subirla de todas formas?`,
-					[
-						{ text: 'Cancelar', style: 'cancel', onPress: () => {} },
-						{ text: 'Subir igual', onPress: () => {} }
-					]
-				);
-				// Por ahora permitimos, pero advertimos
-			}
+			// 2. Estimar tamaño (evitar fetch que puede fallar en iOS)
+			const finalSize = Math.floor(width * height * 0.3); // Estimación conservadora
 
-			// 4. Comprimir imagen si es muy grande (> 2MB o > 2000px)
-			let finalUri = uri;
-			let finalSize = originalSize;
-			const needsCompression = originalSize > 2 * 1024 * 1024 || width > 2000 || height > 2000;
-
-			if (needsCompression) {
-				const manipResult = await ImageManipulator.manipulateAsync(
-					uri,
-					[
-						// Redimensionar si es muy grande
-						...(width > 2000 || height > 2000
-							? [{ resize: { width: Math.min(width, 2000) } }]
-							: [])
-					],
-					{ compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-				);
-
-				finalUri = manipResult.uri;
-
-				// Obtener nuevo tamaño
-				const compressedResponse = await fetch(finalUri);
-				const compressedBlob = await compressedResponse.blob();
-				finalSize = compressedBlob.size;
-
-				console.log(`📸 Imagen comprimida: ${(originalSize / 1024 / 1024).toFixed(2)}MB → ${(finalSize / 1024 / 1024).toFixed(2)}MB`);
-			}
-
-			// 5. Determinar calidad de la imagen
+			// 3. Determinar calidad de la imagen
 			let quality: 'excellent' | 'good' | 'acceptable' | 'poor';
 			if (width >= 1920 && height >= 1080) quality = 'excellent';
 			else if (width >= 1280 && height >= 720) quality = 'good';
@@ -140,101 +139,135 @@ export default function Step3Photos() {
 				}
 			};
 		} catch (error) {
-			console.error('Error validating/compressing image:', error);
-			Alert.alert('Error', 'No se pudo procesar la imagen. Intenta con otra.');
-			return null;
+			console.error('❌ Error en validateAndCompressImage:', error);
+			// En lugar de fallar, retornar la imagen original
+			return {
+				uri: uri,
+				metadata: {
+					size: 0,
+					width: 1280,
+					height: 720,
+					quality: 'good'
+				}
+			};
 		}
 	};
 
+	const savePhoto = (type: PhotoType | 'additional', uri: string, metadata: { size: number; width: number; height: number; quality: 'excellent' | 'good' | 'acceptable' | 'poor' }) => {
+		const photoId = type === 'additional' ? `additional_${Date.now()}` : type;
+
+		if (type === 'additional') {
+			setAdditionalPhotos((prev) => [...prev, uri]);
+			setPhotoMetadata((prev) => ({ ...prev, [photoId]: metadata }));
+			return;
+		}
+
+		setPhotos((prev) => ({ ...prev, [type]: uri }));
+		setPhotoMetadata((prev) => ({ ...prev, [type]: metadata }));
+	};
+
 	const takePhoto = async (type: PhotoType | 'additional') => {
+		console.log(`📸 Iniciando captura de foto para: ${type}`);
+
 		try {
-			if (!cameraPermission || cameraPermission.status !== 'granted') {
-				const perm = await requestCameraPermission();
-				if (!perm || perm.status !== 'granted') {
-					Alert.alert('Permiso denegado', 'Necesitamos acceso a tu cámara para tomar fotos.');
-					setLoadingPhoto(null);
-					setShowPhotoOptions(null);
-					return;
-				}
-			}
+			const hasPermission = await ensurePermission('camera');
+			if (!hasPermission) return;
 
 			setShowPhotoOptions(null);
 			setLoadingPhoto(type === 'additional' ? 'additional' : type);
-			
+
+			console.log('📷 Abriendo cámara...');
 			const result = await ImagePicker.launchCameraAsync({
+				mediaTypes: ImagePicker.MediaTypeOptions.Images,
 				allowsEditing: false,
-				quality: 0.9, // Mayor calidad inicial antes de comprimir
+				quality: 0.85,
+				base64: false,
+				exif: false,
 			});
 
-			if (!result.canceled && result.assets && result.assets.length > 0) {
-				// Validar y comprimir imagen
-				const processed = await validateAndCompressImage(result.assets[0].uri, type);
-				if (!processed) {
-					setLoadingPhoto(null);
-					return;
-				}
+			console.log('📷 Respuesta de cámara:', result.canceled ? 'Cancelado' : 'Foto capturada');
 
-				const photoId = type === 'additional' ? `additional_${Date.now()}` : type;
-
-				if (type === 'additional') {
-					setAdditionalPhotos((prev) => [...prev, processed.uri]);
-					setPhotoMetadata((prev) => ({ ...prev, [photoId]: processed.metadata }));
-				} else {
-					setPhotos((prev) => ({ ...prev, [type]: processed.uri }));
-					setPhotoMetadata((prev) => ({ ...prev, [type]: processed.metadata }));
-				}
+			if (result.canceled) {
+				setLoadingPhoto(null);
+				return;
 			}
+
+			const asset = result.assets?.[0];
+			if (!asset) {
+				setLoadingPhoto(null);
+				return;
+			}
+
+			// Procesar imagen igual que en pickImage para asegurar formato y compresión
+			const processed = await validateAndCompressImage(asset.uri, type);
+			const metadata = processed?.metadata || {
+				size: asset.fileSize || Math.floor((asset.width || 1280) * (asset.height || 720) * 0.3),
+				width: asset.width || 1280,
+				height: asset.height || 720,
+				quality: (asset.width || 0) >= 1920 && (asset.height || 0) >= 1080
+					? 'excellent'
+					: (asset.width || 0) >= 1280 && (asset.height || 0) >= 720
+						? 'good'
+						: (asset.width || 0) >= 800 && (asset.height || 0) >= 600
+							? 'acceptable'
+							: 'poor',
+			};
+
+			console.log('✅ Foto capturada, guardando...');
+			savePhoto(type, processed?.uri || asset.uri, metadata);
 		} catch (error) {
-			console.error('Error taking photo:', error);
-			Alert.alert('Error', 'Hubo un problema al tomar la foto. Intenta de nuevo.');
+			console.error('❌ Error en takePhoto:', error);
+			Alert.alert('Error', 'Hubo un problema al tomar la foto. Intenta nuevamente.');
 		} finally {
 			setLoadingPhoto(null);
 		}
 	};
 
 	const pickImage = async (type: PhotoType | 'additional') => {
+		console.log(`🖼️ Iniciando selección de imagen para: ${type}`);
+
 		try {
-			// If permission is undetermined or denied, request it via hook
-			if (!mediaPermission || mediaPermission.status !== 'granted') {
-				const perm = await requestMediaPermission();
-				if (!perm || perm.status !== 'granted') {
-					Alert.alert('Permiso denegado', 'Necesitamos acceso a tu galería para subir las fotos.');
-					setLoadingPhoto(null);
-					setShowPhotoOptions(null);
-					return;
-				}
-			}
+			const hasPermission = await ensurePermission('media');
+			if (!hasPermission) return;
 
 			setShowPhotoOptions(null);
 			setLoadingPhoto(type === 'additional' ? 'additional' : type);
-			
+
+			console.log('📱 Abriendo galería...');
 			const result = await ImagePicker.launchImageLibraryAsync({
-				mediaTypes: ['images'],
+				mediaTypes: ImagePicker.MediaTypeOptions.Images,
 				allowsEditing: false,
-				quality: 0.9, // Mayor calidad inicial antes de comprimir
+				allowsMultipleSelection: false,
+				quality: 0.85,
 			});
 
-			if (!result.canceled && result.assets && result.assets.length > 0) {
-				// Validar y comprimir imagen
-				const processed = await validateAndCompressImage(result.assets[0].uri, type);
-				if (!processed) {
-					setLoadingPhoto(null);
-					return;
-				}
-
-				const photoId = type === 'additional' ? `additional_${Date.now()}` : type;
-
-				if (type === 'additional') {
-					setAdditionalPhotos((prev) => [...prev, processed.uri]);
-					setPhotoMetadata((prev) => ({ ...prev, [photoId]: processed.metadata }));
-				} else {
-					setPhotos((prev) => ({ ...prev, [type]: processed.uri }));
-					setPhotoMetadata((prev) => ({ ...prev, [type]: processed.metadata }));
-				}
+			if (result.canceled) {
+				setLoadingPhoto(null);
+				return;
 			}
+
+			const asset = result.assets?.[0];
+			if (!asset) {
+				setLoadingPhoto(null);
+				return;
+			}
+
+			const processed = await validateAndCompressImage(asset.uri, type);
+			const metadata = processed?.metadata || {
+				size: asset.fileSize || Math.floor((asset.width || 1280) * (asset.height || 720) * 0.3),
+				width: asset.width || 1280,
+				height: asset.height || 720,
+				quality: 'good' as const,
+			};
+
+			savePhoto(type, processed?.uri || asset.uri, metadata);
+			console.log('✅ Imagen guardada exitosamente');
 		} catch (error) {
-			console.error('Error picking image:', error);
-			Alert.alert('Error', 'Hubo un problema al seleccionar la imagen. Intenta de nuevo.');
+			console.error('❌ Error en pickImage:', error);
+			Alert.alert(
+				'Error con la Galería',
+				'Hubo un problema al abrir la galería. Si el problema continúa en iOS con Expo Go, prueba usando la cámara temporalmente.'
+			);
 		} finally {
 			setLoadingPhoto(null);
 		}
@@ -275,11 +308,17 @@ export default function Step3Photos() {
 			return;
 		}
 
+		console.log('📸 Step3Photos - Navegando con:', {
+			photos,
+			additionalPhotos,
+			totalAdicionales: additionalPhotos.length
+		});
+
 		navigation.navigate('AddVehicleStep4Price', {
-			vehicleData: { 
-				...vehicleData, 
+			vehicleData: {
+				...vehicleData,
 				photos,
-				additionalPhotos 
+				additionalPhotos,
 			}
 		});
 	};
@@ -593,7 +632,8 @@ export default function Step3Photos() {
 								}}
 								onPress={() => {
 									if (showPhotoOptions) {
-										takePhoto(showPhotoOptions);
+										setQueuedAction({kind: 'camera', type: showPhotoOptions});
+										setShowPhotoOptions(null);
 									}
 								}}
 							>
@@ -620,7 +660,8 @@ export default function Step3Photos() {
 								}}
 								onPress={() => {
 									if (showPhotoOptions) {
-										pickImage(showPhotoOptions);
+										setQueuedAction({kind: 'pick', type: showPhotoOptions});
+										setShowPhotoOptions(null);
 									}
 								}}
 							>
