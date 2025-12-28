@@ -1,42 +1,23 @@
-export interface Vehicle {
-  id: string;
-  marca: string;
-  modelo: string;
-  anio: number;
-  precio: number; // precio por día en USD
-  precioOriginal?: number; // si hay descuento
-  ubicacion: string;
-  coordinates?: { latitude: number; longitude: number }; // Coordenadas GPS
-  distancia?: number; // km desde el usuario (calculado dinámicamente)
-  distanceText?: string; // Texto formateado de distancia
-  imagen: string;
-  imagenes?: string[]; // para carousel
-  rating: number; // 0-5
-  reviewCount: number;
-  transmision: 'Automático' | 'Manual';
-  combustible: 'Gasolina' | 'Diesel' | 'Híbrido' | 'Eléctrico';
-  pasajeros: number;
-  puertas: number;
-  tipo: 'Sedán' | 'SUV' | 'Pickup' | 'Hatchback' | 'Minivan';
-  caracteristicas: string[]; // ['A/C', 'Bluetooth', 'GPS', etc.]
-  badges?: ('Nuevo' | 'Más rentado' | 'Descuento' | 'Disponible hoy' | 'Verificado')[];
-  disponible: boolean;
-  propietarioId: string;
-  airportDelivery?: boolean; // Si se puede entregar en aeropuerto
-  airportFee?: number; // Tarifa adicional por entrega en aeropuerto
-}
+import { Vehicle } from '../types/vehicle';
 
-export const MOCK_VEHICLES: Vehicle[] = [
+export { Vehicle };
+
+export const MOCK_VEHICLES: any[] = [
   {
     id: '1',
+    arrendadorId: 'owner1',
     marca: 'Toyota',
     modelo: 'Corolla',
     anio: 2023,
     precio: 25,
-    precioOriginal: 30,
     ubicacion: 'San Salvador',
-    distancia: 2.3,
     imagen: 'https://images.unsplash.com/photo-1623869675781-80aa31f198c7?w=800&q=80',
+    photos: {
+        front: 'https://images.unsplash.com/photo-1623869675781-80aa31f198c7?w=800&q=80',
+        sideLeft: '',
+        sideRight: '',
+        interior: ''
+    },
     imagenes: [
       'https://images.unsplash.com/photo-1623869675781-80aa31f198c7?w=800&q=80',
       'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=800&q=80',
@@ -49,9 +30,16 @@ export const MOCK_VEHICLES: Vehicle[] = [
     puertas: 4,
     tipo: 'Sedán',
     caracteristicas: ['A/C', 'Bluetooth', 'Cámara reversa', 'USB'],
-    badges: ['Descuento', 'Más rentado', 'Verificado'],
+    // badges: ['Descuento', 'Más rentado', 'Verificado'],
     disponible: true,
-    propietarioId: 'owner1',
+    placa: 'P123456',
+    color: 'Blanco',
+    kilometraje: 10000,
+    condicion: 'Excelente',
+    descripcion: 'Un auto confiable y económico.',
+    createdAt: new Date(),
+    trips: 120,
+    status: 'active'
   },
   {
     id: '2',

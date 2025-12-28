@@ -2,36 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 
-interface VehiclePreviewProps {
-	vehicleData: {
-		marca?: string;
-		modelo?: string;
-		año?: string;
-		tipo?: string;
-		transmision?: string;
-		pasajeros?: string;
-		combustible?: string;
-		color?: string;
-		caracteristicas?: string[];
-		photos?: { [key: string]: string | null };
-	};
-	precio?: string;
-	ubicacion?: string;
-	descripcion?: string;
-	isLoading?: boolean;
-}
-
-/**
- * Componente de vista previa del vehículo
- * Muestra cómo se verá el anuncio final
- */
-export const VehiclePreview: React.FC<VehiclePreviewProps> = ({
-	vehicleData,
-	precio,
-	ubicacion,
-	descripcion,
-	isLoading = false,
-}) => {
+// Recibe el objeto Vehicle completo (ya normalizado)
+export const VehiclePreview = ({ vehicle, isLoading = false }) => {
 	if (isLoading) {
 		return (
 			<View style={styles.container}>
@@ -41,10 +13,8 @@ export const VehiclePreview: React.FC<VehiclePreviewProps> = ({
 		);
 	}
 
-	const { marca, modelo, año, tipo, transmision, pasajeros, combustible, color, caracteristicas, photos } = vehicleData;
-
-	// Obtener la primera foto disponible
-	const mainPhoto = photos?.front || photos?.sideLeft || photos?.sideRight || photos?.interior;
+	// Foto principal
+	const mainPhoto = vehicle?.photos?.front || vehicle?.photos?.sideLeft || vehicle?.photos?.sideRight || vehicle?.photos?.interior;
 
 	return (
 		<View style={styles.container}>
@@ -55,101 +25,77 @@ export const VehiclePreview: React.FC<VehiclePreviewProps> = ({
 
 			<View style={styles.card}>
 				{/* Foto principal */}
-				{mainPhoto && (
+				{mainPhoto ? (
 					<Image source={{ uri: mainPhoto }} style={styles.mainImage} />
+				) : (
+					<View style={[styles.mainImage, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' }]}> 
+						<Ionicons name="car-sport" size={48} color="#D1D5DB" />
+					</View>
 				)}
 
 				{/* Información del vehículo */}
 				<View style={styles.content}>
 					<View style={styles.titleRow}>
 						<Text style={styles.vehicleName}>
-							{marca} {modelo}
+							{vehicle.marca} {vehicle.modelo}
 						</Text>
-						{precio && (
+						{vehicle.precio && (
 							<View style={styles.priceTag}>
-								<Text style={styles.priceText}>${precio}</Text>
+								<Text style={styles.priceText}>${vehicle.precio}</Text>
 								<Text style={styles.pricePer}>/día</Text>
 							</View>
 						)}
 					</View>
-
-					{año && (
-						<Text style={styles.year}>{año}</Text>
+					{vehicle.anio && (
+						<Text style={styles.year}>{vehicle.anio}</Text>
 					)}
 
-					{/* Badges de características principales */}
+					{/* Badges principales */}
 					<View style={styles.badgesContainer}>
-						{tipo && (
+						{vehicle.tipo && (
 							<View style={styles.badge}>
 								<Ionicons name="car-sport" size={14} color="#6B7280" />
-								<Text style={styles.badgeText}>{tipo}</Text>
+								<Text style={styles.badgeText}>{vehicle.tipo}</Text>
 							</View>
 						)}
-						{transmision && (
+						{vehicle.transmision && (
 							<View style={styles.badge}>
 								<Ionicons name="settings" size={14} color="#6B7280" />
-								<Text style={styles.badgeText}>{transmision}</Text>
+								<Text style={styles.badgeText}>{vehicle.transmision}</Text>
 							</View>
 						)}
-						{pasajeros && (
+						{vehicle.pasajeros && (
 							<View style={styles.badge}>
 								<Ionicons name="people" size={14} color="#6B7280" />
-								<Text style={styles.badgeText}>{pasajeros} pasajeros</Text>
+								<Text style={styles.badgeText}>{vehicle.pasajeros} pasajeros</Text>
 							</View>
 						)}
-						{combustible && (
+						{vehicle.combustible && (
 							<View style={styles.badge}>
-								<Ionicons name="flash" size={14} color="#6B7280" />
-								<Text style={styles.badgeText}>{combustible}</Text>
-							</View>
-						)}
-						{color && (
-							<View style={styles.badge}>
-								<Ionicons name="color-palette" size={14} color="#6B7280" />
-								<Text style={styles.badgeText}>{color}</Text>
+								<Ionicons name="flame" size={14} color="#6B7280" />
+								<Text style={styles.badgeText}>{vehicle.combustible}</Text>
 							</View>
 						)}
 					</View>
 
-					{/* Ubicación */}
-					{ubicacion && (
-						<View style={styles.locationContainer}>
-							<Ionicons name="location" size={16} color="#0B729D" />
-							<Text style={styles.locationText}>{ubicacion}</Text>
-						</View>
-					)}
-
-					{/* Descripción */}
-					{descripcion && descripcion.length >= 20 && (
-						<Text style={styles.description} numberOfLines={3}>
-							{descripcion}
-						</Text>
-					)}
-
-					{/* Características destacadas */}
-					{caracteristicas && caracteristicas.length > 0 && (
-						<View style={styles.featuresContainer}>
-							<Text style={styles.featuresTitle}>Características:</Text>
-							<View style={styles.featuresList}>
-								{caracteristicas.slice(0, 6).map((feat, index) => (
-									<View key={index} style={styles.featureItem}>
-										<Ionicons name="checkmark-circle" size={14} color="#16A34A" />
-										<Text style={styles.featureText}>{feat}</Text>
-									</View>
-								))}
-								{caracteristicas.length > 6 && (
-									<Text style={styles.moreFeatures}>
-										+{caracteristicas.length - 6} más
-									</Text>
-								)}
-							</View>
-						</View>
-					)}
+				{/* Mensaje si faltan datos */}
+				{(!vehicle.descripcion || vehicle.descripcion.length < 20) && (
+					<View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: 8, marginTop: 8 }}>
+						<Text style={{ color: '#92400E', fontSize: 13 }}>💡 Agrega una descripción para atraer más clientes</Text>
+					</View>
+				)}
+				{(!vehicle.caracteristicas || vehicle.caracteristicas.length === 0) && (
+					<View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: 8, marginTop: 8 }}>
+						<Text style={{ color: '#92400E', fontSize: 13 }}>💡 Agrega características para destacar tu vehículo</Text>
+					</View>
+				)}
 				</View>
 			</View>
 		</View>
 	);
 };
+
+// ...existing code...
 
 const styles = StyleSheet.create({
 	container: {

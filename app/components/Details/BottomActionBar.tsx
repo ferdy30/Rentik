@@ -31,10 +31,6 @@ export default function BottomActionBar({ price, onBookPress }: BottomActionBarP
           <Text style={styles.pricePerDay}>${price}</Text>
           <Text style={styles.currency}>/día</Text>
         </View>
-        <View style={styles.priceDetails}>
-          <Ionicons name="shield-checkmark" size={14} color="#10B981" />
-          <Text style={styles.priceInfo}>Seguro incluido • Km ilimitado</Text>
-        </View>
       </View>
       
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>

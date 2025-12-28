@@ -5,15 +5,24 @@ import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, Modal, Platform, ScrollView, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { db } from '../../FirebaseConfig';
+import BookingBottomSheet from '../components/Details/BookingBottomSheet';
 import BottomActionBar from '../components/Details/BottomActionBar';
+import DetailsSkeleton from '../components/Details/DetailsSkeleton';
+import FadeInSection from '../components/Details/FadeInSection';
 import HostInfo from '../components/Details/HostInfo';
+import VehicleAdditionalInfo from '../components/Details/VehicleAdditionalInfo';
+import VehicleBookingTerms from '../components/Details/VehicleBookingTerms';
 import VehicleCarousel from '../components/Details/VehicleCarousel';
+import VehicleDeliveryOptions from '../components/Details/VehicleDeliveryOptions';
 import VehicleDescription from '../components/Details/VehicleDescription';
 import VehicleFeatures from '../components/Details/VehicleFeatures';
 import VehicleHeader from '../components/Details/VehicleHeader';
 import VehicleLocationMap from '../components/Details/VehicleLocationMap';
 import VehiclePolicies from '../components/Details/VehiclePolicies';
+import VehicleReviews from '../components/Details/VehicleReviews';
 import VehicleSpecs from '../components/Details/VehicleSpecs';
+import { useFavorites } from '../context/FavoritesContext';
+import { normalizeVehicleData } from '../services/vehicles';
 import type { RootStackParamList } from '../types/navigation';
 
 type DetailsRouteProp = RouteProp<RootStackParamList, 'Details'>;
@@ -23,7 +32,26 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function Details() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute<DetailsRouteProp>();
-  const { vehicle } = route.params;
+  const { vehicle: rawVehicle } = route.params;
+  const { favorites, toggleFavorite } = useFavorites();
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [showBookingSheet, setShowBookingSheet] = useState(false);
+  
+  // Normalizar datos para asegurar consistencia
+  const vehicle = React.useMemo(() => {
+    const normalized = normalizeVehicleData(rawVehicle.id || '', rawVehicle);
+    console.log('📋 Vehicle Data en Details:', {
+      id: normalized.id,
+      marca: normalized.marca,
+      modelo: normalized.modelo,
+      descripcion: normalized.descripcion,
+      caracteristicas: normalized.caracteristicas,
+      caracteristicasLength: normalized.caracteristicas?.length
+    });
+    return normalized;
+  }, [rawVehicle]);
+
   const [hostName, setHostName] = useState('Arrendador Verificado');
   const [hostJoined, setHostJoined] = useState('Se unió recientemente');
   const [hostPhoto, setHostPhoto] = useState<string | undefined>(undefined);
@@ -35,6 +63,34 @@ export default function Details() {
   // Full screen image state
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  
+  const isFavorite = favorites.includes(vehicle.id);
+  
+  // Mock reviews data (en producción vendría de Firestore)
+  const mockReviews = [
+    {
+      id: '1',
+      userName: 'Carlos Mendoza',
+      rating: 5,
+      date: 'Hace 2 semanas',
+      comment: 'Excelente vehículo, muy limpio y el anfitrión fue muy atento. La experiencia fue perfecta.',
+      tripDuration: 'Rentó por 5 días',
+    },
+    {
+      id: '2',
+      userName: 'María González',
+      rating: 5,
+      date: 'Hace 1 mes',
+      comment: 'Todo impecable, el auto en perfectas condiciones. Totalmente recomendado.',
+      tripDuration: 'Rentó por 3 días',
+    },
+  ];
+
+  useEffect(() => {
+    // Simular loading inicial
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const fetchHost = async () => {
@@ -72,9 +128,10 @@ export default function Details() {
       }
     };
     fetchHost();
-  }, [vehicle.arrendadorId, vehicle.propietarioId]);
+  }, [vehicle.arrendadorId]);
 
-  const images = vehicle.imagenes && vehicle.imagenes.length > 0 ? vehicle.imagenes : [vehicle.imagen];
+  // Usar las imágenes normalizadas
+  const images = vehicle.imagenes && vehicle.imagenes.length > 0 ? vehicle.imagenes : [vehicle.imagen || 'https://via.placeholder.com/400'];
 
   const handleShare = async () => {
     try {
@@ -91,6 +148,10 @@ export default function Details() {
     setModalVisible(true);
   };
 
+  if (isLoading) {
+    return <DetailsSkeleton />;
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -101,19 +162,24 @@ export default function Details() {
           onBackPress={() => navigation.goBack()}
           onSharePress={handleShare}
           onImagePress={handleImagePress}
+          onFavoritePress={() => toggleFavorite(vehicle.id)}
+          isFavorite={isFavorite}
         />
 
         <View style={styles.content}>
-          <VehicleHeader
-            marca={vehicle.marca}
-            modelo={vehicle.modelo}
-            anio={vehicle.anio}
-            rating={vehicle.rating}
-            reviewCount={vehicle.reviewCount}
-          />
+          <FadeInSection delay={0}>
+            <VehicleHeader
+              marca={vehicle.marca}
+              modelo={vehicle.modelo}
+              anio={vehicle.anio}
+              rating={vehicle.rating}
+              reviewCount={vehicle.reviewCount}
+            />
+          </FadeInSection>
 
           {/* Availability Badge */}
-          <View style={styles.availabilityCard}>
+          <FadeInSection delay={100}>
+            <View style={styles.availabilityCard}>
             <View style={styles.availabilityRow}>
               <Ionicons 
                 name={vehicle.disponible ? "checkmark-circle" : "close-circle"} 
@@ -132,146 +198,130 @@ export default function Details() {
                 Reserva instantánea • Respuesta rápida
               </Text>
             )}
-          </View>
+            </View>
+          </FadeInSection>
 
           <View style={styles.divider} />
 
-          <VehicleSpecs
+          <FadeInSection delay={200}>
+            <VehicleSpecs
             transmision={vehicle.transmision}
             combustible={vehicle.combustible}
             pasajeros={vehicle.pasajeros}
             puertas={vehicle.puertas} 
-          />
+            />
+          </FadeInSection>
 
           <View style={styles.divider} />
 
-			{/* Información Adicional */}
-			{(vehicle.color || vehicle.kilometraje || vehicle.condicion || vehicle.mileageLimit === 'limited') && (
-				<>
-					<View style={{ marginBottom: 24 }}>
-						<Text style={styles.sectionTitle}>Información Adicional</Text>
-						{vehicle.color && (
-							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-								<Ionicons name="color-palette" size={20} color="#6B7280" style={{ marginRight: 12, width: 24 }} />
-								<Text style={{ fontSize: 15, color: '#4B5563', flex: 1 }}>Color</Text>
-								<Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>{vehicle.color}</Text>
-							</View>
-						)}
-						{vehicle.kilometraje && (
-							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-								<Ionicons name="speedometer" size={20} color="#6B7280" style={{ marginRight: 12, width: 24 }} />
-								<Text style={{ fontSize: 15, color: '#4B5563', flex: 1 }}>Kilometraje</Text>
-								<Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>{vehicle.kilometraje?.toLocaleString()} km</Text>
-							</View>
-						)}
-						{vehicle.condicion && (
-							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-								<Ionicons name="star" size={20} color="#6B7280" style={{ marginRight: 12, width: 24 }} />
-								<Text style={{ fontSize: 15, color: '#4B5563', flex: 1 }}>Condición</Text>
-								<Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>{vehicle.condicion}</Text>
-							</View>
-						)}
-						{vehicle.mileageLimit === 'limited' && vehicle.dailyKm && (
-							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
-								<Ionicons name="warning" size={20} color="#F59E0B" style={{ marginRight: 12, width: 24 }} />
-								<Text style={{ fontSize: 15, color: '#4B5563', flex: 1 }}>Límite diario</Text>
-								<Text style={{ fontSize: 15, fontWeight: '600', color: '#F59E0B' }}>{vehicle.dailyKm} km/día</Text>
-							</View>
-						)}
-					</View>
-					<View style={styles.divider} />
-				</>
-			)}
+          <FadeInSection delay={300}>
+            <VehicleAdditionalInfo 
+            color={vehicle.color}
+            kilometraje={vehicle.kilometraje}
+            condicion={vehicle.condicion}
+            mileageLimit={vehicle.mileageLimit}
+            dailyKm={vehicle.dailyKm}
+            />
+          </FadeInSection>
 
-			<VehicleDescription description={vehicle.descripcion} />
+          <FadeInSection delay={400}>
+			      <VehicleDescription description={vehicle.descripcion} />
+          </FadeInSection>
 
 			<View style={styles.divider} />
 
-			{/* Reglas y Descuentos */}
-			{(vehicle.rules || vehicle.discounts) && (
-				<>
-					<View style={{ marginBottom: 24 }}>
-						<Text style={styles.sectionTitle}>Reglas</Text>
-						{vehicle.rules?.petsAllowed !== undefined && (
-							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-								<Ionicons 
-									name={vehicle.rules.petsAllowed ? "checkmark-circle" : "close-circle"} 
-									size={22} 
-									color={vehicle.rules.petsAllowed ? "#10B981" : "#EF4444"} 
-									style={{ marginRight: 10 }}
-								/>
-								<Text style={{ fontSize: 15, color: '#374151' }}>Mascotas {vehicle.rules.petsAllowed ? 'permitidas' : 'no permitidas'}</Text>
-							</View>
-						)}
-						{vehicle.rules?.smokingAllowed !== undefined && (
-							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-								<Ionicons 
-									name={vehicle.rules.smokingAllowed ? "checkmark-circle" : "close-circle"} 
-									size={22} 
-									color={vehicle.rules.smokingAllowed ? "#10B981" : "#EF4444"} 
-									style={{ marginRight: 10 }}
-								/>
-								<Text style={{ fontSize: 15, color: '#374151' }}>Fumar {vehicle.rules.smokingAllowed ? 'permitido' : 'no permitido'}</Text>
-							</View>
-						)}
-						{vehicle.rules?.outOfCityAllowed !== undefined && (
-							<View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-								<Ionicons 
-									name={vehicle.rules.outOfCityAllowed ? "checkmark-circle" : "close-circle"} 
-									size={22} 
-									color={vehicle.rules.outOfCityAllowed ? "#10B981" : "#EF4444"} 
-									style={{ marginRight: 10 }}
-								/>
-								<Text style={{ fontSize: 15, color: '#374151' }}>Viajes fuera de ciudad {vehicle.rules.outOfCityAllowed ? 'permitidos' : 'no permitidos'}</Text>
-							</View>
-						)}
-						
-						{(vehicle.discounts?.weekly > 0 || vehicle.discounts?.monthly > 0) && (
-							<View style={{ backgroundColor: '#EFF6FF', padding: 14, borderRadius: 12, marginTop: 12, flexDirection: 'row', alignItems: 'center' }}>
-								<Ionicons name="pricetag" size={20} color="#0B729D" style={{ marginRight: 10 }} />
-								<View>
-									{vehicle.discounts.weekly > 0 && (
-										<Text style={{ fontSize: 14, fontWeight: '600', color: '#0B729D' }}>{vehicle.discounts.weekly}% descuento semanal</Text>
-									)}
-									{vehicle.discounts.monthly > 0 && (
-										<Text style={{ fontSize: 14, fontWeight: '600', color: '#0B729D' }}>{vehicle.discounts.monthly}% descuento mensual</Text>
-									)}
-								</View>
-							</View>
-						)}
-					</View>
-					<View style={styles.divider} />
-				</>
-			)}
+            {/* Descuentos */}
+            {(vehicle.discounts?.weekly > 0 || vehicle.discounts?.monthly > 0) && (
+                <>
+                    <View style={{ marginBottom: 24 }}>
+                        <Text style={styles.sectionTitle}>Descuentos</Text>
+                        <View style={{ backgroundColor: '#EFF6FF', padding: 14, borderRadius: 12, flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="pricetag" size={20} color="#0B729D" style={{ marginRight: 10 }} />
+                            <View>
+                                {vehicle.discounts.weekly > 0 && (
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#0B729D' }}>{vehicle.discounts.weekly}% descuento semanal</Text>
+                                )}
+                                {vehicle.discounts.monthly > 0 && (
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#0B729D' }}>{vehicle.discounts.monthly}% descuento mensual</Text>
+                                )}
+                            </View>
+                        </View>
+                    </View>
+                    <View style={styles.divider} />
+                </>
+            )}
 
-          <VehicleFeatures features={vehicle.caracteristicas} />
+          <FadeInSection delay={500}>
+            <VehicleFeatures features={vehicle.caracteristicas} />
+          </FadeInSection>
 
           <View style={styles.divider} />
 
-          <VehiclePolicies features={vehicle.caracteristicas} />
+          <FadeInSection delay={600}>
+            <VehicleReviews
+              reviews={mockReviews}
+              averageRating={vehicle.rating}
+              totalReviews={vehicle.reviewCount}
+              ratingBreakdown={{
+                cleanliness: 4.9,
+                communication: 4.8,
+                accuracy: 5.0,
+                value: 4.7,
+              }}
+            />
+          </FadeInSection>
 
           <View style={styles.divider} />
+
+          <FadeInSection delay={700}>
+            <VehiclePolicies rules={vehicle.rules} />
+          </FadeInSection>
+
+          <View style={styles.divider} />
+
+          <FadeInSection delay={800}>
+            <VehicleBookingTerms 
+            deposit={vehicle.deposit}
+            advanceNotice={vehicle.advanceNotice}
+            minTripDuration={vehicle.minTripDuration}
+            maxTripDuration={vehicle.maxTripDuration}
+            protectionPlan={vehicle.protectionPlan}
+            />
+          </FadeInSection>
+
+          <FadeInSection delay={900}>
+            <VehicleDeliveryOptions 
+            flexibleHours={vehicle.flexibleHours}
+            deliveryHours={vehicle.deliveryHours}
+            airportDelivery={vehicle.airportDelivery}
+            airportFee={vehicle.airportFee}
+            />
+          </FadeInSection>
 
           {/* Ubicación con mapa */}
-          <VehicleLocationMap 
+          <FadeInSection delay={1000}>
+            <VehicleLocationMap 
             coordinates={vehicle.coordinates}
             ubicacion={vehicle.ubicacion}
-          />
+            />
+          </FadeInSection>
 
           <View style={styles.divider} />
 
-          {loadingHost ? (
-            <View style={{ paddingVertical: 12 }}>
-              <Text style={{ color: '#6B7280' }}>Cargando anfitrión…</Text>
-            </View>
-          ) : (
-            <HostInfo name={hostName} joinedDate={hostJoined} photoURL={hostPhoto} rating={hostRating} completedTrips={hostTrips} />
-          )}
-          {errorHost ? (
-            <View style={{ marginTop: 8 }}>
-              <Text style={{ color: '#DC2626', fontSize: 12 }}>{errorHost}</Text>
-            </View>
-          ) : null}
+          <FadeInSection delay={1100}>
+            {loadingHost ? (
+              <View style={{ paddingVertical: 12 }}>
+                <Text style={{ color: '#6B7280' }}>Cargando anfitrión…</Text>
+              </View>
+            ) : (
+              <HostInfo name={hostName} joinedDate={hostJoined} photoURL={hostPhoto} rating={hostRating} completedTrips={hostTrips} />
+            )}
+            {errorHost && (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: '#DC2626', fontSize: 12 }}>{errorHost}</Text>
+              </View>
+            )}
+          </FadeInSection>
 
           <View style={{ height: 100 }} />
         </View>
@@ -279,7 +329,22 @@ export default function Details() {
 
       <BottomActionBar
         price={vehicle.precio}
-        onBookPress={() => navigation.navigate('BookingStep1Dates', { vehicle })}
+        onBookPress={() => setShowBookingSheet(true)}
+      />
+
+      {/* Booking Bottom Sheet */}
+      <BookingBottomSheet
+        visible={showBookingSheet}
+        onClose={() => setShowBookingSheet(false)}
+        onConfirm={(startDate, endDate) => {
+          navigation.navigate('BookingStep1Dates', { 
+            vehicle,
+            preselectedDates: { startDate, endDate }
+          });
+        }}
+        pricePerDay={vehicle.precio}
+        weeklyDiscount={vehicle.discounts?.weekly}
+        monthlyDiscount={vehicle.discounts?.monthly}
       />
 
       {/* Full Screen Image Modal */}

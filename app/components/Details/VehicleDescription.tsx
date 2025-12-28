@@ -7,25 +7,25 @@ interface VehicleDescriptionProps {
 
 export default function VehicleDescription({ description }: VehicleDescriptionProps) {
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const displayDescription = description || "El anfitrión no ha proporcionado una descripción detallada para este vehículo.";
+  const displayText = description && description.trim().length > 0 ? description : 'Sin descripción proporcionada';
 
   return (
-    <View>
-      <Text style={styles.sectionTitle}>Descripción</Text>
-      <Text 
-        style={styles.description}
-        numberOfLines={showFullDescription ? undefined : 4}
-      >
-        {displayDescription}
-      </Text>
-      {displayDescription.length > 150 && (
-        <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
-          <Text style={styles.readMoreText}>
-            {showFullDescription ? "Leer menos" : "Leer más"}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
+      <View>
+        <Text style={styles.sectionTitle}>Descripción</Text>
+        <Text 
+          style={styles.description}
+          numberOfLines={showFullDescription ? undefined : 4}
+        >
+          {displayText}
+        </Text>
+        {displayText.length > 150 && displayText !== 'Sin descripción proporcionada' && (
+          <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
+            <Text style={styles.readMoreText}>
+              {showFullDescription ? "Leer menos" : "Leer más"}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
   );
 }
 

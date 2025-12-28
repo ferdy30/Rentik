@@ -187,30 +187,17 @@ export default function BuscarScreen() {
         });
       }
       
+      // Pasar el vehículo completo normalizado, no solo algunos campos
       const mappedVehicles: Vehicle[] = data.map(v => ({
+        ...v, // Incluir TODOS los campos (características, descripción, etc.)
         id: v.id!,
-        marca: v.marca,
-        modelo: v.modelo,
-        anio: v.anio,
-        precio: v.precio,
-        ubicacion: v.ubicacion,
-        coordinates: v.coordinates, // Agregar coordenadas
-        airportDelivery: v.airportDelivery || false, // Campo de entrega en aeropuerto
-        airportFee: v.airportFee || 0,
-        imagen: v.photos?.front || 'https://via.placeholder.com/400',
+        imagen: v.photos?.front || v.imagen || 'https://via.placeholder.com/400',
         imagenes: v.photos ? [v.photos.front, v.photos.sideLeft, v.photos.sideRight, v.photos.interior].filter(Boolean) : [],
         rating: v.rating || 0,
         reviewCount: v.trips || 0,
-        transmision: v.transmision as any,
-        combustible: v.combustible as any,
-        pasajeros: v.pasajeros,
-        puertas: v.puertas,
-        tipo: v.tipo as any,
-        caracteristicas: [], // TODO: Add features to VehicleData
         badges: v.status === 'active' ? ['Verificado'] : [],
         disponible: v.status === 'active',
         propietarioId: v.arrendadorId,
-        arrendadorId: v.arrendadorId, // Add this field explicitly
       }));
       
       // Siempre reemplazar vehículos completos para evitar duplicados

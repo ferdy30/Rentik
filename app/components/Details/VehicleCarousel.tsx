@@ -10,9 +10,11 @@ interface VehicleCarouselProps {
   onBackPress: () => void;
   onSharePress: () => void;
   onImagePress?: (index: number) => void;
+  onFavoritePress?: () => void;
+  isFavorite?: boolean;
 }
 
-export default function VehicleCarousel({ images, onBackPress, onSharePress, onImagePress }: VehicleCarouselProps) {
+export default function VehicleCarousel({ images, onBackPress, onSharePress, onImagePress, onFavoritePress, isFavorite }: VehicleCarouselProps) {
   const [imageIndex, setImageIndex] = useState(0);
 
   const handleScroll = (event: any) => {
@@ -60,6 +62,17 @@ export default function VehicleCarousel({ images, onBackPress, onSharePress, onI
         <Ionicons name="share-outline" size={24} color="#1F2937" />
       </TouchableOpacity>
 
+      {/* Favorite Button */}
+      {onFavoritePress && (
+        <TouchableOpacity style={styles.favoriteButton} onPress={onFavoritePress}>
+          <Ionicons 
+            name={isFavorite ? "heart" : "heart-outline"} 
+            size={24} 
+            color={isFavorite ? "#EF4444" : "#1F2937"} 
+          />
+        </TouchableOpacity>
+      )}
+
       {/* Dots Indicator with Counter */}
       <View style={styles.dotsContainer}>
         <Ionicons name="image-outline" size={14} color="#fff" />
@@ -100,6 +113,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 50,
     right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 50,
+    right: 74,
     width: 44,
     height: 44,
     borderRadius: 22,

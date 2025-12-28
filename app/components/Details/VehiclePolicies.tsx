@@ -1,31 +1,35 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { VehicleRules } from '../../types/vehicle';
 
 interface VehiclePoliciesProps {
-  features?: string[];
+  rules?: VehicleRules;
 }
 
-export default function VehiclePolicies({ features = [] }: VehiclePoliciesProps) {
-  const petsAllowed = features.some(f => f.toLowerCase().includes('mascotas') || f.toLowerCase().includes('pet'));
+export default function VehiclePolicies({ rules }: VehiclePoliciesProps) {
+  // Valores por defecto si no existen reglas definidas
+  const petsAllowed = rules?.petsAllowed ?? false;
+  const smokingAllowed = rules?.smokingAllowed ?? false;
+  const crossBorderAllowed = rules?.crossBorderAllowed ?? false;
 
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Reglas y Políticas</Text>
       
       <View style={styles.policyGrid}>
-        {/* Regla: No fumar (Estándar) */}
+        {/* Regla: Fumar */}
         <View style={styles.policyItem}>
-          <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
-            <Ionicons name="ban-outline" size={20} color="#DC2626" />
+          <View style={[styles.iconContainer, { backgroundColor: smokingAllowed ? '#DCFCE7' : '#FEE2E2' }]}>
+            <Ionicons name={smokingAllowed ? "checkmark-circle-outline" : "ban-outline"} size={20} color={smokingAllowed ? '#16A34A' : '#DC2626'} />
           </View>
           <View style={styles.textContainer}>
-            <Text style={styles.policyTitle}>Prohibido fumar</Text>
-            <Text style={styles.policyDesc}>Multa por olor a humo</Text>
+            <Text style={styles.policyTitle}>{smokingAllowed ? 'Fumar permitido' : 'Prohibido fumar'}</Text>
+            <Text style={styles.policyDesc}>{smokingAllowed ? 'Se permite fumar' : 'Multa por olor a humo'}</Text>
           </View>
         </View>
 
-        {/* Regla: Mascotas (Dinámica) */}
+        {/* Regla: Mascotas */}
         <View style={styles.policyItem}>
           <View style={[styles.iconContainer, { backgroundColor: petsAllowed ? '#DCFCE7' : '#F3F4F6' }]}>
             <Ionicons name="paw-outline" size={20} color={petsAllowed ? '#16A34A' : '#6B7280'} />
@@ -36,7 +40,18 @@ export default function VehiclePolicies({ features = [] }: VehiclePoliciesProps)
           </View>
         </View>
 
-        {/* Regla: Combustible */}
+        {/* Regla: Viajes fuera de ciudad/país */}
+        <View style={styles.policyItem}>
+          <View style={[styles.iconContainer, { backgroundColor: crossBorderAllowed ? '#DCFCE7' : '#F3F4F6' }]}>
+            <Ionicons name="map-outline" size={20} color={crossBorderAllowed ? '#16A34A' : '#6B7280'} />
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={styles.policyTitle}>{crossBorderAllowed ? 'Viajes largos' : 'Solo ciudad'}</Text>
+            <Text style={styles.policyDesc}>{crossBorderAllowed ? 'Permitido salir de la ciudad' : 'Uso local únicamente'}</Text>
+          </View>
+        </View>
+
+        {/* Regla: Combustible (Estándar) */}
         <View style={styles.policyItem}>
           <View style={[styles.iconContainer, { backgroundColor: '#DBEAFE' }]}>
             <Ionicons name="water-outline" size={20} color="#2563EB" />
@@ -46,6 +61,7 @@ export default function VehiclePolicies({ features = [] }: VehiclePoliciesProps)
             <Text style={styles.policyDesc}>Devolver con el mismo nivel</Text>
           </View>
         </View>
+
 
         {/* Regla: Limpieza */}
         <View style={styles.policyItem}>

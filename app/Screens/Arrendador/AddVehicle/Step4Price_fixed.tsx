@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -24,9 +24,9 @@ import { useAuth } from '../../../../context/Auth';
 import LocationPicker from '../../../components/LocationPicker';
 import { StepIndicator } from '../../../components/StepIndicator';
 import { VehiclePreview } from '../../../components/VehiclePreview';
+import { normalizeVehicleData } from '../../../services/vehicles';
 import type { ArrendadorStackParamList } from '../../../navigation/ArrendadorStack';
-import { addVehicle, normalizeVehicleData } from '../../../services/vehicles';
-
+import { addVehicle } from '../../../services/vehicles';
 import { calculateSuggestedPrice, comparePriceToMarket } from '../../../utils/priceCalculator';
 import { generateSuggestedDescription } from '../../../utils/vehicleSuggestions';
 import { styles } from './styles';
@@ -168,11 +168,11 @@ export default function Step4Price() {
 		setCurrentMonth(newDate);
 	};
 
-	// Planes de Protección
+	// Planes de ProtecciÃ³n
 	const [protectionPlan, setProtectionPlan] = useState<'basic' | 'standard' | 'premium'>('standard');
 	const PROTECTION_PLANS = {
-		basic: { name: 'Básico', commission: 20, deductible: 3000, desc: 'Mayor ganancia, mayor riesgo' },
-		standard: { name: 'Estándar', commission: 25, deductible: 1000, desc: 'Balance ideal (Recomendado)' },
+		basic: { name: 'BÃ¡sico', commission: 20, deductible: 3000, desc: 'Mayor ganancia, mayor riesgo' },
+		standard: { name: 'EstÃ¡ndar', commission: 25, deductible: 1000, desc: 'Balance ideal (Recomendado)' },
 		premium: { name: 'Premium', commission: 35, deductible: 0, desc: 'Menor ganancia, cero riesgo' }
 	};
 
@@ -186,8 +186,8 @@ export default function Step4Price() {
 	const [mileageLimit, setMileageLimit] = useState<'unlimited' | 'limited'>('unlimited');
 	const [dailyKm, setDailyKm] = useState('200');
 	const [advanceNotice, setAdvanceNotice] = useState('12'); // horas
-	const [minTripDuration, setMinTripDuration] = useState('1'); // días
-	const [maxTripDuration, setMaxTripDuration] = useState('30'); // días
+	const [minTripDuration, setMinTripDuration] = useState('1'); // dÃ­as
+	const [maxTripDuration, setMaxTripDuration] = useState('30'); // dÃ­as
 
 	// Reglas
 	const [rules, setRules] = useState({
@@ -202,7 +202,7 @@ export default function Step4Price() {
 		monthly: '15',
 	});
 
-	// Depósito
+	// DepÃ³sito
 	const [depositType, setDepositType] = useState<'auto' | 'custom'>('auto');
 	const [customDeposit, setCustomDeposit] = useState('');
 
@@ -227,13 +227,13 @@ export default function Step4Price() {
 		descripcion: false,
 	});
 
-	// Calcular precio sugerido basado en datos del vehículo
+	// Calcular precio sugerido basado en datos del vehÃ­culo
 	useEffect(() => {
 		if (vehicleData) {
 			const estimate = calculateSuggestedPrice(vehicleData);
 			setSuggestedPrice(estimate);
 
-			// Generar descripción sugerida
+			// Generar descripciÃ³n sugerida
 			const suggested = generateSuggestedDescription(vehicleData);
 			setSuggestedDescriptionText(suggested);
 		}
@@ -245,13 +245,13 @@ export default function Step4Price() {
 				if (!value) return 'El precio es requerido';
 				const precio = parseFloat(value);
 				if (isNaN(precio) || precio <= 0) return 'Debe ser mayor a 0';
-				if (precio < 5) return 'Mínimo $5 por día';
-				if (precio > 500) return 'Máximo $500 por día';
+				if (precio < 5) return 'MÃ­nimo $5 por dÃ­a';
+				if (precio > 500) return 'MÃ¡ximo $500 por dÃ­a';
 				return '';
 			case 'descripcion':
-				if (!value) return 'La descripción es requerida';
-				if (value.length < 20) return `Mínimo 20 caracteres (${value.length}/20)`;
-				if (value.length > 500) return 'Máximo 500 caracteres';
+				if (!value) return 'La descripciÃ³n es requerida';
+				if (value.length < 20) return `MÃ­nimo 20 caracteres (${value.length}/20)`;
+				if (value.length > 500) return 'MÃ¡ximo 500 caracteres';
 				return '';
 			default:
 				return '';
@@ -285,18 +285,18 @@ export default function Step4Price() {
 	};
 
 	const isFormValid = () => {
-		// Validar que el precio sea válido
+		// Validar que el precio sea vÃ¡lido
 		if (!formData.precio || errors.precio) return false;
 		
-		// Validar que la descripción sea válida
+		// Validar que la descripciÃ³n sea vÃ¡lida
 		if (!formData.descripcion || errors.descripcion) return false;
 		
-		// Validar que exista ubicación con coordenadas GPS
+		// Validar que exista ubicaciÃ³n con coordenadas GPS
 		if (!locationData) return false;
 		if (!locationData.coordinates) return false;
 		if (!locationData.coordinates.latitude || !locationData.coordinates.longitude) return false;
 		
-		// Validar que las coordenadas sean válidas
+		// Validar que las coordenadas sean vÃ¡lidas
 		const { latitude, longitude } = locationData.coordinates;
 		if (latitude < -90 || latitude > 90) return false;
 		if (longitude < -180 || longitude > 180) return false;
@@ -308,7 +308,7 @@ export default function Step4Price() {
 		const precio = parseFloat(formData.precio);
 
 		if (!user) {
-			Alert.alert('Error', 'No se encontró la sesión del usuario');
+			Alert.alert('Error', 'No se encontrÃ³ la sesiÃ³n del usuario');
 			return;
 		}
 
@@ -317,7 +317,7 @@ export default function Step4Price() {
 			setIsUploading(true);
 			setShowPreviewModal(false);
 			
-			// Calcular depósito
+			// Calcular depÃ³sito
 			const calculatedDeposit = depositType === 'auto' 
 				? Math.round(precio * 2) 
 				: parseFloat(customDeposit) || Math.round(precio * 2);
@@ -349,13 +349,13 @@ export default function Step4Price() {
 				protectionPlan: protectionPlan || 'standard',
 			};
 
-			console.log('📸 Fotos a publicar:', {
+			console.log('ðŸ“¸ Fotos a publicar:', {
 				photos: finalData.photos,
 				additionalPhotos: finalData.additionalPhotos,
 				totalPhotos: finalData.additionalPhotos ? Object.keys(finalData.photos || {}).length + finalData.additionalPhotos.length : Object.keys(finalData.photos || {}).length
 			});
 
-			console.log('📋 Datos completos a publicar:', {
+			console.log('ðŸ“‹ Datos completos a publicar:', {
 				marca: finalData.marca,
 				modelo: finalData.modelo,
 				descripcion: finalData.descripcion,
@@ -366,14 +366,14 @@ export default function Step4Price() {
 				ubicacion: finalData.ubicacion
 			});
 
-			// Subir vehículo con callback de progreso
+			// Subir vehÃ­culo con callback de progreso
 			const vehicleId = await addVehicle(finalData, user.uid, (current, total) => {
 				setUploadProgress({ current, total });
 			});
 
-			console.log('✅ Vehículo publicado con ID:', vehicleId);
+			console.log('âœ… VehÃ­culo publicado con ID:', vehicleId);
 
-			// Mostrar animación de éxito
+			// Mostrar animaciÃ³n de Ã©xito
 			setLoading(false);
 			setIsUploading(false);
 			setShowSuccessModal(true);
@@ -384,14 +384,17 @@ export default function Step4Price() {
 				useNativeDriver: true,
 			}).start();
 
-			// Navegar después de 2 segundos
+			// Navegar a Details despuÃ©s de 2 segundos con el vehÃ­culo reciÃ©n creado
 			setTimeout(() => {
 				setShowSuccessModal(false);
-				navigation.navigate('HomeArrendador');
+				// Navegar a Details con todos los datos en memoria
+				navigation.getParent()?.navigate('Details', { 
+					vehicle: { ...finalData, id: vehicleId } 
+				});
 			}, 2500);
 		} catch (error) {
 			console.error(error);
-			Alert.alert('Error', 'Hubo un problema al guardar el vehículo. Inténtalo de nuevo.');
+			Alert.alert('Error', 'Hubo un problema al guardar el vehÃ­culo. IntÃ©ntalo de nuevo.');
 		} finally {
 			setLoading(false);
 			setIsUploading(false);
@@ -408,8 +411,8 @@ export default function Step4Price() {
 					<Ionicons name="arrow-back" size={24} color="#032B3C" />
 				</TouchableOpacity>
 				<View style={styles.headerCenter}>
-					<Text style={styles.headerTitle}>Precio y Ubicación</Text>
-					<Text style={styles.headerSubtitle}>Último paso</Text>
+					<Text style={styles.headerTitle}>Precio y UbicaciÃ³n</Text>
+					<Text style={styles.headerSubtitle}>Ãšltimo paso</Text>
 				</View>
 				<View style={{ width: 40 }} />
 			</View>
@@ -417,7 +420,7 @@ export default function Step4Price() {
 		<StepIndicator 
 			currentStep={4} 
 			totalSteps={4}
-			labels={['Básico', 'Specs', 'Fotos', 'Precio']}
+			labels={['BÃ¡sico', 'Specs', 'Fotos', 'Precio']}
 		/>
 			{/* Progress Bar */}
 			<View style={styles.progressContainer}>
@@ -430,14 +433,14 @@ export default function Step4Price() {
 			>
 				<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 					<View style={{ marginBottom: 12 }}>
-						<Text style={styles.sectionTitle}>¡Casi listo!</Text>
+						<Text style={styles.sectionTitle}>Â¡Casi listo!</Text>
 						<Text style={{ fontSize: 14, color: '#6B7280', marginTop: 4, lineHeight: 20 }}>
-							Establece el precio y ubicación de tu vehículo
+							Establece el precio y ubicaciÃ³n de tu vehÃ­culo
 						</Text>
 					</View>
 
-					{/* Vista Previa Live del Vehículo */}
-					{vehicleData && (
+										{/* Vista Previa Live del VehÃ­culo */}
+										{vehicleData && (
 						<VehiclePreview
 							vehicle={normalizeVehicleData('preview', {
 								...vehicleData,
@@ -447,8 +450,6 @@ export default function Step4Price() {
 								coordinates: locationData?.coordinates || vehicleData.coordinates,
 							})}
 						/>
-					)}
-
 					{/* Precio */}
 					<View style={localStyles.card}>
 						<View style={localStyles.cardHeader}>
@@ -456,8 +457,8 @@ export default function Step4Price() {
 								<Ionicons name="cash-outline" size={24} color="#0B729D" />
 							</View>
 							<View>
-								<Text style={localStyles.cardTitle}>Precio por día</Text>
-								<Text style={localStyles.cardSubtitle}>¿Cuánto quieres ganar?</Text>
+								<Text style={localStyles.cardTitle}>Precio por dÃ­a</Text>
+								<Text style={localStyles.cardSubtitle}>Â¿CuÃ¡nto quieres ganar?</Text>
 							</View>
 						</View>
 
@@ -497,11 +498,11 @@ export default function Step4Price() {
 										Tu ganancia: ${(parseFloat(formData.precio) * 0.85).toFixed(2)}
 									</Text>
 									<Text style={{ fontSize: 12, color: '#6B7280' }}>
-										(Comisión Rentik 15%)
+										(ComisiÃ³n Rentik 15%)
 									</Text>
 								</View>
 								
-								{/* Indicador de comparación con mercado */}
+								{/* Indicador de comparaciÃ³n con mercado */}
 								{priceComparison && (
 									<View style={[
 										styles.priceComparisonCard,
@@ -541,15 +542,15 @@ export default function Step4Price() {
 						) : null}
 					</View>
 
-					{/* Ubicación */}
+					{/* UbicaciÃ³n */}
 					<View style={localStyles.card}>
 						<View style={localStyles.cardHeader}>
 							<View style={localStyles.cardIconContainer}>
 								<Ionicons name="location-outline" size={24} color="#0B729D" />
 							</View>
 							<View>
-								<Text style={localStyles.cardTitle}>Ubicación de entrega</Text>
-								<Text style={localStyles.cardSubtitle}>¿Dónde entregarás el auto?</Text>
+								<Text style={localStyles.cardTitle}>UbicaciÃ³n de entrega</Text>
+								<Text style={localStyles.cardSubtitle}>Â¿DÃ³nde entregarÃ¡s el auto?</Text>
 							</View>
 						</View>
 						<LocationPicker
@@ -558,17 +559,17 @@ export default function Step4Price() {
 							title=""
 							subtitle=""
 						/>
-					</View>
-
-					{/* Descripción */}
-					<View style={localStyles.card}>
-						<View style={localStyles.cardHeader}>
-							<View style={localStyles.cardIconContainer}>
+					{touched.precio && !locationData && (
+						<View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: '#FEE2E2', padding: 12, borderRadius: 8 }}>
+							<Ionicons name="warning" size={16} color="#DC2626" />
+							<Text style={{ fontSize: 13, color: '#DC2626', marginLeft: 6, fontWeight: '600' }}>La ubicaciÃ³n es obligatoria para publicar</Text>
+						</View>
+					)}
 								<Ionicons name="text-outline" size={24} color="#0B729D" />
 							</View>
 							<View style={{ flex: 1 }}>
-								<Text style={localStyles.cardTitle}>Descripción</Text>
-								<Text style={localStyles.cardSubtitle}>Destaca tu vehículo</Text>
+								<Text style={localStyles.cardTitle}>DescripciÃ³n</Text>
+								<Text style={localStyles.cardSubtitle}>Destaca tu vehÃ­culo</Text>
 							</View>
 							{!formData.descripcion && suggestedDescriptionText && (
 								<TouchableOpacity
@@ -587,7 +588,7 @@ export default function Step4Price() {
 
 						<TextInput
 							style={[styles.input, styles.textArea, touched.descripcion && errors.descripcion ? styles.inputError : formData.descripcion && !errors.descripcion ? styles.inputSuccess : {}]}
-							placeholder="Describe las mejores características de tu auto...\n\nEjemplo: Auto en excelente estado, aire acondicionado, Bluetooth, cámara de reversa. Perfecto para viajes largos o paseos por la ciudad."
+							placeholder="Describe las mejores caracterÃ­sticas de tu auto...\n\nEjemplo: Auto en excelente estado, aire acondicionado, Bluetooth, cÃ¡mara de reversa. Perfecto para viajes largos o paseos por la ciudad."
 							value={formData.descripcion}
 							onChangeText={(descripcion) => handleFieldChange('descripcion', descripcion)}
 							onBlur={() => handleFieldBlur('descripcion')}
@@ -652,8 +653,8 @@ export default function Step4Price() {
 									</Text>
 									<Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
 										{blockedDates.length > 0 
-											? `${blockedDates.length} días bloqueados` 
-											: 'Disponible todos los días'}
+											? `${blockedDates.length} dÃ­as bloqueados` 
+											: 'Disponible todos los dÃ­as'}
 									</Text>
 								</View>
 							</View>
@@ -661,14 +662,14 @@ export default function Step4Price() {
 						</TouchableOpacity>
 					</View>
 
-					{/* Planes de Protección */}
+					{/* Planes de ProtecciÃ³n */}
 					<View style={localStyles.card}>
 						<View style={localStyles.cardHeader}>
 							<View style={localStyles.cardIconContainer}>
 								<Ionicons name="shield-checkmark-outline" size={24} color="#0B729D" />
 							</View>
 							<View>
-								<Text style={localStyles.cardTitle}>Plan de Protección</Text>
+								<Text style={localStyles.cardTitle}>Plan de ProtecciÃ³n</Text>
 								<Text style={localStyles.cardSubtitle}>Elige tu nivel de cobertura</Text>
 							</View>
 						</View>
@@ -707,7 +708,7 @@ export default function Step4Price() {
 								<View style={{ flexDirection: 'row', gap: 16 }}>
 									<View style={{ backgroundColor: protectionPlan === key ? '#E0F2FE' : '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
 										<Text style={{ fontSize: 12, fontWeight: '700', color: protectionPlan === key ? '#0369A1' : '#374151' }}>
-											Comisión: {plan.commission}%
+											ComisiÃ³n: {plan.commission}%
 										</Text>
 									</View>
 								</View>
@@ -723,7 +724,7 @@ export default function Step4Price() {
 							</View>
 							<View>
 								<Text style={localStyles.cardTitle}>Horarios de entrega</Text>
-								<Text style={localStyles.cardSubtitle}>¿Cuándo puedes entregar?</Text>
+								<Text style={localStyles.cardSubtitle}>Â¿CuÃ¡ndo puedes entregar?</Text>
 							</View>
 						</View>
 
@@ -731,7 +732,7 @@ export default function Step4Price() {
 							<View style={{ flex: 1, paddingRight: 16 }}>
 								<Text style={{ fontSize: 14, fontWeight: '600', color: '#374151' }}>Horarios flexibles</Text>
 								<Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
-									Coordinarás directamente con el cliente
+									CoordinarÃ¡s directamente con el cliente
 								</Text>
 							</View>
 							<Switch
@@ -744,7 +745,7 @@ export default function Step4Price() {
 						
 						{!flexibleHours && (
 							<View>
-								<Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', marginBottom: 6 }}>Horario específico</Text>
+								<Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', marginBottom: 6 }}>Horario especÃ­fico</Text>
 								<TextInput
 									style={styles.input}
 									placeholder="Ej: 9:00 AM - 8:00 PM"
@@ -800,8 +801,8 @@ export default function Step4Price() {
 								<Ionicons name="speedometer" size={24} color="#0B729D" />
 							</View>
 							<View style={{ flex: 1 }}>
-								<Text style={localStyles.cardTitle}>Límite de Kilometraje</Text>
-								<Text style={localStyles.cardSubtitle}>Define cuánto pueden conducir</Text>
+								<Text style={localStyles.cardTitle}>LÃ­mite de Kilometraje</Text>
+								<Text style={localStyles.cardSubtitle}>Define cuÃ¡nto pueden conducir</Text>
 							</View>
 						</View>
 
@@ -817,7 +818,7 @@ export default function Step4Price() {
 
 						{mileageLimit === 'limited' && (
 							<Animated.View style={{ marginTop: 8, padding: 16, backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
-								<Text style={{ fontSize: 14, color: '#374151', marginBottom: 8, fontWeight: '600' }}>Límite diario (km)</Text>
+								<Text style={{ fontSize: 14, color: '#374151', marginBottom: 8, fontWeight: '600' }}>LÃ­mite diario (km)</Text>
 								<View style={{ flexDirection: 'row', alignItems: 'center' }}>
 									<TextInput
 										style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: 'white' }]}
@@ -826,10 +827,10 @@ export default function Step4Price() {
 										keyboardType="numeric"
 										placeholder="200"
 									/>
-									<Text style={{ fontSize: 14, color: '#6B7280', marginLeft: 8 }}>km/día</Text>
+									<Text style={{ fontSize: 14, color: '#6B7280', marginLeft: 8 }}>km/dÃ­a</Text>
 								</View>
 								<Text style={{ fontSize: 12, color: '#6B7280', marginTop: 8 }}>
-									El exceso se cobrará automáticamente a $0.10 por km adicional.
+									El exceso se cobrarÃ¡ automÃ¡ticamente a $0.10 por km adicional.
 								</Text>
 							</Animated.View>
 						)}
@@ -842,7 +843,7 @@ export default function Step4Price() {
 							</View>
 							<View style={{ flex: 1 }}>
 								<Text style={localStyles.cardTitle}>Tiempo de Preaviso</Text>
-								<Text style={localStyles.cardSubtitle}>Anticipación requerida</Text>
+								<Text style={localStyles.cardSubtitle}>AnticipaciÃ³n requerida</Text>
 							</View>
 						</View>
 
@@ -874,14 +875,14 @@ export default function Step4Price() {
 								<Ionicons name="calendar" size={24} color="#0B729D" />
 							</View>
 							<View style={{ flex: 1 }}>
-								<Text style={localStyles.cardTitle}>Duración del Viaje</Text>
-								<Text style={localStyles.cardSubtitle}>Mínimo y máximo de días</Text>
+								<Text style={localStyles.cardTitle}>DuraciÃ³n del Viaje</Text>
+								<Text style={localStyles.cardSubtitle}>MÃ­nimo y mÃ¡ximo de dÃ­as</Text>
 							</View>
 						</View>
 
 						<View style={{ gap: 16 }}>
 							<View>
-								<Text style={{ fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 }}>Mínimo de días</Text>
+								<Text style={{ fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 }}>MÃ­nimo de dÃ­as</Text>
 								<View style={{ flexDirection: 'row', gap: 8 }}>
 									{['1', '2', '3'].map((days) => (
 										<TouchableOpacity
@@ -897,14 +898,14 @@ export default function Step4Price() {
 												borderColor: minTripDuration === days ? '#0B729D' : '#E5E7EB',
 											}}
 										>
-											<Text style={{ fontWeight: '600', color: minTripDuration === days ? 'white' : '#374151' }}>{days} {days === '1' ? 'Día' : 'Días'}</Text>
+											<Text style={{ fontWeight: '600', color: minTripDuration === days ? 'white' : '#374151' }}>{days} {days === '1' ? 'DÃ­a' : 'DÃ­as'}</Text>
 										</TouchableOpacity>
 									))}
 								</View>
 							</View>
 
 							<View>
-								<Text style={{ fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 }}>Máximo de días</Text>
+								<Text style={{ fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 }}>MÃ¡ximo de dÃ­as</Text>
 								<View style={{ flexDirection: 'row', gap: 8 }}>
 									{['5', '15', '30'].map((days) => (
 										<TouchableOpacity
@@ -920,7 +921,7 @@ export default function Step4Price() {
 												borderColor: maxTripDuration === days ? '#0B729D' : '#E5E7EB',
 											}}
 										>
-											<Text style={{ fontWeight: '600', color: maxTripDuration === days ? 'white' : '#374151' }}>{days} Días</Text>
+											<Text style={{ fontWeight: '600', color: maxTripDuration === days ? 'white' : '#374151' }}>{days} DÃ­as</Text>
 										</TouchableOpacity>
 									))}
 								</View>
@@ -928,14 +929,14 @@ export default function Step4Price() {
 						</View>
 					</View>
 
-					{/* Reglas del vehículo */}
+					{/* Reglas del vehÃ­culo */}
 					<View style={localStyles.card}>
 						<View style={localStyles.cardHeader}>
 							<View style={localStyles.cardIconContainer}>
 								<Ionicons name="document-text-outline" size={24} color="#0B729D" />
 							</View>
 							<View>
-								<Text style={localStyles.cardTitle}>Reglas del vehículo</Text>
+								<Text style={localStyles.cardTitle}>Reglas del vehÃ­culo</Text>
 								<Text style={localStyles.cardSubtitle}>Establece tus condiciones</Text>
 							</View>
 						</View>
@@ -999,7 +1000,7 @@ export default function Step4Price() {
 						<View style={{ flexDirection: 'row', marginBottom: 12 }}>
 							<View style={{ flex: 1, marginRight: 8 }}>
 								<Text style={{ fontSize: 13, color: '#374151', fontWeight: '600', marginBottom: 6 }}>
-									Semanal (7+ días)
+									Semanal (7+ dÃ­as)
 								</Text>
 								<View style={{ position: 'relative' }}>
 									<TextInput
@@ -1016,7 +1017,7 @@ export default function Step4Price() {
 							</View>
 							<View style={{ flex: 1, marginLeft: 8 }}>
 								<Text style={{ fontSize: 13, color: '#374151', fontWeight: '600', marginBottom: 6 }}>
-									Mensual (30+ días)
+									Mensual (30+ dÃ­as)
 								</Text>
 								<View style={{ position: 'relative' }}>
 									<TextInput
@@ -1040,13 +1041,13 @@ export default function Step4Price() {
 								</View>
 								{discounts.weekly && (
 									<Text style={{ fontSize: 11, color: '#0369A1', marginTop: 2 }}>
-										• Semanal: ${(parseFloat(formData.precio) * 7 * (1 - parseFloat(discounts.weekly) / 100)).toFixed(2)} 
+										â€¢ Semanal: ${(parseFloat(formData.precio) * 7 * (1 - parseFloat(discounts.weekly) / 100)).toFixed(2)} 
 										{' '}(${parseFloat(formData.precio)} - {discounts.weekly}%)
 									</Text>
 								)}
 								{discounts.monthly && (
 									<Text style={{ fontSize: 11, color: '#0369A1', marginTop: 2 }}>
-										• Mensual: ${(parseFloat(formData.precio) * 30 * (1 - parseFloat(discounts.monthly) / 100)).toFixed(2)} 
+										â€¢ Mensual: ${(parseFloat(formData.precio) * 30 * (1 - parseFloat(discounts.monthly) / 100)).toFixed(2)} 
 										{' '}(${parseFloat(formData.precio)} - {discounts.monthly}%)
 									</Text>
 								)}
@@ -1054,15 +1055,15 @@ export default function Step4Price() {
 						)}
 					</View>
 
-					{/* Depósito de seguridad */}
+					{/* DepÃ³sito de seguridad */}
 					<View style={localStyles.card}>
 						<View style={localStyles.cardHeader}>
 							<View style={localStyles.cardIconContainer}>
 								<Ionicons name="shield-checkmark-outline" size={24} color="#0B729D" />
 							</View>
 							<View>
-								<Text style={localStyles.cardTitle}>Depósito de seguridad</Text>
-								<Text style={localStyles.cardSubtitle}>Protección adicional</Text>
+								<Text style={localStyles.cardTitle}>DepÃ³sito de seguridad</Text>
+								<Text style={localStyles.cardSubtitle}>ProtecciÃ³n adicional</Text>
 							</View>
 						</View>
 
@@ -1086,7 +1087,7 @@ export default function Step4Price() {
 									fontSize: 14,
 									fontWeight: '600',
 									color: depositType === 'auto' ? '#032B3C' : '#6B7280'
-								}}>Automático (2x)</Text>
+								}}>AutomÃ¡tico (2x)</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
 								style={{
@@ -1125,10 +1126,10 @@ export default function Step4Price() {
 						) : formData.precio ? (
 							<View style={{ backgroundColor: '#F0FDF4', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#BBF7D0' }}>
 								<Text style={{ fontSize: 13, color: '#16A34A', fontWeight: '600' }}>
-									Depósito: ${(parseFloat(formData.precio) * 2).toFixed(2)}
+									DepÃ³sito: ${(parseFloat(formData.precio) * 2).toFixed(2)}
 								</Text>
 								<Text style={{ fontSize: 11, color: '#15803D', marginTop: 2 }}>
-									Se reembolsa al terminar la renta si no hay daños
+									Se reembolsa al terminar la renta si no hay daÃ±os
 								</Text>
 							</View>
 						) : null}
@@ -1171,7 +1172,7 @@ export default function Step4Price() {
 						</TouchableOpacity>
 						<View style={{ alignItems: 'center' }}>
 							<Text style={{ fontSize: 18, fontWeight: '700', color: 'white' }}>Vista Previa</Text>
-							<Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>Así verán tu vehículo</Text>
+							<Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>AsÃ­ verÃ¡n tu vehÃ­culo</Text>
 						</View>
 						<View style={{ width: 28 }} />
 					</View>
@@ -1204,7 +1205,7 @@ export default function Step4Price() {
 									<Text style={{ fontSize: 28, fontWeight: '800', color: '#0B729D' }}>
 										${formData.precio}
 									</Text>
-									<Text style={{ fontSize: 14, color: '#6B7280' }}>por día</Text>
+									<Text style={{ fontSize: 14, color: '#6B7280' }}>por dÃ­a</Text>
 								</View>
 							</View>
 
@@ -1230,7 +1231,7 @@ export default function Step4Price() {
 
 							{/* Description */}
 							<View style={{ marginBottom: 20 }}>
-								<Text style={{ fontSize: 18, fontWeight: '700', color: '#032B3C', marginBottom: 12 }}>Descripción</Text>
+								<Text style={{ fontSize: 18, fontWeight: '700', color: '#032B3C', marginBottom: 12 }}>DescripciÃ³n</Text>
 								<Text style={{ fontSize: 15, color: '#4B5563', lineHeight: 22 }}>
 									{formData.descripcion}
 								</Text>
@@ -1241,7 +1242,7 @@ export default function Step4Price() {
 								<View style={{ marginBottom: 20, backgroundColor: '#F9FAFB', padding: 16, borderRadius: 12 }}>
 									<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
 										<Ionicons name="location" size={20} color="#0B729D" />
-										<Text style={{ fontSize: 16, fontWeight: '700', color: '#032B3C', marginLeft: 8 }}>Ubicación</Text>
+										<Text style={{ fontSize: 16, fontWeight: '700', color: '#032B3C', marginLeft: 8 }}>UbicaciÃ³n</Text>
 									</View>
 									<Text style={{ fontSize: 14, color: '#6B7280' }}>
 										{locationData.address}
@@ -1251,7 +1252,7 @@ export default function Step4Price() {
 
 							{/* Features */}
 							<View style={{ marginBottom: 20 }}>
-								<Text style={{ fontSize: 18, fontWeight: '700', color: '#032B3C', marginBottom: 12 }}>Características</Text>
+								<Text style={{ fontSize: 18, fontWeight: '700', color: '#032B3C', marginBottom: 12 }}>CaracterÃ­sticas</Text>
 								<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
 									{rules.petsAllowed && (
 										<View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1346,7 +1347,7 @@ export default function Step4Price() {
 
 					<View style={{ padding: 16 }}>
 						<Text style={{ textAlign: 'center', color: '#6B7280', marginBottom: 20 }}>
-							Toca los días que NO quieres rentar tu auto (días bloqueados).
+							Toca los dÃ­as que NO quieres rentar tu auto (dÃ­as bloqueados).
 						</Text>
 						
 						<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 20 }}>
@@ -1362,7 +1363,7 @@ export default function Step4Price() {
 						</View>
 
 						<View style={{ flexDirection: 'row', marginBottom: 10 }}>
-							{['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
+							{['Dom', 'Lun', 'Mar', 'MiÃ©', 'Jue', 'Vie', 'SÃ¡b'].map(day => (
 								<Text key={day} style={{ flex: 1, textAlign: 'center', color: '#9CA3AF', fontSize: 12, fontWeight: '600' }}>{day}</Text>
 							))}
 						</View>
@@ -1461,7 +1462,7 @@ export default function Step4Price() {
 				</View>
 			</Modal>
 
-			{/* Modal de Éxito */}
+			{/* Modal de Ã‰xito */}
 			<Modal
 				visible={showSuccessModal}
 				transparent
@@ -1472,8 +1473,8 @@ export default function Step4Price() {
 						<View style={styles.successIconCircle}>
 							<Ionicons name="checkmark" size={60} color="#16A34A" />
 						</View>
-						<Text style={styles.successModalTitle}>¡Vehículo Registrado!</Text>
-						<Text style={styles.successModalText}>Tu vehículo ha sido publicado exitosamente</Text>
+						<Text style={styles.successModalTitle}>Â¡VehÃ­culo Registrado!</Text>
+						<Text style={styles.successModalText}>Tu vehÃ­culo ha sido publicado exitosamente</Text>
 					</Animated.View>
 				</View>
 			</Modal>
@@ -1531,3 +1532,4 @@ export default function Step4Price() {
 		</View>
 	);
 }
+

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import type { Vehicle } from '../constants/vehicles';
+import type { Vehicle } from '../types/vehicle';
 
 interface VehicleCardProps {
   vehicle: Vehicle;

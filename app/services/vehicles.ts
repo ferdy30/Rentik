@@ -1,51 +1,100 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { db, storage } from '../../FirebaseConfig';
-
-export interface VehicleData {
-  id?: string;
-  arrendadorId: string;
-  marca: string;
-  modelo: string;
-  anio: number;
-  placa: string;
-  tipo: string;
-  transmision: string;
-  combustible: string;
-  pasajeros: number;
-  puertas: number;
-  color: string;
-  caracteristicas: string[];
-  precio: number;
-  descripcion: string;
-  ubicacion: string;
-  coordinates?: {
-    latitude: number;
-    longitude: number;
-  };
-  placeId?: string;
-  photos: {
-    front: string;
-    sideLeft: string;
-    sideRight: string;
-    interior: string;
-  };
-  imagen?: string;
-  imagenes?: string[];
-  createdAt: Date;
-  rating: number;
-  trips: number;
-  status: 'active' | 'inactive' | 'rented';
-}
-
 import { Platform } from 'react-native';
+import { db, storage } from '../../FirebaseConfig';
+import { Vehicle } from '../types/vehicle';
+
+// Re-exportar para compatibilidad
+export type VehicleData = Vehicle;
+
+/**
+ * Normaliza los datos del vehículo para asegurar compatibilidad entre versiones
+ */
+export const normalizeVehicleData = (id: string, data: any): Vehicle => {
+  // 1. Normalizar fotos
+  let photos = data.photos || {};
+  
+  // Si no tiene estructura de fotos nueva pero tiene imagen antigua
+  if (!photos.front && data.imagen) {
+    photos.front = data.imagen;
+  }
+  
+  // Si tiene array de imagenes pero no fotos específicas
+  if (data.imagenes && Array.isArray(data.imagenes)) {
+    if (!photos.front && data.imagenes[0]) photos.front = data.imagenes[0];
+    if (!photos.sideLeft && data.imagenes[1]) photos.sideLeft = data.imagenes[1];
+    if (!photos.sideRight && data.imagenes[2]) photos.sideRight = data.imagenes[2];
+    if (!photos.interior && data.imagenes[3]) photos.interior = data.imagenes[3];
+  }
+
+  // Asegurar que photos tenga todas las propiedades requeridas
+  photos = {
+    front: photos.front || '',
+    sideLeft: photos.sideLeft || '',
+    sideRight: photos.sideRight || '',
+    interior: photos.interior || '',
+    ...photos // Mantener otras propiedades si existen
+  };
+
+  return {
+    id,
+    arrendadorId: data.arrendadorId || '',
+    // Info Básica
+    marca: data.marca || '',
+    modelo: data.modelo || '',
+    anio: data.anio || new Date().getFullYear(),
+    placa: data.placa || '',
+    tipo: data.tipo || 'Sedán',
+    transmision: data.transmision || 'Automático',
+    combustible: data.combustible || 'Gasolina',
+    // Specs
+    pasajeros: data.pasajeros ?? 5,
+    puertas: data.puertas ?? 4,
+    color: data.color || 'Blanco',
+    kilometraje: data.kilometraje ?? 0,
+    condicion: data.condicion || 'Bueno',
+    caracteristicas: Array.isArray(data.caracteristicas) ? data.caracteristicas : [],
+    // Multimedia
+    photos,
+    imagen: data.imagen || photos.front || '',
+    imagenes: Array.isArray(data.imagenes) ? data.imagenes : Object.values(photos).filter(Boolean),
+    // Precio y Ubicación
+    precio: typeof data.precio === 'number' ? data.precio : 0,
+    descripcion: typeof data.descripcion === 'string' ? data.descripcion : '',
+    ubicacion: typeof data.ubicacion === 'string' ? data.ubicacion : '',
+    coordinates: data.coordinates || { latitude: 0, longitude: 0 },
+    placeId: data.placeId || '',
+    // Disponibilidad
+    availableFrom: data.availableFrom || new Date().toISOString(),
+    blockedDates: Array.isArray(data.blockedDates) ? data.blockedDates : [],
+    flexibleHours: typeof data.flexibleHours === 'boolean' ? data.flexibleHours : true,
+    deliveryHours: data.deliveryHours || '',
+    airportDelivery: typeof data.airportDelivery === 'boolean' ? data.airportDelivery : false,
+    airportFee: typeof data.airportFee === 'number' ? data.airportFee : 0,
+    mileageLimit: data.mileageLimit || 'unlimited',
+    dailyKm: typeof data.dailyKm === 'number' ? data.dailyKm : null,
+    advanceNotice: typeof data.advanceNotice === 'number' ? data.advanceNotice : 12,
+    minTripDuration: typeof data.minTripDuration === 'number' ? data.minTripDuration : 1,
+    maxTripDuration: typeof data.maxTripDuration === 'number' ? data.maxTripDuration : 30,
+    rules: typeof data.rules === 'object' && data.rules !== null ? data.rules : {},
+    discounts: typeof data.discounts === 'object' && data.discounts !== null ? data.discounts : {},
+    deposit: typeof data.deposit === 'number' ? data.deposit : 0,
+    protectionPlan: data.protectionPlan || 'standard',
+    // Meta
+    createdAt: data.createdAt || new Date().toISOString(),
+    rating: typeof data.rating === 'number' ? data.rating : 0,
+    reviewCount: typeof data.reviewCount === 'number' ? data.reviewCount : 0,
+    trips: typeof data.trips === 'number' ? data.trips : 0,
+    status: data.status || 'active',
+    disponible: data.disponible ?? true,
+  };
+};
 
 /**
  * Sube una imagen a Firebase Storage y retorna la URL de descarga
  */
 export const uploadImage = async (uri: string, path: string): Promise<string> => {
   try {
-    // Validar que la URI no esté vacía
     if (!uri || uri.trim() === '') {
       throw new Error('URI de imagen inválida');
     }
@@ -53,12 +102,10 @@ export const uploadImage = async (uri: string, path: string): Promise<string> =>
     let blob: Blob;
 
     if (Platform.OS === 'ios') {
-        // En iOS, fetch funciona bien y es más nativo
         const response = await fetch(uri);
         if (!response.ok) throw new Error(`Error al cargar imagen: ${response.status}`);
         blob = await response.blob();
     } else {
-        // En Android, XMLHttpRequest es más robusto para URIs locales (file:// y content://)
         blob = await new Promise<Blob>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.onload = function () {
@@ -74,7 +121,6 @@ export const uploadImage = async (uri: string, path: string): Promise<string> =>
         });
     }
     
-    // Validar tamaño de imagen (máximo 10MB para ser seguros, aunque 5MB es buen límite)
     if (blob.size > 10 * 1024 * 1024) {
       throw new Error('La imagen es muy grande. El tamaño máximo es 10MB');
     }
@@ -82,7 +128,6 @@ export const uploadImage = async (uri: string, path: string): Promise<string> =>
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, blob);
     
-    // Cerrar el blob para liberar memoria
     // @ts-ignore
     if (blob.close) {
         // @ts-ignore
@@ -98,110 +143,70 @@ export const uploadImage = async (uri: string, path: string): Promise<string> =>
 
 /**
  * Guarda un nuevo vehículo en Firestore
+ * @param onProgress - Callback para reportar progreso de subida de fotos (current, total)
  */
-export const addVehicle = async (vehicleData: Omit<VehicleData, 'id' | 'createdAt' | 'rating' | 'trips' | 'status'>, userId: string) => {
+export const addVehicle = async (
+  vehicleData: Omit<Vehicle, 'id' | 'createdAt' | 'rating' | 'trips' | 'status' | 'reviewCount'>, 
+  userId: string,
+  onProgress?: (current: number, total: number) => void
+) => {
   try {
-    // Validaciones básicas
-    if (!userId || userId.trim() === '') {
-      throw new Error('Usuario inválido');
-    }
+    if (!userId) throw new Error('Usuario inválido');
+    if (!vehicleData.precio || vehicleData.precio < 5) throw new Error('Precio inválido');
 
-    if (!vehicleData.precio || vehicleData.precio < 5 || vehicleData.precio > 500) {
-      throw new Error('Precio inválido (debe estar entre $5 y $500)');
-    }
-
-    if (!vehicleData.descripcion || vehicleData.descripcion.length < 20) {
-      throw new Error('La descripción es muy corta');
-    }
-
-    // 1. Subir fotos en paralelo (incluir fotos adicionales)
+    // 1. Preparar lista de fotos a subir
     const timestamp = Date.now();
-    
-    // Objeto para mapear las URLs de las fotos obligatorias
     const uploadedPhotos: { [key: string]: string } = {};
     const allPhotoUrls: string[] = [];
+    
+    // Crear lista de fotos a subir
+    const photosToUpload: Array<{ key: string; uri: string }> = [];
+    
+    if (vehicleData.photos?.front) photosToUpload.push({ key: 'front', uri: vehicleData.photos.front });
+    if (vehicleData.photos?.sideLeft) photosToUpload.push({ key: 'sideLeft', uri: vehicleData.photos.sideLeft });
+    if (vehicleData.photos?.sideRight) photosToUpload.push({ key: 'sideRight', uri: vehicleData.photos.sideRight });
+    if (vehicleData.photos?.interior) photosToUpload.push({ key: 'interior', uri: vehicleData.photos.interior });
+    
+    // Fotos adicionales
+    Object.keys(vehicleData.photos || {}).forEach(key => {
+        if (!['front', 'sideLeft', 'sideRight', 'interior'].includes(key) && vehicleData.photos[key]) {
+            photosToUpload.push({ key, uri: vehicleData.photos[key] });
+        }
+    });
 
-    // Función auxiliar para subir y rastrear
-    const uploadAndTrack = async (key: string, uri: string) => {
-        if (!uri) return;
+    const totalPhotos = photosToUpload.length;
+    let uploadedCount = 0;
+
+    // Subir fotos secuencialmente con reporte de progreso
+    for (const { key, uri } of photosToUpload) {
         try {
             const path = `vehicles/${userId}/${timestamp}/${key}.jpg`;
             const url = await uploadImage(uri, path);
             uploadedPhotos[key] = url;
             allPhotoUrls.push(url);
-            return url;
+            
+            uploadedCount++;
+            if (onProgress) {
+                onProgress(uploadedCount, totalPhotos);
+            }
         } catch (e) {
             console.error(`Error uploading ${key}:`, e);
-            return null;
+            uploadedCount++;
+            if (onProgress) {
+                onProgress(uploadedCount, totalPhotos);
+            }
         }
-    };
-
-    const uploadPromises: Promise<any>[] = [];
-
-    // Subir fotos obligatorias con sus claves específicas
-    if (vehicleData.photos?.front) uploadPromises.push(uploadAndTrack('front', vehicleData.photos.front));
-    if (vehicleData.photos?.sideLeft) uploadPromises.push(uploadAndTrack('sideLeft', vehicleData.photos.sideLeft));
-    if (vehicleData.photos?.sideRight) uploadPromises.push(uploadAndTrack('sideRight', vehicleData.photos.sideRight));
-    if (vehicleData.photos?.interior) uploadPromises.push(uploadAndTrack('interior', vehicleData.photos.interior));
-    
-    // Subir fotos adicionales
-    const additionalPhotos = (vehicleData as any).additionalPhotos;
-    if (additionalPhotos && Array.isArray(additionalPhotos)) {
-        additionalPhotos.forEach((uri: string, index: number) => {
-             uploadPromises.push(uploadAndTrack(`additional_${index}`, uri));
-        });
     }
 
-    await Promise.all(uploadPromises);
-
-    console.log('🎉 Todas las fotos subidas:', allPhotoUrls.length, 'URLs');
-
-    // 2. Guardar datos en Firestore
+    // 2. Guardar en Firestore
     const newVehicle = {
-      marca: vehicleData.marca,
-      modelo: vehicleData.modelo,
-      anio: parseInt(vehicleData.anio),
-      placa: vehicleData.placa,
-      tipo: vehicleData.tipo,
-      transmision: vehicleData.transmision,
-      combustible: vehicleData.combustible,
-      pasajeros: parseInt(vehicleData.pasajeros),
-      puertas: parseInt(vehicleData.puertas),
-      color: vehicleData.color,
-      kilometraje: parseInt(vehicleData.kilometraje),
-      condicion: vehicleData.condicion,
-      caracteristicas: vehicleData.caracteristicas || [],
-      
-      precio: parseFloat(vehicleData.precio),
-      descripcion: vehicleData.descripcion,
-      ubicacion: vehicleData.ubicacion,
-      coordinates: vehicleData.coordinates,
-      placeId: vehicleData.placeId,
-      
-      availableFrom: vehicleData.availableFrom,
-      blockedDates: vehicleData.blockedDates || [],
-      
-      flexibleHours: vehicleData.flexibleHours,
-      deliveryHours: vehicleData.deliveryHours,
-      airportDelivery: vehicleData.airportDelivery,
-      airportFee: vehicleData.airportFee || 0,
-      
-      mileageLimit: vehicleData.mileageLimit || 'unlimited',
-      dailyKm: vehicleData.dailyKm || null,
-      advanceNotice: parseInt(vehicleData.advanceNotice || '12'),
-      minTripDuration: parseInt(vehicleData.minTripDuration || '1'),
-      maxTripDuration: parseInt(vehicleData.maxTripDuration || '30'),
-      
-      rules: vehicleData.rules || {},
-      discounts: vehicleData.discounts || {},
-      deposit: vehicleData.deposit,
-      protectionPlan: vehicleData.protectionPlan || 'standard',
-      
+      ...vehicleData,
       photos: {
         front: uploadedPhotos.front || '',
         sideLeft: uploadedPhotos.sideLeft || '',
         sideRight: uploadedPhotos.sideRight || '',
         interior: uploadedPhotos.interior || '',
+        ...uploadedPhotos // Incluir adicionales
       },
       imagenes: allPhotoUrls,
       imagen: uploadedPhotos.front || allPhotoUrls[0] || '',
@@ -211,18 +216,22 @@ export const addVehicle = async (vehicleData: Omit<VehicleData, 'id' | 'createdA
       rating: 0,
       reviewCount: 0,
       trips: 0,
-      disponible: true,
       status: 'active',
+      disponible: true,
     };
 
     console.log('💾 Guardando en Firestore:', {
-      imagenes: newVehicle.imagenes,
-      imagen: newVehicle.imagen,
-      totalImagenes: newVehicle.imagenes.length
+      marca: newVehicle.marca,
+      modelo: newVehicle.modelo,
+      descripcion: newVehicle.descripcion,
+      descripcionLength: newVehicle.descripcion?.length,
+      caracteristicas: newVehicle.caracteristicas,
+      caracteristicasLength: newVehicle.caracteristicas?.length,
+      caracteristicasType: typeof newVehicle.caracteristicas,
+      caracteristicasIsArray: Array.isArray(newVehicle.caracteristicas)
     });
 
     const docRef = await addDoc(collection(db, 'vehicles'), newVehicle);
-    console.log('✅ Vehículo guardado con ID:', docRef.id);
     return docRef.id;
   } catch (error) {
     console.error('Error adding vehicle:', error);
@@ -233,11 +242,11 @@ export const addVehicle = async (vehicleData: Omit<VehicleData, 'id' | 'createdA
 /**
  * Obtiene los vehículos de un arrendador específico
  */
-export const getVehiclesByOwner = async (userId: string): Promise<VehicleData[]> => {
+export const getVehiclesByOwner = async (userId: string): Promise<Vehicle[]> => {
   try {
     const q = query(collection(db, 'vehicles'), where('arrendadorId', '==', userId));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VehicleData));
+    return querySnapshot.docs.map(doc => normalizeVehicleData(doc.id, doc.data()));
   } catch (error) {
     console.error('Error fetching owner vehicles:', error);
     throw error;
@@ -245,18 +254,16 @@ export const getVehiclesByOwner = async (userId: string): Promise<VehicleData[]>
 };
 
 /**
- * Obtiene todos los vehículos disponibles con paginación (para arrendatarios)
+ * Obtiene todos los vehículos disponibles
  */
-export const getAllVehicles = async (limitCount: number = 20): Promise<VehicleData[]> => {
+export const getAllVehicles = async (limitCount: number = 20): Promise<Vehicle[]> => {
   try {
     const q = query(
       collection(db, 'vehicles'), 
-      where('status', '==', 'active'),
-      // orderBy('createdAt', 'desc'), // Agregar cuando se cree el índice en Firestore
-      // limit(limitCount)
+      where('status', '==', 'active')
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VehicleData));
+    return querySnapshot.docs.map(doc => normalizeVehicleData(doc.id, doc.data()));
   } catch (error) {
     console.error('Error fetching all vehicles:', error);
     throw error;
@@ -264,7 +271,7 @@ export const getAllVehicles = async (limitCount: number = 20): Promise<VehicleDa
 };
 
 /**
- * Elimina un vehículo de Firestore
+ * Elimina un vehículo
  */
 export const deleteVehicle = async (vehicleId: string) => {
   try {
@@ -276,9 +283,9 @@ export const deleteVehicle = async (vehicleId: string) => {
 };
 
 /**
- * Actualiza un vehículo en Firestore
+ * Actualiza un vehículo
  */
-export const updateVehicle = async (vehicleId: string, data: Partial<VehicleData>) => {
+export const updateVehicle = async (vehicleId: string, data: Partial<Vehicle>) => {
   try {
     const vehicleRef = doc(db, 'vehicles', vehicleId);
     await updateDoc(vehicleRef, data);
@@ -291,10 +298,10 @@ export const updateVehicle = async (vehicleId: string, data: Partial<VehicleData
 /**
  * Suscribe a los cambios en los vehículos de un arrendador
  */
-export const subscribeToOwnerVehicles = (userId: string, onUpdate: (vehicles: VehicleData[]) => void, onError: (error: any) => void) => {
+export const subscribeToOwnerVehicles = (userId: string, onUpdate: (vehicles: Vehicle[]) => void, onError: (error: any) => void) => {
   const q = query(collection(db, 'vehicles'), where('arrendadorId', '==', userId));
   return onSnapshot(q, (snapshot) => {
-    const vehicles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VehicleData));
+    const vehicles = snapshot.docs.map(doc => normalizeVehicleData(doc.id, doc.data()));
     onUpdate(vehicles);
   }, onError);
 };

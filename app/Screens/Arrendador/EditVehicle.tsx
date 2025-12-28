@@ -14,12 +14,18 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { updateVehicle, VehicleData } from '../../services/vehicles';
+import { normalizeVehicleData, updateVehicle, VehicleData } from '../../services/vehicles';
 
 export default function EditVehicle() {
     const navigation = useNavigation();
     const route = useRoute<any>();
-    const { vehicle } = route.params;
+    const { vehicle: rawVehicle } = route.params;
+
+    // Normalizar datos al cargar
+    const vehicle = React.useMemo(() => 
+        normalizeVehicleData(rawVehicle.id, rawVehicle), 
+        [rawVehicle]
+    );
 
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState<Partial<VehicleData>>({
@@ -30,6 +36,10 @@ export default function EditVehicle() {
         precio: vehicle.precio,
         descripcion: vehicle.descripcion,
         status: vehicle.status,
+        // Preservar otros datos importantes
+        photos: vehicle.photos,
+        imagenes: vehicle.imagenes,
+        imagen: vehicle.imagen
     });
 
     const handleSave = async () => {
