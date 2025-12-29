@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../context/Auth';
+import { subscribeToUserChats } from '../services/chat';
 import { getOwnerReservations } from '../services/reservations';
 import ChatScreen from './Arrendador/Chat';
 import DashboardScreen from './Arrendador/Dashboard';
@@ -14,25 +16,55 @@ const Tab = createBottomTabNavigator();
 
 export default function HomeArrendador() {
   const { user } = useAuth();
-  const [pendingCount, setPendingCount] = useState(0);
+  const [activeReservationsCount, setActiveReservationsCount] = useState(0);
+  const [unreadChatsCount, setUnreadChatsCount] = useState(0);
 
-  const fetchPendingReservations = useCallback(async () => {
+  const fetchActiveReservations = useCallback(async () => {
     if (!user) return;
     try {
       const reservations = await getOwnerReservations(user.uid);
-      const pending = reservations.filter(r => r.status === 'pending').length;
-      setPendingCount(pending);
+      const active = reservations.filter(r => 
+        r.status === 'pending' || r.status === 'confirmed'
+      ).length;
+      console.log('[HomeArrendador] Reservas activas:', active, '(pending + confirmed)');
+      setActiveReservationsCount(active);
     } catch (error) {
-      console.error('Error fetching pending reservations:', error);
+      console.error('Error fetching active reservations:', error);
     }
   }, [user]);
 
+  // Actualizar cuando la pantalla recibe foco
+  useFocusEffect(
+    useCallback(() => {
+      fetchActiveReservations();
+    }, [fetchActiveReservations])
+  );
+
   useEffect(() => {
-    fetchPendingReservations();
+    if (!user) return;
+    
+    fetchActiveReservations();
     // Poll every 30 seconds for updates
-    const interval = setInterval(fetchPendingReservations, 30000);
-    return () => clearInterval(interval);
-  }, [fetchPendingReservations]);
+    const interval = setInterval(fetchActiveReservations, 30000);
+    
+    // Subscribe to chats for unread count
+    const unsubscribe = subscribeToUserChats(
+      user.uid,
+      20,
+      (chats) => {
+        const unread = chats.reduce((total, chat) => {
+          return total + (chat.unreadCount?.[user.uid] || 0);
+        }, 0);
+        setUnreadChatsCount(unread);
+      },
+      (error) => console.error('Error subscribing to chats:', error)
+    );
+    
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
+  }, [fetchActiveReservations, user]);
 
   return (
     <Tab.Navigator id={undefined}
@@ -55,28 +87,27 @@ export default function HomeArrendador() {
         tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
         tabBarIcon: ({ color, focused }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'ellipse-outline';
+          let badgeCount = 0;
+          
           if (route.name === 'Inicio') iconName = focused ? 'home' : 'home-outline';
           if (route.name === 'Mis autos') iconName = focused ? 'car' : 'car-outline';
-          if (route.name === 'Reservas') iconName = focused ? 'calendar' : 'calendar-outline';
-          if (route.name === 'Mensajes') iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          if (route.name === 'Reservas') {
+            iconName = focused ? 'calendar' : 'calendar-outline';
+            badgeCount = activeReservationsCount;
+          }
+          if (route.name === 'Mensajes') {
+            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+            badgeCount = unreadChatsCount;
+          }
           if (route.name === 'Perfil') iconName = focused ? 'person' : 'person-outline';
+          
           return (
-            <View>
+            <View style={styles.iconContainer}>
               <Ionicons name={iconName} size={20} color={color} />
-              {route.name === 'Reservas' && pendingCount > 0 && (
-                <View style={{
-                  position: 'absolute',
-                  right: -8,
-                  top: -4,
-                  backgroundColor: '#EF4444',
-                  borderRadius: 10,
-                  width: 18,
-                  height: 18,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                  <Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }}>
-                    {pendingCount > 9 ? '9+' : pendingCount}
+              {badgeCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {badgeCount > 9 ? '9+' : badgeCount}
                   </Text>
                 </View>
               )}
@@ -93,3 +124,32 @@ export default function HomeArrendador() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    position: 'relative',
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    right: -8,
+    top: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+});

@@ -71,6 +71,7 @@ export type RootStackParamList = {
   BookingStep2Location: { vehicle: any; startDate: string; endDate: string };
   BookingStep3Time: { vehicle: any; startDate: string; endDate: string; pickupLocation: string; returnLocation: string };
   BookingStep4Confirmation: { vehicle: any; startDate: string; endDate: string; pickupLocation: string; returnLocation: string; pickupTime: string; returnTime: string };
+  CheckInPreparation: { reservation: Reservation; isArrendador?: boolean };
   CheckInStart: { reservation: Reservation };
   CheckInPhotos: { reservation: Reservation; checkInId: string };
   CheckInConditions: { reservation: Reservation; checkInId: string };

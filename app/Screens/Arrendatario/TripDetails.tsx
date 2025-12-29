@@ -19,8 +19,10 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { db } from '../../../FirebaseConfig';
 import { useAuth } from '../../../context/Auth';
+import TripTimeline from '../../components/TripTimeline';
 import { createChatIfNotExists } from '../../services/chat';
 import { Reservation } from '../../services/reservations';
+import { scheduleReservationReminders } from '../../utils/tripNotifications';
 
 export default function TripDetails() {
     const navigation = useNavigation<any>();
@@ -45,6 +47,15 @@ export default function TripDetails() {
     };
 
     const statusColors = getStatusColor(reservation.status);
+
+    // Programar notificaciones automáticas para reservas confirmadas
+    useEffect(() => {
+        if (reservation.status === 'confirmed') {
+            scheduleReservationReminders(reservation).catch(error => {
+                console.error('[TripDetails] Error scheduling reminders:', error);
+            });
+        }
+    }, [reservation.id, reservation.status]);
 
     useEffect(() => {
         const fetchHostInfo = async () => {
@@ -497,174 +508,67 @@ export default function TripDetails() {
                     <Ionicons name="arrow-back" size={24} color="#111827" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Detalles del Viaje</Text>
-                <TouchableOpacity 
-                    style={styles.menuButton} 
-                    onPress={() => {
-                        Alert.alert(
-                            'Opciones',
-                            'Selecciona una acción',
-                            [
-                                {
-                                    text: '📅 Agregar al calendario',
-                                    onPress: handleAddToCalendar
-                                },
-                                {
-                                    text: '👥 Compartir detalles',
-                                    onPress: handleShareDetails
-                                },
-                                {
-                                    text: '⚠️ Reportar problema',
-                                    onPress: handleReportProblem
-                                },
-                                {
-                                    text: 'Cancelar',
-                                    style: 'cancel'
-                                }
-                            ]
-                        );
-                    }}
-                >
-                    <Ionicons name="ellipsis-horizontal" size={24} color="#111827" />
-                </TouchableOpacity>
+                <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Status Banner */}
-                <View style={[styles.statusBanner, { backgroundColor: statusColors.bg }]}>
-                    <View style={styles.statusIconContainer}>
-                        <Ionicons name={getStatusIcon(reservation.status)} size={24} color={statusColors.text} />
-                    </View>
-                    <View style={styles.statusTextContainer}>
-                        <Text style={[styles.statusTitle, { color: statusColors.text }]}>
-                            {getStatusMessage(reservation.status)}
-                        </Text>
-                        <Text style={[styles.statusSubtitle, { color: statusColors.text }]}>
-                            {getStatusSubtitle(reservation.status, reservation)}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Time Remaining Counter */}
-                {(reservation.status === 'confirmed' || reservation.status === 'completed') && timeRemainingInfo && (
-                    <View style={[styles.timeCounter, { backgroundColor: `${timeRemainingInfo.color}15` }]}>
-                        <View style={[styles.timeCounterIcon, { backgroundColor: timeRemainingInfo.color }]}>
-                            <Ionicons name={timeRemainingInfo.icon as any} size={20} color="#fff" />
-                        </View>
-                        <Text style={[styles.timeCounterText, { color: timeRemainingInfo.color }]}>
-                            {timeRemainingInfo.message}
-                        </Text>
-                    </View>
-                )}
-
-                {/* Timeline */}
-                {(reservation.status === 'confirmed' || reservation.status === 'completed') && (
-                    <View style={styles.timelineSection}>
-                        <TouchableOpacity 
-                            style={styles.timelineHeader}
-                            onPress={() => setShowTimeline(!showTimeline)}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Ionicons name="time-outline" size={20} color="#0B729D" />
-                                <Text style={styles.sectionTitle}>Progreso del viaje</Text>
-                            </View>
-                            <Ionicons 
-                                name={showTimeline ? 'chevron-up' : 'chevron-down'} 
-                                size={20} 
-                                color="#6B7280" 
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+                {/* Vehículo Card */}
+                <View style={styles.section}>
+                  <View style={styles.vehicleSection}>
+                    <View style={styles.vehicleCard}>
+                        <View style={styles.imageWrapper}>
+                            <Image 
+                                source={{ uri: reservation.vehicleSnapshot?.imagen }} 
+                                style={styles.vehicleImage}
+                                contentFit="cover"
+                                transition={200}
                             />
-                        </TouchableOpacity>
-                        
-                        {showTimeline && (
-                            <View style={styles.timeline}>
-                                {timelineSteps.map((step, index) => (
-                                    <View key={index} style={styles.timelineItem}>
-                                        <View style={styles.timelineIconContainer}>
-                                            <View style={[
-                                                styles.timelineIcon,
-                                                step.completed && styles.timelineIconCompleted,
-                                                step.active && styles.timelineIconActive,
-                                            ]}>
-                                                <Ionicons 
-                                                    name={step.icon as any} 
-                                                    size={20} 
-                                                    color={step.completed || step.active ? '#fff' : '#9CA3AF'} 
-                                                />
-                                            </View>
-                                            {index < timelineSteps.length - 1 && (
-                                                <View style={[
-                                                    styles.timelineLine,
-                                                    step.completed && styles.timelineLineCompleted
-                                                ]} />
-                                            )}
-                                        </View>
-                                        <View style={[
-                                            styles.timelineCard,
-                                            step.completed && styles.timelineCardCompleted,
-                                            step.active && styles.timelineCardActive,
-                                        ]}>
-                                            <View style={styles.timelineCardHeader}>
-                                                <Text style={[
-                                                    styles.timelineTitle,
-                                                    step.completed && styles.timelineTitleCompleted,
-                                                    step.active && styles.timelineTitleActive,
-                                                ]}>
-                                                    {step.title}
-                                                </Text>
-                                                {step.completed && (
-                                                    <View style={styles.completedBadge}>
-                                                        <Text style={styles.completedBadgeText}>✓</Text>
-                                                    </View>
-                                                )}
-                                                {step.active && !step.completed && (
-                                                    <View style={styles.activeBadge}>
-                                                        <View style={styles.pulseDot} />
-                                                        <Text style={styles.activeBadgeText}>En progreso</Text>
-                                                    </View>
-                                                )}
-                                            </View>
-                                            {step.date && (
-                                                <Text style={styles.timelineDate}>
-                                                    {step.date.toLocaleDateString('es-ES', { 
-                                                        day: 'numeric', 
-                                                        month: 'short',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
-                                                </Text>
-                                            )}
-                                        </View>
-                                    </View>
-                                ))}
+                            <View style={styles.imageGradient} />
+                        </View>
+                        <View style={styles.vehicleOverlay}>
+                            <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+                                <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
+                                    {reservation.status === 'pending' && '⏳ Pendiente'}
+                                    {reservation.status === 'confirmed' && '✅ Confirmada'}
+                                    {reservation.status === 'completed' && '🎉 Completada'}
+                                    {reservation.status === 'cancelled' && '❌ Cancelada'}
+                                    {reservation.status === 'denied' && '🚫 Denegada'}
+                                </Text>
                             </View>
-                        )}
-                    </View>
-                )}
-
-                {/* Vehicle Card */}
-                <View style={styles.vehicleCard}>
-                    <Image 
-                        source={{ uri: reservation.vehicleSnapshot?.imagen }} 
-                        style={styles.vehicleImage}
-                        contentFit="cover"
-                        transition={200}
-                    />
-                    <View style={styles.vehicleInfo}>
-                        <Text style={styles.vehicleBrand}>{reservation.vehicleSnapshot?.marca}</Text>
-                        <Text style={styles.vehicleModel}>
-                            {reservation.vehicleSnapshot?.modelo}
-                        </Text>
-                        <Text style={styles.vehicleYear}>{reservation.vehicleSnapshot?.anio}</Text>
-                        <View style={styles.reservationIdContainer}>
-                            <Ionicons name="document-text-outline" size={12} color="#9CA3AF" />
-                            <Text style={styles.reservationId}>ID: {reservation.id.slice(0, 8).toUpperCase()}</Text>
                         </View>
                     </View>
+                    <View style={styles.vehicleInfoCard}>
+                        <View style={styles.vehicleMainInfo}>
+                            <Text style={styles.vehicleBrandText}>{reservation.vehicleSnapshot?.marca}</Text>
+                            <Text style={styles.vehicleModelText}>
+                                {reservation.vehicleSnapshot?.modelo}
+                            </Text>
+                            <Text style={styles.vehicleYearText}>{reservation.vehicleSnapshot?.anio}</Text>
+                        </View>
+                        <View style={styles.reservationIdBox}>
+                            <Ionicons name="document-text-outline" size={14} color="#6B7280" />
+                            <Text style={styles.reservationIdText}>ID: {reservation.id.slice(0, 8).toUpperCase()}</Text>
+                        </View>
+                    </View>
+                  </View>
                 </View>
 
                 {/* Host Info */}
                 {!loadingHost && hostInfo && (
-                    <View style={styles.hostCard}>
-                        <Text style={styles.hostCardTitle}>Tu anfitrión</Text>
+                    <View style={styles.sectionWithPadding}>
+                        <View style={styles.hostCard}>
+                            <View style={styles.hostCardHeader}>
+                                <View style={styles.hostHeaderLeft}>
+                                    <View style={styles.hostIconCircle}>
+                                        <Ionicons name="person-circle" size={22} color="#0B729D" />
+                                    </View>
+                                    <Text style={styles.hostCardTitle}>Tu Anfitrión</Text>
+                                </View>
+                                <View style={styles.superHostBadge}>
+                                    <Ionicons name="star" size={12} color="#F59E0B" />
+                                    <Text style={styles.superHostText}>Anfitrión</Text>
+                                </View>
+                            </View>
                         <View style={styles.hostContent}>
                             <View style={styles.hostImageContainer}>
                                 {hostInfo.photoURL ? (
@@ -676,45 +580,51 @@ export default function TripDetails() {
                                     />
                                 ) : (
                                     <View style={styles.hostImagePlaceholder}>
-                                        <Ionicons name="person" size={32} color="#9CA3AF" />
+                                        <Ionicons name="person" size={36} color="#9CA3AF" />
                                     </View>
                                 )}
                                 <View style={styles.hostVerifiedBadge}>
-                                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                    <Ionicons name="shield-checkmark" size={18} color="#10B981" />
                                 </View>
                             </View>
                             <View style={styles.hostDetails}>
                                 <Text style={styles.hostName}>{hostInfo.nombre}</Text>
                                 <View style={styles.hostStats}>
-                                    <View style={styles.hostStat}>
-                                        <Ionicons name="star" size={14} color="#F59E0B" />
+                                    <View style={styles.hostStatItem}>
+                                        <Ionicons name="star" size={15} color="#F59E0B" />
                                         <Text style={styles.hostStatText}>{hostInfo.rating.toFixed(1)}</Text>
                                     </View>
-                                    <Text style={styles.hostStatDivider}>•</Text>
-                                    <View style={styles.hostStat}>
-                                        <Ionicons name="car-sport" size={14} color="#6B7280" />
+                                    <View style={styles.statDivider} />
+                                    <View style={styles.hostStatItem}>
+                                        <Ionicons name="car-sport-outline" size={15} color="#0B729D" />
                                         <Text style={styles.hostStatText}>{hostInfo.completedTrips} viajes</Text>
                                     </View>
-                                    <Text style={styles.hostStatDivider}>•</Text>
+                                </View>
+                                <View style={styles.hostMemberInfo}>
+                                    <Ionicons name="calendar-outline" size={13} color="#9CA3AF" />
                                     <Text style={styles.hostMemberSince}>
-                                        Desde {hostInfo.memberSince.getFullYear()}
+                                        Miembro desde {hostInfo.memberSince.getFullYear()}
                                     </Text>
                                 </View>
-                                {hostInfo.telefono && (
-                                    <TouchableOpacity 
-                                        style={styles.hostCallButton}
-                                        onPress={() => Linking.openURL(`tel:${hostInfo.telefono}`)}
-                                    >
-                                        <Ionicons name="call" size={16} color="#0B729D" />
-                                        <Text style={styles.hostCallText}>Llamar</Text>
-                                    </TouchableOpacity>
-                                )}
                             </View>
+                        </View>
+                        {hostInfo.telefono && (
+                            <TouchableOpacity 
+                                style={styles.hostCallButton}
+                                onPress={() => Linking.openURL(`tel:${hostInfo.telefono}`)}
+                            >
+                                <View style={styles.callButtonIcon}>
+                                    <Ionicons name="call" size={18} color="#fff" />
+                                </View>
+                                <Text style={styles.hostCallText}>Contactar anfitrión</Text>
+                                <Ionicons name="chevron-forward" size={18} color="#fff" />
+                            </TouchableOpacity>
+                        )}
                         </View>
                     </View>
                 )}
 
-                {/* Action Buttons (Dynamic based on status) */}
+                {/* Action Buttons */}
                 {reservation.status === 'confirmed' && (() => {
                     const startDate = reservation.startDate?.toDate();
                     const now = new Date();
@@ -725,12 +635,12 @@ export default function TripDetails() {
                         <View style={styles.actionButtons}>
                             <TouchableOpacity 
                                 style={[styles.primaryButton, !canCheckIn && styles.buttonDisabled]} 
-                                onPress={handleCheckIn}
+                                onPress={() => navigation.navigate('CheckInPreparation', { reservation, isArrendador: false })}
                                 disabled={!canCheckIn}
                             >
                                 <Ionicons name="qr-code-outline" size={20} color="#fff" />
                                 <Text style={styles.primaryButtonText}>
-                                    {canCheckIn ? 'Iniciar Check-in' : `Check-in en ${Math.ceil(hoursUntilStart / 24)}d`}
+                                    {canCheckIn ? 'Preparar Check-in' : `Check-in en ${Math.ceil(hoursUntilStart / 24)}d`}
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity 
@@ -784,9 +694,19 @@ export default function TripDetails() {
                     </View>
                 )}
 
+                {/* Timeline Visual - show for confirmed and later statuses */}
+                {reservation.status !== 'pending' && reservation.status !== 'denied' && reservation.status !== 'cancelled' && (
+                    <View style={styles.sectionWithPadding}>
+                        <TripTimeline currentStatus={reservation.status} isRenter={true} />
+                    </View>
+                )}
+
                 {/* Trip Info */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Información del viaje</Text>
+                <View style={styles.sectionWithPadding}>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="information-circle-outline" size={24} color="#0B729D" />
+                        <Text style={styles.sectionTitle}>Información del viaje</Text>
+                    </View>
                     
                     <View style={styles.infoRow}>
                         <View style={styles.iconBox}>
@@ -848,7 +768,7 @@ export default function TripDetails() {
 
                 {/* Extras */}
                 {reservation.extras && (
-                    <View style={styles.section}>
+                    <View style={styles.sectionWithPadding}>
                         <Text style={styles.sectionTitle}>Extras contratados</Text>
                         {reservation.extras.insurance && (
                             <View style={styles.infoRow}>
@@ -888,7 +808,7 @@ export default function TripDetails() {
 
                 {/* Price Breakdown */}
                 {reservation.priceBreakdown && (
-                    <View style={styles.section}>
+                    <View style={styles.sectionWithPadding}>
                         <View style={styles.priceHeader}>
                             <Ionicons name="receipt-outline" size={20} color="#0B729D" />
                             <Text style={styles.sectionTitle}>Resumen de pago</Text>
@@ -938,7 +858,7 @@ export default function TripDetails() {
                 )}
 
                 {/* Important Info Section */}
-                <View style={styles.section}>
+                <View style={styles.sectionWithPadding}>
                     <View style={styles.importantHeader}>
                         <Ionicons name="information-circle" size={20} color="#0B729D" />
                         <Text style={styles.sectionTitle}>Información importante</Text>
@@ -1184,81 +1104,86 @@ const styles = StyleSheet.create({
     helpButton: {
         padding: 8,
     },
-    content: {
+    scrollView: {
         flex: 1,
     },
-    statusBanner: {
+    section: {
+        padding: 0,
+    },
+    sectionWithPadding: {
+        padding: 20,
+        backgroundColor: '#fff',
+    },
+    sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
-        paddingHorizontal: 20,
-        gap: 12,
+        gap: 8,
+        marginBottom: 16,
     },
-    statusIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    statusTextContainer: {
-        flex: 1,
-    },
-    statusTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        marginBottom: 2,
-    },
-    statusSubtitle: {
-        fontSize: 13,
-        fontWeight: '500',
-        opacity: 0.9,
-    },
-    statusText: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    timeCounter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        marginHorizontal: 20,
+    vehicleSection: {
+        marginBottom: 12,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
+        marginHorizontal: 16,
         marginTop: 16,
-        borderRadius: 12,
-        gap: 12,
-    },
-    timeCounterIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    timeCounterText: {
-        fontSize: 16,
-        fontWeight: '700',
     },
     vehicleCard: {
-        flexDirection: 'row',
-        padding: 20,
-        borderBottomWidth: 8,
-        borderBottomColor: '#F9FAFB',
+        position: 'relative',
+        borderRadius: 0,
+        overflow: 'hidden',
+    },
+    imageWrapper: {
+        position: 'relative',
+        overflow: 'hidden',
     },
     vehicleImage: {
-        width: 120,
-        height: 120,
-        borderRadius: 16,
-        marginRight: 16,
+        width: '100%',
+        height: 220,
         backgroundColor: '#F3F4F6',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
     },
-    vehicleInfo: {
-        flex: 1,
-        justifyContent: 'center',
+    imageGradient: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 80,
+        backgroundColor: 'transparent',
     },
-    vehicleBrand: {
+    vehicleOverlay: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+    },
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    statusBadgeText: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    vehicleInfoCard: {
+        backgroundColor: '#fff',
+        padding: 24,
+        borderBottomLeftRadius: 16,
+        borderBottomRightRadius: 16,
+    },
+    vehicleMainInfo: {
+        marginBottom: 12,
+    },
+    vehicleBrandText: {
         fontSize: 12,
         color: '#6B7280',
         fontWeight: '600',
@@ -1266,122 +1191,219 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
         marginBottom: 4,
     },
-    vehicleModel: {
-        fontSize: 20,
-        fontWeight: '700',
+    vehicleModelText: {
+        fontSize: 28,
+        fontWeight: '800',
         color: '#111827',
-        marginBottom: 2,
+        marginBottom: 4,
+        letterSpacing: -0.5,
     },
-    vehicleYear: {
-        fontSize: 14,
+    vehicleYearText: {
+        fontSize: 16,
         fontWeight: '600',
-        color: '#0B729D',
-        marginBottom: 8,
+        color: '#6B7280',
     },
-    reservationIdContainer: {
+    reservationIdBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#F0F9FF',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        alignSelf: 'flex-start',
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    reservationIdText: {
+        fontSize: 12,
+        color: '#0369A1',
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    hostCard: {
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 0,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+        elevation: 6,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        overflow: 'hidden',
+    },
+    hostCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 16,
+        backgroundColor: '#FAFBFC',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    hostHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    hostIconCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#E0F2FE',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    superHostBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 12,
     },
-    reservationId: {
+    superHostText: {
         fontSize: 11,
-        color: '#9CA3AF',
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-        fontWeight: '600',
-    },
-    hostCard: {
-        padding: 20,
-        borderBottomWidth: 8,
-        borderBottomColor: '#F9FAFB',
+        fontWeight: '700',
+        color: '#92400E',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     hostCardTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '700',
         color: '#111827',
-        marginBottom: 16,
     },
     hostContent: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 20,
+        gap: 16,
     },
     hostImageContainer: {
         position: 'relative',
-        marginRight: 16,
     },
     hostImage: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
         backgroundColor: '#F3F4F6',
+        borderWidth: 3,
+        borderColor: '#fff',
     },
     hostImagePlaceholder: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: '#F3F4F6',
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#E5E7EB',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 3,
+        borderColor: '#fff',
     },
     hostVerifiedBadge: {
         position: 'absolute',
-        bottom: 0,
-        right: 0,
+        bottom: -2,
+        right: -2,
         backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 2,
+        borderRadius: 14,
+        padding: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     hostDetails: {
         flex: 1,
     },
     hostName: {
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 20,
+        fontWeight: '800',
         color: '#111827',
-        marginBottom: 6,
+        marginBottom: 8,
     },
     hostStats: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 8,
+        gap: 12,
+        marginBottom: 10,
     },
-    hostStat: {
+    hostStatItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 5,
+        backgroundColor: '#F9FAFB',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    statDivider: {
+        width: 1,
+        height: 16,
+        backgroundColor: '#E5E7EB',
     },
     hostStatText: {
         fontSize: 13,
-        fontWeight: '600',
-        color: '#6B7280',
+        fontWeight: '700',
+        color: '#374151',
     },
-    hostStatDivider: {
-        marginHorizontal: 8,
-        color: '#D1D5DB',
-        fontSize: 12,
+    hostMemberInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
     hostMemberSince: {
-        fontSize: 13,
-        color: '#6B7280',
+        fontSize: 12,
+        color: '#9CA3AF',
+        fontWeight: '500',
     },
     hostCallButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        alignSelf: 'flex-start',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        backgroundColor: '#F0F9FF',
-        borderRadius: 8,
-        gap: 6,
+        justifyContent: 'space-between',
+        marginHorizontal: 20,
+        marginBottom: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        backgroundColor: '#0B729D',
+        borderRadius: 12,
+        gap: 10,
+        shadowColor: '#0B729D',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    callButtonIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     hostCallText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#0B729D',
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#fff',
     },
     actionButtons: {
         flexDirection: 'row',
-        padding: 20,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
         gap: 12,
+        backgroundColor: '#FAFBFC',
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+        borderColor: '#F3F4F6',
     },
     primaryButton: {
         flex: 1,
@@ -1389,9 +1411,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
+        paddingVertical: 16,
         borderRadius: 12,
         gap: 8,
+        shadowColor: '#0B729D',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
     },
     primaryButtonText: {
         color: '#fff',
@@ -1404,19 +1431,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
+        paddingVertical: 16,
         borderRadius: 12,
         gap: 8,
+        borderWidth: 2,
+        borderColor: '#0B729D',
     },
     secondaryButtonText: {
         color: '#0B729D',
         fontWeight: '600',
         fontSize: 14,
-    },
-    section: {
-        padding: 20,
-        borderBottomWidth: 8,
-        borderBottomColor: '#F9FAFB',
     },
     sectionTitle: {
         fontSize: 18,
@@ -1430,13 +1454,15 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     iconBox: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
+        width: 48,
+        height: 48,
+        borderRadius: 12,
         backgroundColor: '#F0F9FF',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: 16,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
     },
     infoContent: {
         flex: 1,
@@ -1533,6 +1559,7 @@ const styles = StyleSheet.create({
     },
     mapSection: {
         padding: 20,
+        backgroundColor: '#fff',
     },
     mapHeader: {
         flexDirection: 'row',

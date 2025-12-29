@@ -37,7 +37,7 @@ export default function ReservasScreen() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'requests' | 'upcoming' | 'history'>('requests');
+  const [activeTab, setActiveTab] = useState<'all' | 'requests' | 'upcoming' | 'history'>('all');
   
   // Modal state for denial
   const [modalVisible, setModalVisible] = useState(false);
@@ -256,6 +256,7 @@ export default function ReservasScreen() {
   const getFilteredReservations = () => {
     return reservations.filter(r => {
       if (r.archived) return false;
+      if (activeTab === 'all') return true;
       if (activeTab === 'requests') return r.status === 'pending';
       if (activeTab === 'upcoming') return r.status === 'confirmed';
       if (activeTab === 'history') return ['completed', 'cancelled', 'denied'].includes(r.status);
@@ -283,6 +284,19 @@ export default function ReservasScreen() {
       {/* Tabs */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity 
+          style={[styles.tab, activeTab === 'all' && styles.activeTab]} 
+          onPress={() => setActiveTab('all')}
+        >
+          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>Todos</Text>
+          {reservations.filter(r => !r.archived).length > 0 && (
+            <View style={styles.badgeAll}>
+              <Text style={styles.badgeText}>
+                {reservations.filter(r => !r.archived).length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity 
           style={[styles.tab, activeTab === 'requests' && styles.activeTab]} 
           onPress={() => setActiveTab('requests')}
         >
@@ -300,12 +314,26 @@ export default function ReservasScreen() {
           onPress={() => setActiveTab('upcoming')}
         >
           <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>Próximas</Text>
+          {reservations.filter(r => r.status === 'confirmed' && !r.archived).length > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {reservations.filter(r => r.status === 'confirmed' && !r.archived).length}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'history' && styles.activeTab]} 
           onPress={() => setActiveTab('history')}
         >
           <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>Historial</Text>
+          {reservations.filter(r => ['completed', 'cancelled', 'denied'].includes(r.status) && !r.archived).length > 0 && (
+            <View style={styles.badgeHistory}>
+              <Text style={styles.badgeText}>
+                {reservations.filter(r => ['completed', 'cancelled', 'denied'].includes(r.status) && !r.archived).length}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -318,6 +346,7 @@ export default function ReservasScreen() {
           <View style={{ alignItems: 'center', marginTop: 50 }}>
             <Ionicons 
               name={
+                activeTab === 'all' ? "file-tray-outline" :
                 activeTab === 'requests' ? "notifications-outline" : 
                 activeTab === 'upcoming' ? "calendar-outline" : "time-outline"
               } 
@@ -325,7 +354,8 @@ export default function ReservasScreen() {
               color="#D1D5DB" 
             />
             <Text style={{ marginTop: 16, fontSize: 16, color: '#6B7280' }}>
-              {activeTab === 'requests' ? 'No tienes solicitudes pendientes.' :
+              {activeTab === 'all' ? 'No tienes reservas.' :
+               activeTab === 'requests' ? 'No tienes solicitudes pendientes.' :
                activeTab === 'upcoming' ? 'No tienes reservas próximas.' :
                'No tienes historial de reservas.'}
             </Text>
@@ -346,7 +376,7 @@ export default function ReservasScreen() {
                 onDeny={() => handleDenyPress(r.id)}
                 onChat={() => handleChat(r)}
                 onCheckIn={() => navigation.navigate('CheckInStart', { reservation: r })}
-                onViewDetails={() => handleChat(r)}
+                onViewDetails={() => navigation.navigate('ReservationDetails', { reservation: r })}
                 onArchive={() => handleArchiveReservation(r.id)}
                 onDelete={() => handleDeleteReservation(r.id, vehicleName)}
                 isProcessing={processingId === r.id}
@@ -444,6 +474,18 @@ const styles = StyleSheet.create({
   },
   badge: {
     backgroundColor: '#EF4444',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  badgeAll: {
+    backgroundColor: '#0B729D',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  badgeHistory: {
+    backgroundColor: '#6B7280',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,

@@ -1,5 +1,5 @@
-import { Timestamp, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { auth, db } from '../../FirebaseConfig';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { db, Firebaseauth } from '../../FirebaseConfig';
 
 export interface AvailabilityData {
   id?: string;
@@ -27,6 +27,7 @@ export interface Reservation {
   deliveryAddress?: string;
   deliveryCoords?: { latitude: number; longitude: number };
   pickupCoords?: { latitude: number; longitude: number };
+  pickupCoordinates?: { latitude: number; longitude: number };
   denialReason?: string;
     cancellationReason?: string;
   messageToHost?: string;
@@ -173,6 +174,47 @@ export const checkAvailability = (
   return true;
 };
 
+export const checkReservationConflicts = async (
+  vehicleId: string,
+  startDate: Timestamp,
+  endDate: Timestamp,
+  excludeReservationId?: string
+): Promise<boolean> => {
+  try {
+    // Buscar reservas confirmadas o activas para este vehículo
+    const q = query(
+      collection(db, 'reservations'),
+      where('vehicleId', '==', vehicleId),
+      where('status', 'in', ['confirmed', 'active', 'pending'])
+    );
+
+    const querySnapshot = await getDocs(q);
+    const start = startDate.toMillis();
+    const end = endDate.toMillis();
+
+    for (const docSnap of querySnapshot.docs) {
+      // Si es la misma reserva que estamos actualizando, skip
+      if (excludeReservationId && docSnap.id === excludeReservationId) {
+        continue;
+      }
+
+      const resData = docSnap.data();
+      const resStart = resData.startDate.toMillis();
+      const resEnd = resData.endDate.toMillis();
+
+      // Check overlap: (StartA <= EndB) and (EndA >= StartB)
+      if (start <= resEnd && end >= resStart) {
+        return true; // Conflicto encontrado
+      }
+    }
+
+    return false; // No hay conflictos
+  } catch (error) {
+    console.error('Error checking conflicts:', error);
+    throw error;
+  }
+};
+
 export const updateReservationStatus = async (
   reservationId: string,
   status: 'confirmed' | 'denied' | 'cancelled' | 'completed',
@@ -180,6 +222,28 @@ export const updateReservationStatus = async (
 ) => {
   try {
     const reservationRef = doc(db, 'reservations', reservationId);
+    const reservationSnap = await getDoc(reservationRef);
+    
+    if (!reservationSnap.exists()) {
+      throw new Error('Reserva no encontrada');
+    }
+
+    const reservationData = reservationSnap.data();
+
+    // Si estamos confirmando, verificar que no haya conflictos
+    if (status === 'confirmed') {
+      const hasConflict = await checkReservationConflicts(
+        reservationData.vehicleId,
+        reservationData.startDate,
+        reservationData.endDate,
+        reservationId
+      );
+
+      if (hasConflict) {
+        throw new Error('Ya existe una reserva confirmada para estas fechas. Por favor rechaza esta solicitud.');
+      }
+    }
+
     const updateData: any = { 
       status,
       updatedAt: serverTimestamp()
@@ -196,7 +260,7 @@ export const updateReservationStatus = async (
     }
 
     await updateDoc(reservationRef, updateData);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating reservation status:', error);
     throw error;
   }
@@ -204,6 +268,10 @@ export const updateReservationStatus = async (
 
 export const deleteReservation = async (reservationId: string) => {
   try {
+    if (!Firebaseauth.currentUser) {
+      throw new Error('Usuario no autenticado');
+    }
+    
     const reservationRef = doc(db, 'reservations', reservationId);
     
     // Verify the reservation exists and user has permission
@@ -213,19 +281,16 @@ export const deleteReservation = async (reservationId: string) => {
     }
     
     const reservationData = reservationSnap.data();
-    const currentUser = auth.currentUser;
-    
-    if (!currentUser) {
-      throw new Error('Usuario no autenticado');
-    }
+    const currentUserId = Firebaseauth.currentUser.uid;
     
     // Verify user is either the renter or the host
-    if (reservationData.userId !== currentUser.uid && reservationData.arrendadorId !== currentUser.uid) {
+    if (reservationData.userId !== currentUserId && reservationData.arrendadorId !== currentUserId) {
       throw new Error('No tienes permisos para eliminar esta reserva');
     }
     
     await deleteDoc(reservationRef);
   } catch (error: any) {
+    console.error('Error deleting reservation:', error);
     throw new Error(error.message || 'Error al eliminar la reserva');
   }
 };

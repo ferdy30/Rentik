@@ -42,15 +42,21 @@ service cloud.firestore {
 
     // Reservations collection
     match /reservations/{reservationId} {
+      // Allow read if user is the renter or the owner
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
         resource.data.arrendadorId == request.auth.uid
       );
+      // Allow list (query) for user's own reservations
+      allow list: if isAuthenticated();
+      // Allow create if user is creating their own reservation
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Allow update if user is renter or owner (for status changes, etc.)
       allow update: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
         resource.data.arrendadorId == request.auth.uid
       );
+      // Allow delete if user is renter or owner
       allow delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
         resource.data.arrendadorId == request.auth.uid

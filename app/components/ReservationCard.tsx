@@ -13,7 +13,6 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
 import { Reservation } from '../services/reservations';
 import { calculateDaysBetween, formatDate, isPast } from '../utils/date';
 
@@ -58,6 +57,7 @@ export default function ReservationCard({
 }: ReservationCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [scaleAnim] = useState(new Animated.Value(1));
+  const [pulseAnim] = useState(new Animated.Value(1));
   const [countdown, setCountdown] = useState('');
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -93,6 +93,10 @@ export default function ReservationCard({
   const startDate = reservation.startDate.toDate();
   const endDate = reservation.endDate.toDate();
   const days = calculateDaysBetween(startDate, endDate);
+  
+  // Check if new (less than 24 hours)
+  const createdAt = reservation.createdAt?.toDate() || startDate;
+  const isNew = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60) <= 24;
 
   // Format delivery and return times - use pickupTime/returnTime if available
   const formatTimeFromISO = (isoString?: string, fallbackDate?: Date): string => {
@@ -117,9 +121,27 @@ export default function ReservationCard({
   const isStartingSoon = isUpcoming && hoursUntilStart <= 24 && hoursUntilStart > 0;
   const isUrgent = isUpcoming && daysUntilStart <= 3 && daysUntilStart > 0;
 
-  // Check if reservation is new (created in last 24h)
-  const createdAt = reservation.createdAt?.toDate() || startDate;
-  const isNew = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60) <= 24;
+  // Pulse animation for new badge
+  useEffect(() => {
+    if (isNew && reservation.status === 'pending') {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [isNew, reservation.status]);
 
   // Countdown en tiempo real
   useEffect(() => {
@@ -261,10 +283,10 @@ export default function ReservationCard({
 
           {/* New Badge */}
           {isNew && reservation.status === 'pending' && (
-            <View style={styles.newBadge}>
+            <Animated.View style={[styles.newBadge, { transform: [{ scale: pulseAnim }] }]}>
               <Ionicons name="sparkles" size={12} color="#fff" />
               <Text style={styles.newBadgeText}>NUEVA</Text>
-            </View>
+            </Animated.View>
           )}
 
           {/* Urgent/Soon Badge con Countdown */}
@@ -292,7 +314,7 @@ export default function ReservationCard({
                 {formatDate(startDate)} - {formatDate(endDate)}
               </Text>
               <Text style={styles.daysTextOverlay}>
-                • {`${days} ${days === 1 ? 'día' : 'días'}`}
+                {`• ${days} ${days === 1 ? 'día' : 'días'}`}
               </Text>
             </View>
           </View>
@@ -371,106 +393,6 @@ export default function ReservationCard({
           </View>
         )}
 
-        {/* Map Section */}
-        {(reservation.deliveryCoords || reservation.pickupCoords || reservation.isDelivery) && (
-          <View style={styles.mapSection}>
-            <View style={styles.mapHeader}>
-              <Ionicons name="map" size={18} color="#0B729D" />
-              <Text style={styles.mapTitle}>
-                {reservation.isDelivery ? 'Lugar de entrega' : 'Lugar de recogida'}
-              </Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.mapContainer}
-              onPress={handleNavigationOptions}
-              activeOpacity={0.8}
-            >
-              <MapView
-                style={styles.map}
-                initialRegion={{
-                  latitude: coords?.latitude || 0,
-                  longitude: coords?.longitude || 0,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }}
-                scrollEnabled={false}
-                zoomEnabled={false}
-                pitchEnabled={false}
-                rotateEnabled={false}
-                pointerEvents="none"
-              >
-                <Marker
-                  coordinate={{
-                    latitude: coords?.latitude || 0,
-                    longitude: coords?.longitude || 0,
-                  }}
-                  title={reservation.isDelivery ? 'Entrega' : 'Recogida'}
-                >
-                  <View style={styles.customMarker}>
-                    <Ionicons name="location" size={32} color="#EF4444" />
-                  </View>
-                </Marker>
-              </MapView>
-              {/* Tap indicator overlay */}
-              <View style={styles.mapOverlay}>
-                <View style={styles.mapTapIndicator}>
-                  <Ionicons name="navigate" size={16} color="#0B729D" />
-                  <Text style={styles.mapTapText}>Toca para abrir</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-            <View style={styles.addressRow}>
-              <Text style={styles.addressText} numberOfLines={2}>
-                {address || 'Dirección por confirmar'}
-              </Text>
-              <TouchableOpacity 
-                style={styles.copyButton} 
-                onPress={handleCopyAddress}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="copy-outline" size={18} color="#0B729D" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Delivery & Return Times */}
-        <View style={styles.timesSection}>
-          {/* Delivery Date/Time */}
-          <View style={styles.timeCard}>
-            <View style={styles.timeIconContainer}>
-              <View style={[styles.timeIconCircle, { backgroundColor: '#DCFCE7' }]}>
-                <Ionicons name="arrow-down-circle" size={20} color="#16A34A" />
-              </View>
-            </View>
-            <View style={styles.timeContent}>
-              <Text style={styles.timeLabel}>Fecha de entrega</Text>
-              <Text style={styles.timeDate}>{deliveryDate}</Text>
-              <View style={styles.timeRow}>
-                <Ionicons name="time-outline" size={14} color="#6B7280" />
-                <Text style={styles.timeValue}>{deliveryTime}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Return Date/Time */}
-          <View style={styles.timeCard}>
-            <View style={styles.timeIconContainer}>
-              <View style={[styles.timeIconCircle, { backgroundColor: '#FEE2E2' }]}>
-                <Ionicons name="arrow-up-circle" size={20} color="#DC2626" />
-              </View>
-            </View>
-            <View style={styles.timeContent}>
-              <Text style={styles.timeLabel}>Fecha de devolución</Text>
-              <Text style={styles.timeDate}>{returnDate}</Text>
-              <View style={styles.timeRow}>
-                <Ionicons name="time-outline" size={14} color="#6B7280" />
-                <Text style={styles.timeValue}>{returnTime}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
         {/* Extras */}
         {reservation.extras && Object.values(reservation.extras).some(v => v) && (
           <View style={styles.extrasSection}>
@@ -548,71 +470,101 @@ export default function ReservationCard({
         </TouchableOpacity>
 
         {/* Actions Section */}
-        {reservation.status === 'pending' && onConfirm && onDeny && (
+        {reservation.status === 'pending' && (
           <View style={styles.actionsSection}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.confirmButton]}
-              onPress={onConfirm}
-              disabled={isProcessing}
-            >
-              {isProcessing ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                  <Text style={styles.actionButtonText}>Aceptar</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.denyButton]}
-              onPress={onDeny}
-              disabled={isProcessing}
-            >
-              <Ionicons name="close-circle" size={20} color="#fff" />
-              <Text style={styles.actionButtonText}>Rechazar</Text>
-            </TouchableOpacity>
-            {onChat && (
+            {/* Quick Actions for Pending */}
+            <View style={styles.quickActionsRow}>
               <TouchableOpacity
-                style={[styles.actionButton, styles.chatButton]}
-                onPress={onChat}
-                disabled={isLoadingChat}
+                style={[styles.quickActionButton, styles.denyQuickButton]}
+                onPress={onDeny}
+                disabled={isProcessing}
               >
-                {isLoadingChat ? (
+                {isProcessing ? (
+                  <ActivityIndicator size="small" color="#DC2626" />
+                ) : (
+                  <>
+                    <Ionicons name="close-circle" size={20} color="#DC2626" />
+                    <Text style={styles.denyQuickButtonText}>Rechazar</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.quickActionButton, styles.acceptQuickButton]}
+                onPress={onConfirm}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Ionicons name="chatbubble" size={20} color="#fff" />
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                    <Text style={styles.acceptQuickButtonText}>Aceptar</Text>
+                  </>
                 )}
+              </TouchableOpacity>
+            </View>
+            
+            {/* View More Button */}
+            {onViewDetails && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.viewMoreButton]}
+                onPress={onViewDetails}
+                disabled={isProcessing}
+              >
+                <Ionicons name="eye" size={20} color="#0B729D" />
+                <Text style={[styles.actionButtonText, { color: '#0B729D' }]}>Ver detalles completos</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
-        {reservation.status === 'confirmed' && onCheckIn && (
+        {reservation.status === 'confirmed' && (
           <View style={styles.actionsSection}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.checkInButton]}
-              onPress={onCheckIn}
-            >
-              <Ionicons name="key" size={20} color="#fff" />
-              <Text style={styles.actionButtonText}>Iniciar Check-in</Text>
-            </TouchableOpacity>
-            {onChat && (
+            {/* Countdown/Status Info */}
+            {isStartingSoon ? (
+              <View style={styles.upcomingAlert}>
+                <Ionicons name="alarm" size={20} color="#F59E0B" />
+                <Text style={styles.upcomingAlertText}>
+                  {countdown ? `Comienza en ${countdown}` : '¡Comienza pronto!'}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.upcomingInfo}>
+                <Ionicons name="calendar-outline" size={18} color="#0B729D" />
+                <Text style={styles.upcomingInfoText}>
+                  Comienza {formatDate(startDate)}
+                </Text>
+              </View>
+            )}
+            
+            {/* Action Buttons */}
+            <View style={styles.quickActionsRow}>
+              {onChat && (
+                <TouchableOpacity
+                  style={[styles.quickActionButton, styles.chatQuickButton]}
+                  onPress={onChat}
+                  disabled={isLoadingChat}
+                >
+                  {isLoadingChat ? (
+                    <ActivityIndicator size="small" color="#0B729D" />
+                  ) : (
+                    <>
+                      <Ionicons name="chatbubbles" size={20} color="#0B729D" />
+                      <Text style={styles.chatQuickButtonText}>Chat</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            {onViewDetails && (
               <TouchableOpacity
-                style={[styles.actionButton, styles.chatButtonFull]}
-                onPress={onChat}
-                disabled={isLoadingChat}
+                style={[styles.actionButton, styles.viewMoreButton]}
+                onPress={onViewDetails}
               >
-                {isLoadingChat ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="chatbubble" size={18} color="#fff" />
-                    <Text style={styles.actionButtonText}>
-                      {`Chatear con ${userProfile?.nombre || 'cliente'}`}
-                    </Text>
-                  </>
-                )}
+                <Ionicons name="eye" size={20} color="#0B729D" />
+                <Text style={[styles.actionButtonText, { color: '#0B729D' }]}>Ver detalles completos</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1193,8 +1145,92 @@ const styles = StyleSheet.create({
     color: '#16A34A',
   },
   actionsSection: {
+    gap: 10,
+  },
+  quickActionsRow: {
     flexDirection: 'row',
     gap: 10,
+    marginBottom: 8,
+  },
+  quickActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  denyQuickButton: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#DC2626',
+  },
+  denyQuickButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  acceptQuickButton: {
+    backgroundColor: '#16A34A',
+    borderColor: '#16A34A',
+  },
+  acceptQuickButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  checkInQuickButton: {
+    backgroundColor: '#16A34A',
+    borderColor: '#16A34A',
+  },
+  checkInQuickButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  chatQuickButton: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0B729D',
+  },
+  chatQuickButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0B729D',
+  },
+  upcomingAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  upcomingAlertText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  upcomingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#EFF6FF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  upcomingInfoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E40AF',
   },
   actionButton: {
     flexDirection: 'row',
@@ -1220,6 +1256,12 @@ const styles = StyleSheet.create({
   checkInButton: {
     flex: 1,
     backgroundColor: '#16A34A',
+  },
+  viewMoreButton: {
+    width: '100%',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#0B729D',
   },
   chatButtonFull: {
     flex: 1,

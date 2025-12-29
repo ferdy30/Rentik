@@ -7,6 +7,10 @@ export interface VehiclePhotos {
 }
 
 export interface VehicleRules {
+  allowPets?: boolean;
+  allowSmoking?: boolean;
+  allowLongTrips?: boolean;
+  // Legacy fields
   pets?: boolean;
   smoking?: boolean;
   crossBorder?: boolean;

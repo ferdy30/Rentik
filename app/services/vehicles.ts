@@ -1,5 +1,5 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Platform } from 'react-native';
 import { db, storage } from '../../FirebaseConfig';
 import { Vehicle } from '../types/vehicle';
@@ -291,6 +291,77 @@ export const updateVehicle = async (vehicleId: string, data: Partial<Vehicle>) =
     await updateDoc(vehicleRef, data);
   } catch (error) {
     console.error('Error updating vehicle:', error);
+    throw error;
+  }
+};
+
+/**
+ * Actualiza las fotos de un vehículo
+ * @param vehicleId - ID del vehículo
+ * @param photos - Array de URIs de las nuevas fotos (locales o remotas)
+ * @param deletedPhotos - Array de URLs de Firebase Storage para eliminar
+ * @param userId - ID del usuario para el path de Storage
+ */
+export const updateVehiclePhotos = async (
+  vehicleId: string,
+  photos: string[],
+  deletedPhotos: string[],
+  userId: string
+) => {
+  try {
+    // 1. Eliminar fotos de Firebase Storage
+    if (deletedPhotos.length > 0) {
+      await Promise.all(
+        deletedPhotos.map(async (url) => {
+          try {
+            // Solo eliminar si es URL de Firebase Storage
+            if (url.includes('firebasestorage.googleapis.com')) {
+              const photoRef = ref(storage, url);
+              await deleteObject(photoRef);
+            }
+          } catch (e) {
+            console.warn('Error deleting photo:', url, e);
+          }
+        })
+      );
+    }
+
+    // 2. Subir nuevas fotos (solo las que sean URIs locales)
+    const timestamp = Date.now();
+    const uploadedUrls: string[] = [];
+
+    for (let i = 0; i < photos.length; i++) {
+      const photo = photos[i];
+      
+      // Si ya es URL de Firebase, mantenerla
+      if (photo.startsWith('http')) {
+        uploadedUrls.push(photo);
+      } else {
+        // Subir nueva foto
+        try {
+          const path = `vehicles/${userId}/${timestamp}/photo_${i}.jpg`;
+          const url = await uploadImage(photo, path);
+          uploadedUrls.push(url);
+        } catch (e) {
+          console.error('Error uploading photo:', e);
+        }
+      }
+    }
+
+    // 3. Actualizar documento en Firestore
+    const vehicleRef = doc(db, 'vehicles', vehicleId);
+    await updateDoc(vehicleRef, {
+      imagenes: uploadedUrls,
+      imagen: uploadedUrls[0] || '',
+      photos: {
+        front: uploadedUrls[0] || '',
+        sideLeft: uploadedUrls[1] || '',
+        sideRight: uploadedUrls[2] || '',
+        interior: uploadedUrls[3] || '',
+      },
+    });
+  } catch (error) {
+    console.error('Error updating vehicle photos:', error);
     throw error;
   }
 };

@@ -5,7 +5,6 @@ import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, Modal, Platform, ScrollView, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { db } from '../../FirebaseConfig';
-import BookingBottomSheet from '../components/Details/BookingBottomSheet';
 import BottomActionBar from '../components/Details/BottomActionBar';
 import DetailsSkeleton from '../components/Details/DetailsSkeleton';
 import FadeInSection from '../components/Details/FadeInSection';
@@ -36,7 +35,6 @@ export default function Details() {
   const { favorites, toggleFavorite } = useFavorites();
   
   const [isLoading, setIsLoading] = useState(true);
-  const [showBookingSheet, setShowBookingSheet] = useState(false);
   
   // Normalizar datos para asegurar consistencia
   const vehicle = React.useMemo(() => {
@@ -329,22 +327,7 @@ export default function Details() {
 
       <BottomActionBar
         price={vehicle.precio}
-        onBookPress={() => setShowBookingSheet(true)}
-      />
-
-      {/* Booking Bottom Sheet */}
-      <BookingBottomSheet
-        visible={showBookingSheet}
-        onClose={() => setShowBookingSheet(false)}
-        onConfirm={(startDate, endDate) => {
-          navigation.navigate('BookingStep1Dates', { 
-            vehicle,
-            preselectedDates: { startDate, endDate }
-          });
-        }}
-        pricePerDay={vehicle.precio}
-        weeklyDiscount={vehicle.discounts?.weekly}
-        monthlyDiscount={vehicle.discounts?.monthly}
+        onBookPress={() => navigation.navigate('BookingStep1Dates', { vehicle })}
       />
 
       {/* Full Screen Image Modal */}

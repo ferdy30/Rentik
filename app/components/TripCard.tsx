@@ -300,14 +300,14 @@ export default function TripCard({
       {/* Quick Actions */}
       {(tripDetails.isActive || tripDetails.isPending) && onQuickAction && (
         <View style={styles.quickActionsContainer}>
-          {/* Chat Action */}
+          {/* Ver más Action */}
           <TouchableOpacity
             style={[styles.quickActionButton, styles.quickActionPrimary]}
-            onPress={() => onQuickAction('chat')}
+            onPress={onPress}
             activeOpacity={0.7}
           >
-            <Ionicons name="chatbubble" size={18} color="#FFF" />
-            <Text style={styles.quickActionPrimaryText}>Chat</Text>
+            <Ionicons name="eye" size={18} color="#FFF" />
+            <Text style={styles.quickActionPrimaryText}>Ver más</Text>
           </TouchableOpacity>
           
           {/* Check-in/Navigate for active trips */}
@@ -325,11 +325,11 @@ export default function TripCard({
           {tripDetails.isActive && !tripDetails.isStartingSoon && (
             <TouchableOpacity
               style={styles.quickActionButton}
-              onPress={onPress}
+              onPress={() => onQuickAction('chat')}
               activeOpacity={0.7}
             >
-              <Ionicons name="information-circle-outline" size={18} color="#0B729D" />
-              <Text style={styles.quickActionText}>Más info</Text>
+              <Ionicons name="chatbubble-outline" size={18} color="#0B729D" />
+              <Text style={styles.quickActionText}>Chat</Text>
             </TouchableOpacity>
           )}
         </View>

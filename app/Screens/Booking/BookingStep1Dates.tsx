@@ -62,8 +62,38 @@ export default function BookingStep1Dates() {
         return days;
     }, [currentMonth]);
 
-    // Check if a date is blocked by a reservation
+    // Check if a date is blocked by a reservation OR by the owner
     const isDateBlocked = (date: Date) => {
+        const dateStr = date.toDateString();
+        
+        // Check if blocked by owner (blockedDates from vehicle)
+        const blockedByOwner = vehicle.blockedDates?.some((blockedDateStr: string) => {
+            const blockedDate = new Date(blockedDateStr);
+            return blockedDate.toDateString() === dateStr;
+        });
+        
+        if (blockedByOwner) return true;
+        
+        // Check if blocked by reservations
+        return reservations.some(res => {
+            const resStart = new Date(res.startDate);
+            const resEnd = new Date(res.endDate);
+            const checkDate = new Date(dateStr);
+            return checkDate >= resStart && checkDate <= resEnd;
+        });
+    };
+
+    // Separate check for owner-blocked dates
+    const isOwnerBlocked = (date: Date) => {
+        const dateStr = date.toDateString();
+        return vehicle.blockedDates?.some((blockedDateStr: string) => {
+            const blockedDate = new Date(blockedDateStr);
+            return blockedDate.toDateString() === dateStr;
+        }) || false;
+    };
+
+    // Separate check for reservation-blocked dates
+    const isReservationBlocked = (date: Date) => {
         const dateStr = date.toDateString();
         return reservations.some(res => {
             const resStart = new Date(res.startDate);
@@ -116,7 +146,7 @@ export default function BookingStep1Dates() {
         }
 
         if (isDateBlocked(date)) {
-            Alert.alert('Fecha ocupada', 'Esta fecha ya está reservada por otro usuario.');
+            Alert.alert('Fecha no disponible', 'Esta fecha está bloqueada o ya tiene una reserva.');
             return;
         }
 
@@ -411,16 +441,30 @@ export default function BookingStep1Dates() {
                         const isPast = isPastDate(date);
                         const isSelected = isDateSelected(date);
                         const inRange = isDateInRange(date);
+                        const ownerBlocked = isOwnerBlocked(date);
+                        const reservationBlocked = isReservationBlocked(date);
                         const isDisabled = isPast || isBlocked;
+
+                        // Determinar el estilo de fondo según el tipo de bloqueo
+                        let backgroundStyle = null;
+                        if (isSelected) {
+                            backgroundStyle = styles.selectedDay;
+                        } else if (inRange) {
+                            backgroundStyle = styles.rangeDay;
+                        } else if (ownerBlocked) {
+                            backgroundStyle = styles.ownerBlockedDay;
+                        } else if (reservationBlocked) {
+                            backgroundStyle = styles.reservationBlockedDay;
+                        } else if (isPast) {
+                            backgroundStyle = styles.pastDay;
+                        }
 
                         return (
                             <TouchableOpacity
                                 key={index}
                                 style={[
                                     styles.dayCell,
-                                    isSelected && styles.selectedDay,
-                                    inRange && styles.rangeDay,
-                                    isDisabled && styles.disabledDay,
+                                    backgroundStyle,
                                 ]}
                                 onPress={() => handleDatePress(date)}
                                 disabled={isDisabled}
@@ -434,9 +478,14 @@ export default function BookingStep1Dates() {
                                 ]}>
                                     {date.getDate()}
                                 </Text>
-                                {isBlocked && (
-                                    <View style={styles.blockedIndicator}>
-                                        <Ionicons name="close" size={12} color="#EF4444" />
+                                {ownerBlocked && (
+                                    <View style={styles.ownerBlockedIndicator}>
+                                        <Ionicons name="lock-closed" size={10} color="#DC2626" />
+                                    </View>
+                                )}
+                                {reservationBlocked && !ownerBlocked && (
+                                    <View style={styles.reservationBlockedIndicator}>
+                                        <Ionicons name="calendar" size={10} color="#F59E0B" />
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -455,15 +504,21 @@ export default function BookingStep1Dates() {
                         <Text style={styles.legendText}>En rango</Text>
                     </View>
                     <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#EF4444' }]} />
-                        <Text style={styles.legendText}>No disponible</Text>
+                        <View style={[styles.legendDot, { backgroundColor: '#FEE2E2' }]} />
+                        <Ionicons name="lock-closed" size={12} color="#DC2626" style={{ marginLeft: -8, marginRight: 4 }} />
+                        <Text style={styles.legendText}>Bloqueado</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: '#FEF3C7' }]} />
+                        <Ionicons name="calendar" size={12} color="#F59E0B" style={{ marginLeft: -8, marginRight: 4 }} />
+                        <Text style={styles.legendText}>Reservado</Text>
                     </View>
                 </View>
 
                 <View style={styles.infoBox}>
                     <Ionicons name="information-circle-outline" size={20} color="#0B729D" />
                     <Text style={styles.infoText}>
-                        Las fechas en rojo están ocupadas por otras reservas. Duración mínima: 1 día.
+                        Las fechas en rojo están ocupadas o bloqueadas por el arrendador. Duración mínima: 1 día.
                     </Text>
                 </View>
 
@@ -765,9 +820,24 @@ const styles = StyleSheet.create({
         color: '#0B729D',
     },
     disabledDay: {
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
+        opacity: 0.5,
+    },
+    pastDay: {
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
+        opacity: 0.5,
+    },
+    ownerBlockedDay: {
         backgroundColor: '#FEE2E2',
         borderRadius: 12,
-        opacity: 0.6,
+        opacity: 0.7,
+    },
+    reservationBlockedDay: {
+        backgroundColor: '#FEF3C7',
+        borderRadius: 12,
+        opacity: 0.7,
     },
     disabledDayText: {
         color: '#9CA3AF',
@@ -777,6 +847,22 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 2,
         right: 2,
+    },
+    ownerBlockedIndicator: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        backgroundColor: '#FEE2E2',
+        borderRadius: 8,
+        padding: 2,
+    },
+    reservationBlockedIndicator: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        backgroundColor: '#FEF3C7',
+        borderRadius: 8,
+        padding: 2,
     },
     legendContainer: {
         flexDirection: 'row',
