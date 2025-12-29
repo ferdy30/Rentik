@@ -149,6 +149,10 @@ export default function BookingStep4Confirmation() {
             }
             if (deliveryCoords) {
                 reservationData.deliveryCoords = deliveryCoords;
+                reservationData.pickupCoordinates = deliveryCoords; // Also save as pickupCoordinates for map display
+            } else if (vehicle.coordinates) {
+                // For pickup at vehicle location, save vehicle coordinates
+                reservationData.pickupCoordinates = vehicle.coordinates;
             }
             if (message) {
                 reservationData.messageToHost = message;

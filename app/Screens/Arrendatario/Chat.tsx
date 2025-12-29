@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { Image } from 'expo-image';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -74,6 +75,20 @@ export default function ChatScreen() {
     const otherUserId = item.participants.find(p => p !== user?.uid);
     const otherUserName = otherUserId && item.participantNames?.[otherUserId] ? item.participantNames[otherUserId] : 'Anfitrión';
     const unreadCount = user?.uid ? (item.unreadCount?.[user.uid] || 0) : 0;
+    const vehicleName = item.vehicleInfo ? `${item.vehicleInfo.marca} ${item.vehicleInfo.modelo}` : null;
+
+    // Format date logic
+    const getDateLabel = (timestamp: any) => {
+        if (!timestamp?.toDate) return '';
+        const date = timestamp.toDate();
+        const now = new Date();
+        const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        
+        if (isToday) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        return date.toLocaleDateString();
+    };
 
     return (
       <TouchableOpacity 
@@ -83,11 +98,20 @@ export default function ChatScreen() {
           participants: item.participants,
           vehicleInfo: item.vehicleInfo
         })}
+        activeOpacity={0.7}
       >
         <View style={styles.avatarContainer}>
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Text style={styles.avatarInitials}>{otherUserName.charAt(0).toUpperCase()}</Text>
-          </View>
+          {item.vehicleInfo?.imagen ? (
+            <Image 
+                source={{ uri: item.vehicleInfo.imagen }}
+                style={styles.avatarImage}
+                contentFit="cover"
+            />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarInitials}>{otherUserName.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
           {unreadCount > 0 && (
             <View style={styles.unreadBadge}>
               <Text style={styles.unreadText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -97,11 +121,21 @@ export default function ChatScreen() {
         
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
-            <Text style={[styles.name, unreadCount > 0 && styles.nameUnread]}>{otherUserName}</Text>
-            <Text style={styles.time}>
-              {item.lastMessageTimestamp?.toDate().toLocaleDateString()}
+            <Text style={[styles.name, unreadCount > 0 && styles.nameUnread]} numberOfLines={1}>
+                {otherUserName}
+            </Text>
+            <Text style={[styles.time, unreadCount > 0 && styles.timeUnread]}>
+              {getDateLabel(item.lastMessageTimestamp)}
             </Text>
           </View>
+          
+          {vehicleName && (
+            <View style={styles.vehicleInfoContainer}>
+                <Ionicons name="car-sport" size={12} color="#0B729D" />
+                <Text style={styles.vehicleName} numberOfLines={1}>{vehicleName}</Text>
+            </View>
+          )}
+
           <View style={styles.messageContainer}>
             <Text style={[styles.lastMessage, unreadCount > 0 && styles.lastMessageUnread]} numberOfLines={1}>
               {item.lastMessage || 'Inicia la conversación...'}
@@ -183,9 +217,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 60,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 60,
+    paddingBottom: 24,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
@@ -193,40 +227,35 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     color: '#6B7280',
     fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontWeight: '600',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   headerTitle: {
-    color: '#0B729D',
+    color: '#111827',
     fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.5,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
   },
   listContent: {
     paddingBottom: 100,
-    paddingTop: 8,
+    paddingTop: 12,
   },
   chatItem: {
     flexDirection: 'row',
-    padding: 18,
+    padding: 16,
     alignItems: 'center',
     backgroundColor: '#fff',
     marginHorizontal: 16,
     marginVertical: 6,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#F3F4F6',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
     elevation: 2,
   },
   avatarContainer: {
@@ -236,18 +265,24 @@ const styles = StyleSheet.create({
   avatar: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 20,
     backgroundColor: '#F0F9FF',
-    borderWidth: 2,
-    borderColor: '#BFDBFE',
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
   },
   avatarPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitials: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#0B729D',
   },
   chatContent: {
@@ -257,16 +292,38 @@ const styles = StyleSheet.create({
   chatHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
   name: {
     fontSize: 16,
     fontWeight: '700',
     color: '#111827',
+    flex: 1,
+    marginRight: 8,
+  },
+  nameUnread: {
+    color: '#0B729D',
   },
   time: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  timeUnread: {
+    color: '#0B729D',
+    fontWeight: '700',
+  },
+  vehicleInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 4,
+  },
+  vehicleName: {
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '600',
   },
   messageContainer: {
     flexDirection: 'row',
@@ -278,6 +335,11 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     flex: 1,
     marginRight: 8,
+    lineHeight: 20,
+  },
+  lastMessageUnread: {
+    color: '#111827',
+    fontWeight: '600',
   },
   separator: {
     height: 0,
@@ -286,46 +348,31 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 40,
   },
   emptyText: {
     marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
   },
   unreadBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -6,
+    right: -6,
     backgroundColor: '#EF4444',
-    borderRadius: 12,
-    minWidth: 22,
-    height: 22,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#fff',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 3,
   },
   unreadText: {
     color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  nameUnread: {
-    fontWeight: '800',
-  },
-  lastMessageUnread: {
-    color: '#111827',
-    fontWeight: '600',
-  },
-  vehicleLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 2,
+    fontSize: 10,
+    fontWeight: '700',
   },
   loadingContainer: {
     flex: 1,

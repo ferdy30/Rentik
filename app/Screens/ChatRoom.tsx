@@ -1,5 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { doc, getDoc } from 'firebase/firestore';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -15,6 +19,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { db, storage } from '../../FirebaseConfig';
 import { useAuth } from '../../context/Auth';
 import {
     createChatIfNotExists,
@@ -39,6 +44,8 @@ export default function ChatRoom() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [lastVisible, setLastVisible] = useState<any>(null);
+    const [otherUserPhoto, setOtherUserPhoto] = useState<string | null>(null);
+    const [otherUserName, setOtherUserName] = useState<string>('Usuario');
     const flatListRef = useRef<FlatList>(null);
     const unsubscribeRef = useRef<(() => void) | null>(null);
 
@@ -49,11 +56,33 @@ export default function ChatRoom() {
                     setLoading(true);
                     setError(null);
                     
-                    // Create participant names object (using basic names for now)
+                    // Fetch real participant names and photos
                     const participantNames: { [key: string]: string } = {};
-                    participants.forEach(pid => {
-                        participantNames[pid] = 'Usuario';
-                    });
+                    const participantPhotos: { [key: string]: string | null } = {};
+
+                    await Promise.all(participants.map(async (pid: string) => {
+                        try {
+                            const userDoc = await getDoc(doc(db, 'users', pid));
+                            if (userDoc.exists()) {
+                                const userData = userDoc.data();
+                                participantNames[pid] = userData.nombre || 'Usuario';
+                                participantPhotos[pid] = userData.photoURL || null;
+                            } else {
+                                participantNames[pid] = 'Usuario';
+                                participantPhotos[pid] = null;
+                            }
+                        } catch (e) {
+                            console.error('Error fetching user', pid, e);
+                            participantNames[pid] = 'Usuario';
+                            participantPhotos[pid] = null;
+                        }
+                    }));
+
+                    const otherId = participants.find((p: string) => p !== user.uid);
+                    if (otherId) {
+                        setOtherUserPhoto(participantPhotos[otherId] || null);
+                        setOtherUserName(participantNames[otherId] || 'Usuario');
+                    }
                     
                     await createChatIfNotExists(reservationId, participants, vehicleInfo, participantNames);
                     
@@ -117,6 +146,38 @@ export default function ChatRoom() {
         }
     };
 
+    const handlePickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.7,
+            });
+
+            if (!result.canceled && result.assets[0].uri) {
+                setSendingMessage(true);
+                const uri = result.assets[0].uri;
+                
+                // Upload to Firebase Storage
+                const response = await fetch(uri);
+                const blob = await response.blob();
+                const filename = `chat/${reservationId}/${Date.now()}.jpg`;
+                const storageRef = ref(storage, filename);
+                
+                await uploadBytes(storageRef, blob);
+                const downloadURL = await getDownloadURL(storageRef);
+                
+                // Send message with image
+                await sendMessage(reservationId, '', user!.uid, downloadURL);
+                setSendingMessage(false);
+            }
+        } catch (error) {
+            console.error('Error picking/uploading image:', error);
+            Alert.alert('Error', 'No se pudo enviar la imagen');
+            setSendingMessage(false);
+        }
+    };
+
     const handleSend = async () => {
         if (inputText.trim().length === 0 || !user || sendingMessage) return;
         
@@ -154,12 +215,21 @@ export default function ChatRoom() {
                     styles.messageBubble,
                     isMyMessage ? styles.myMessageBubble : styles.theirMessageBubble
                 ]}>
-                    <Text style={[
-                        styles.messageText,
-                        isMyMessage ? styles.myMessageText : styles.theirMessageText
-                    ]}>
-                        {item.text}
-                    </Text>
+                    {item.image ? (
+                        <Image 
+                            source={{ uri: item.image }} 
+                            style={{ width: 200, height: 200, borderRadius: 8, marginBottom: 4 }}
+                            contentFit="cover"
+                        />
+                    ) : null}
+                    {item.text ? (
+                        <Text style={[
+                            styles.messageText,
+                            isMyMessage ? styles.myMessageText : styles.theirMessageText
+                        ]}>
+                            {item.text}
+                        </Text>
+                    ) : null}
                     <Text style={[
                         styles.messageTime,
                         isMyMessage ? styles.myMessageTime : styles.theirMessageTime
@@ -180,8 +250,17 @@ export default function ChatRoom() {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#111827" />
                 </TouchableOpacity>
+                {otherUserPhoto && (
+                    <Image 
+                        source={{ uri: otherUserPhoto }} 
+                        style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
+                        contentFit="cover"
+                    />
+                )}
                 <View style={styles.headerInfo}>
-                    <Text style={styles.headerTitle}>Chat</Text>
+                    <Text style={styles.headerTitle}>
+                        {otherUserName !== 'Usuario' ? otherUserName : 'Chat'}
+                    </Text>
                     {vehicleInfo && (
                         <Text style={styles.headerSubtitle}>{vehicleInfo.marca} {vehicleInfo.modelo}</Text>
                     )}
@@ -242,6 +321,13 @@ export default function ChatRoom() {
                 )}
 
                 <View style={styles.inputContainer}>
+                    <TouchableOpacity 
+                        style={styles.attachButton} 
+                        onPress={handlePickImage}
+                        disabled={sendingMessage}
+                    >
+                        <Ionicons name="image-outline" size={24} color="#6B7280" />
+                    </TouchableOpacity>
                     <TextInput
                         style={styles.input}
                         placeholder="Escribe un mensaje..."
@@ -362,6 +448,10 @@ const styles = StyleSheet.create({
         marginRight: 12,
         fontSize: 16,
         maxHeight: 100,
+    },
+    attachButton: {
+        padding: 8,
+        marginRight: 4,
     },
     sendButton: {
         width: 44,

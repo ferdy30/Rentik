@@ -187,9 +187,50 @@ export default function BookingStep2Location() {
     };
 
     const handleNext = () => {
-        if (deliveryType === 'delivery' && !deliveryAddress.trim()) {
-            Alert.alert('Dirección requerida', 'Por favor ingresa o selecciona una dirección de entrega.');
-            return;
+        // Validaciones críticas para delivery
+        if (deliveryType === 'delivery') {
+            // 1. Validar que tenga dirección
+            if (!deliveryAddress.trim()) {
+                Alert.alert('Dirección requerida', 'Por favor ingresa o selecciona una dirección de entrega.');
+                return;
+            }
+            
+            // 2. Validar que tenga coordenadas
+            if (!deliveryCoords) {
+                Alert.alert(
+                    'Ubicación no válida',
+                    'No pudimos obtener las coordenadas de esta dirección.\n\n' +
+                    'Por favor:\n' +
+                    '• Selecciona una dirección de las sugerencias\n' +
+                    '• Usa tu ubicación actual\n' +
+                    '• Toca el mapa para marcar el punto exacto',
+                    [{ text: 'Entendido' }]
+                );
+                return;
+            }
+            
+            // 3. Validar distancia máxima (máximo $50 de delivery)
+            if (deliveryCost > 50) {
+                Alert.alert(
+                    'Distancia muy larga',
+                    `El costo de delivery sería $${deliveryCost.toFixed(2)}. El máximo permitido es $50.\n\n` +
+                    `Distancia: ${deliveryDistance}\n\n` +
+                    'Por favor elige una ubicación más cercana o recoge el vehículo en el punto de origen.',
+                    [
+                        { text: 'Cambiar ubicación', style: 'default' },
+                        { 
+                            text: 'Recoger en origen', 
+                            onPress: () => {
+                                setDeliveryType('pickup');
+                                setDeliveryAddress('');
+                                setDeliveryCoords(null);
+                                setDeliveryCost(0);
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
         }
 
         navigation.navigate('BookingStep3Time' as never, { 

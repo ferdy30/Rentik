@@ -13,6 +13,7 @@ import CheckInDamageReport from '../Screens/CheckIn/CheckInDamageReport';
 import CheckInKeys from '../Screens/CheckIn/CheckInKeys';
 import CheckInPhotos from '../Screens/CheckIn/CheckInPhotos';
 import CheckInPreparation from '../Screens/CheckIn/CheckInPreparation';
+import CheckInProcessExplanation from '../Screens/CheckIn/CheckInProcessExplanation';
 import CheckInSignature from '../Screens/CheckIn/CheckInSignature';
 import CheckInStart from '../Screens/CheckIn/CheckInStart';
 import Details from '../Screens/Details';
@@ -121,6 +122,7 @@ export default function AppNavigation() {
             
             {/* Check-in Flow */}
             <Stack.Screen name="CheckInPreparation" component={CheckInPreparation} />
+            <Stack.Screen name="CheckInProcessExplanation" component={CheckInProcessExplanation} />
             <Stack.Screen name="CheckInStart" component={CheckInStart} />
             <Stack.Screen name="CheckInPhotos" component={CheckInPhotos} />
             <Stack.Screen name="CheckInConditions" component={CheckInConditions} />

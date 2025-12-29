@@ -20,32 +20,39 @@ export default function CheckInPreparation() {
     const route = useRoute<any>();
     const { reservation } = route.params as { reservation: Reservation };
 
-    const [checklist, setChecklist] = useState({
-        license: false,
-        id: false,
-        payment: false,
-        confirmation: false,
-    });
+    const [checklist, setChecklist] = useState(
+        route.params.isArrendador ? {
+            clean: false,
+            fuel: false,
+            keys: false,
+            documents: false,
+        } : {
+            license: false,
+            id: false,
+            payment: false,
+            confirmation: false,
+        }
+    );
 
     const isArrendador = route.params.isArrendador || false;
 
     const allChecked = Object.values(checklist).every(v => v);
 
-    const handleToggleCheck = (key: keyof typeof checklist) => {
-        setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
+    const handleToggleCheck = (key: string) => {
+        setChecklist(prev => ({ ...prev, [key]: !prev[key as keyof typeof checklist] }));
     };
 
     const handleContinue = () => {
         if (!allChecked) {
             Alert.alert(
-                'Documentos Incompletos',
-                'Por favor confirma que tienes todos los documentos requeridos antes de continuar.',
+                'Lista incompleta',
+                'Por favor confirma todos los puntos antes de continuar.',
                 [{ text: 'Entendido' }]
             );
             return;
         }
 
-        navigation.navigate('CheckInStart', { reservation });
+        navigation.navigate('CheckInProcessExplanation', { reservation, isArrendador });
     };
 
     const handleChat = () => {
@@ -53,6 +60,11 @@ export default function CheckInPreparation() {
         navigation.navigate('ChatRoom', {
             reservationId: reservation.id,
             participants: [reservation.userId, reservation.arrendadorId],
+            vehicleInfo: {
+                marca: reservation.vehicleSnapshot?.marca || '',
+                modelo: reservation.vehicleSnapshot?.modelo || '',
+                imagen: reservation.vehicleSnapshot?.imagen || ''
+            }
         });
     };
 
@@ -73,27 +85,52 @@ export default function CheckInPreparation() {
         }
     };
 
-    const checklistItems = [
+    const checklistItems = isArrendador ? [
         {
-            key: 'license' as const,
+            key: 'clean',
+            icon: 'sparkles-outline',
+            title: 'Vehículo limpio',
+            description: 'Interior y exterior en buen estado',
+        },
+        {
+            key: 'fuel',
+            icon: 'water-outline',
+            title: 'Tanque lleno',
+            description: 'O al nivel acordado',
+        },
+        {
+            key: 'keys',
+            icon: 'key-outline',
+            title: 'Llaves listas',
+            description: 'Ten las llaves a la mano',
+        },
+        {
+            key: 'documents',
+            icon: 'document-text-outline',
+            title: 'Documentos del vehículo',
+            description: 'Tarjeta de circulación y seguro',
+        },
+    ] : [
+        {
+            key: 'license',
             icon: 'card-outline',
             title: 'Licencia de conducir vigente',
             description: 'Original, no vencida',
         },
         {
-            key: 'id' as const,
+            key: 'id',
             icon: 'person-outline',
             title: 'Identificación oficial',
             description: 'DUI, pasaporte o cédula',
         },
         {
-            key: 'payment' as const,
+            key: 'payment',
             icon: 'wallet-outline',
             title: 'Método de pago',
             description: 'Tarjeta de crédito/débito',
         },
         {
-            key: 'confirmation' as const,
+            key: 'confirmation',
             icon: 'document-text-outline',
             title: 'Comprobante de reserva',
             description: 'Ya lo tienes en la app',
@@ -176,10 +213,14 @@ export default function CheckInPreparation() {
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Ionicons name="checkmark-done-circle" size={24} color="#0B729D" />
-                        <Text style={styles.sectionTitle}>Documentos requeridos</Text>
+                        <Text style={styles.sectionTitle}>
+                            {isArrendador ? 'Lista de preparación' : 'Documentos requeridos'}
+                        </Text>
                     </View>
                     <Text style={styles.sectionSubtitle}>
-                        Confirma que tienes estos documentos antes de continuar
+                        {isArrendador 
+                            ? 'Confirma que el vehículo está listo para la entrega'
+                            : 'Confirma que tienes estos documentos antes de continuar'}
                     </Text>
 
                     {checklistItems.map((item) => (
@@ -215,22 +256,41 @@ export default function CheckInPreparation() {
                         <Text style={styles.tipsTitle}>Tips para un check-in rápido</Text>
                     </View>
                     <View style={styles.tipsList}>
-                        <View style={styles.tipItem}>
-                            <View style={styles.tipBullet} />
-                            <Text style={styles.tipText}>Llega 5-10 minutos antes de la hora acordada</Text>
-                        </View>
-                        <View style={styles.tipItem}>
-                            <View style={styles.tipBullet} />
-                            <Text style={styles.tipText}>Revisa el nivel de combustible al inicio</Text>
-                        </View>
-                        <View style={styles.tipItem}>
-                            <View style={styles.tipBullet} />
-                            <Text style={styles.tipText}>Toma fotos de cualquier daño existente</Text>
-                        </View>
-                        <View style={styles.tipItem}>
-                            <View style={styles.tipBullet} />
-                            <Text style={styles.tipText}>Verifica que todos los accesorios estén presentes</Text>
-                        </View>
+                        {isArrendador ? (
+                            <>
+                                <View style={styles.tipItem}>
+                                    <View style={styles.tipBullet} />
+                                    <Text style={styles.tipText}>Ten a la mano el contrato digital</Text>
+                                </View>
+                                <View style={styles.tipItem}>
+                                    <View style={styles.tipBullet} />
+                                    <Text style={styles.tipText}>Verifica la identidad del conductor</Text>
+                                </View>
+                                <View style={styles.tipItem}>
+                                    <View style={styles.tipBullet} />
+                                    <Text style={styles.tipText}>Toma fotos claras de los 4 lados</Text>
+                                </View>
+                            </>
+                        ) : (
+                            <>
+                                <View style={styles.tipItem}>
+                                    <View style={styles.tipBullet} />
+                                    <Text style={styles.tipText}>Llega 5-10 minutos antes de la hora acordada</Text>
+                                </View>
+                                <View style={styles.tipItem}>
+                                    <View style={styles.tipBullet} />
+                                    <Text style={styles.tipText}>Revisa el nivel de combustible al inicio</Text>
+                                </View>
+                                <View style={styles.tipItem}>
+                                    <View style={styles.tipBullet} />
+                                    <Text style={styles.tipText}>Toma fotos de cualquier daño existente</Text>
+                                </View>
+                                <View style={styles.tipItem}>
+                                    <View style={styles.tipBullet} />
+                                    <Text style={styles.tipText}>Verifica que todos los accesorios estén presentes</Text>
+                                </View>
+                            </>
+                        )}
                     </View>
                 </View>
 
@@ -238,7 +298,7 @@ export default function CheckInPreparation() {
                 <View style={styles.quickActions}>
                     <TouchableOpacity style={styles.quickActionButton} onPress={handleChat}>
                         <Ionicons name="chatbubble-outline" size={20} color="#0B729D" />
-                        <Text style={styles.quickActionText}>Chat con {isArrendador ? 'arrendatario' : 'anfitrión'}</Text>
+                        <Text style={styles.quickActionText}>Chat con {isArrendador ? 'el viajero' : 'anfitrión'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.quickActionButton} onPress={handleGetDirections}>
                         <Ionicons name="navigate-outline" size={20} color="#0B729D" />
@@ -479,10 +539,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
         padding: 14,
-        backgroundColor: '#fff',
+        backgroundColor: '#F0F9FF',
         borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#0B729D',
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
     },
     quickActionText: {
         fontSize: 14,

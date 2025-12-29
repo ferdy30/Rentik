@@ -2,15 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useAuth } from '../../../context/Auth';
 import { useToast } from '../../../context/ToastContext';
@@ -365,10 +365,12 @@ export default function ViajesScreen() {
                 if (action === 'chat') {
                   navigation.navigate('ChatRoom', { 
                     reservationId: res.id,
-                    otherUserId: res.arrendadorId,
-                    vehicleName: res.vehicleSnapshot 
-                      ? `${res.vehicleSnapshot.marca} ${res.vehicleSnapshot.modelo}`
-                      : 'Vehículo'
+                    participants: [res.userId, res.arrendadorId],
+                    vehicleInfo: {
+                        marca: res.vehicleSnapshot?.marca || '',
+                        modelo: res.vehicleSnapshot?.modelo || '',
+                        imagen: res.vehicleSnapshot?.imagen || ''
+                    }
                   });
                 } else if (action === 'navigate') {
                   // Navigate to location

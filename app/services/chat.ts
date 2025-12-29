@@ -22,6 +22,7 @@ import { db } from '../../FirebaseConfig';
 export interface Message {
   id: string;
   text: string;
+  image?: string;
   senderId: string;
   createdAt: Timestamp;
   read: boolean;
@@ -101,12 +102,13 @@ export const createChatIfNotExists = async (reservationId: string, participants:
   }
 };
 
-export const sendMessage = async (chatId: string, text: string, senderId: string) => {
+export const sendMessage = async (chatId: string, text: string, senderId: string, image?: string) => {
   try {
     // 1. Add message to subcollection
     const messagesRef = collection(db, 'chats', chatId, 'messages');
     await addDoc(messagesRef, {
       text,
+      image: image || null,
       senderId,
       createdAt: serverTimestamp(),
       read: false
@@ -122,7 +124,7 @@ export const sendMessage = async (chatId: string, text: string, senderId: string
       
       // 3. Update chat document with last message and increment unread count for other user
       const updateData: any = {
-        lastMessage: text,
+        lastMessage: image ? '📷 Imagen' : text,
         lastMessageTimestamp: serverTimestamp(),
         lastMessageSenderId: senderId,
         updatedAt: serverTimestamp()

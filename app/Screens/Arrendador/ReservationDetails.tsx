@@ -588,24 +588,70 @@ export default function ReservationDetails() {
       {/* Action Buttons para reservas confirmadas */}
       {reservation.status === 'confirmed' && (() => {
         const startDate = reservation.startDate?.toDate();
+        const endDate = reservation.endDate?.toDate();
         const now = new Date();
-        const hoursUntilStart = startDate ? (startDate.getTime() - now.getTime()) / (1000 * 60 * 60) : 999;
-        const canCheckIn = hoursUntilStart <= 24 && hoursUntilStart >= 0;
-        const daysUntil = Math.ceil(hoursUntilStart / 24);
+        
+        const msUntilStart = startDate ? startDate.getTime() - now.getTime() : 999999999;
+        const msUntilEnd = endDate ? endDate.getTime() - now.getTime() : -1;
+        const hoursUntilStart = msUntilStart / (1000 * 60 * 60);
+        const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
+        
+        // Check-in disponible si:
+        // - Faltan menos de 24h Y más de -2h (ventana de tolerancia de 26h), O
+        // - El viaje ya empezó pero no ha terminado
+        const canCheckIn = (
+            (hoursUntilStart <= 24 && hoursUntilStart > -2) ||
+            (hoursUntilStart <= 0 && hoursUntilEnd > 0)
+        );
+        
+        let buttonText = 'Preparar Check-in';
+        let statusBanner = null;
+        
+        if (!canCheckIn) {
+            if (hoursUntilStart > 24) {
+                const days = Math.ceil(hoursUntilStart / 24);
+                buttonText = `Disponible en ${days} día${days > 1 ? 's' : ''}`;
+            } else if (hoursUntilEnd <= 0) {
+                buttonText = 'Viaje finalizado';
+            } else {
+                buttonText = 'Ventana expirada';
+            }
+        } else if (hoursUntilStart > 0 && hoursUntilStart <= 24) {
+            const hours = Math.floor(hoursUntilStart);
+            const minutes = Math.floor((hoursUntilStart % 1) * 60);
+            statusBanner = (
+                <View style={styles.checkInBanner}>
+                    <Ionicons name="time-outline" size={18} color="#F59E0B" />
+                    <Text style={styles.checkInBannerText}>
+                        Check-in disponible • {hours}h {minutes}min para el inicio
+                    </Text>
+                </View>
+            );
+        } else if (hoursUntilStart <= 0 && hoursUntilEnd > 0) {
+            statusBanner = (
+                <View style={[styles.checkInBanner, { backgroundColor: '#DCFCE7' }]}>
+                    <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                    <Text style={[styles.checkInBannerText, { color: '#166534' }]}>
+                        ¡El viaje está activo! Hora de hacer check-in
+                    </Text>
+                </View>
+            );
+        }
 
         return (
-          <View style={styles.actionBar}>
-            <TouchableOpacity 
-              style={[styles.checkInButton, !canCheckIn && styles.buttonDisabled]}
-              onPress={() => navigation.navigate('CheckInPreparation', { reservation, isArrendador: true })}
-              disabled={!canCheckIn}
-            >
-              <Ionicons name="key" size={20} color="#fff" />
-              <Text style={styles.checkInButtonText}>
-                {canCheckIn ? 'Preparar Check-in' : `Check-in en ${daysUntil}d`}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <>
+            {statusBanner}
+            <View style={styles.actionBar}>
+              <TouchableOpacity 
+                style={[styles.checkInButton, !canCheckIn && styles.buttonDisabled]}
+                onPress={() => navigation.navigate('CheckInPreparation', { reservation, isArrendador: true })}
+                disabled={!canCheckIn}
+              >
+                <Ionicons name="key" size={20} color="#fff" />
+                <Text style={styles.checkInButtonText}>{buttonText}</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         );
       })()}
 
@@ -1345,6 +1391,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#991B1B',
     lineHeight: 20,
+  },
+  checkInBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#FDE68A',
+  },
+  checkInBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#92400E',
+    flex: 1,
   },
   actionBar: {
     position: 'absolute',

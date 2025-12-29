@@ -62,6 +62,7 @@ export default function LocationPicker({
 
   const mapRef = useRef<MapView>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Efecto para obtener ubicación inicial si no se provee
   useEffect(() => {
@@ -374,7 +375,14 @@ export default function LocationPicker({
             value={query}
             onChangeText={(text) => {
               setQuery(text);
-              fetchAutocomplete(text);
+              
+              if (searchTimeout.current) {
+                clearTimeout(searchTimeout.current);
+              }
+              
+              searchTimeout.current = setTimeout(() => {
+                fetchAutocomplete(text);
+              }, 500);
             }}
             placeholderTextColor="#9CA3AF"
           />

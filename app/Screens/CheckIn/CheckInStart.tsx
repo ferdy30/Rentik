@@ -187,15 +187,87 @@ export default function CheckInStart() {
     const handleMarkReady = async () => {
         if (!checkInId) return;
         
-        // Verify distance (within 500m)
-        if (distance && distance > 0.5) {
+        // Rangos de proximidad más flexibles
+        const PROXIMITY_PERFECT = 0.1;    // 100m - Verde (ideal)
+        const PROXIMITY_GOOD = 0.3;       // 300m - Amarillo (bueno)
+        const PROXIMITY_ACCEPTABLE = 0.5; // 500m - Naranja (aceptable)
+        // >500m - Rojo (muy lejos)
+        
+        if (distance && distance > PROXIMITY_ACCEPTABLE) {
+            // Muy lejos - ofrecer opciones
             Alert.alert(
                 'Ubicación incorrecta',
-                `Estás a ${distance.toFixed(2)} km del vehículo. Debes estar dentro de 500 metros para iniciar el check-in.`,
-                [{ text: 'Entendido' }]
+                `Estás a ${distance.toFixed(2)} km del punto de encuentro.\n\n` +
+                'Debes estar dentro de 500 metros para continuar.',
+                [
+                    {
+                        text: 'Ir a la ubicación',
+                        onPress: () => {
+                            const coords = meetingCoordinates || vehicleCoordinates;
+                            if (coords) {
+                                Linking.openURL(
+                                    `https://www.google.com/maps/dir/?api=1&destination=${coords.latitude},${coords.longitude}&travelmode=driving`
+                                );
+                            }
+                        }
+                    },
+                    {
+                        text: 'Contactar',
+                        onPress: async () => {
+                            // Navegar al chat o llamar
+                            navigation.navigate('ChatRoom', {
+                                reservationId: reservation.id,
+                                participants: [reservation.userId, reservation.arrendadorId],
+                                vehicleInfo: {
+                                    marca: reservation.vehicleSnapshot?.marca || '',
+                                    modelo: reservation.vehicleSnapshot?.modelo || '',
+                                    imagen: reservation.vehicleSnapshot?.imagen || ''
+                                }
+                            });
+                        }
+                    },
+                    { text: 'Cancelar', style: 'cancel' }
+                ]
             );
             return;
         }
+        
+        // Distancia aceptable pero no perfecta - advertir pero permitir
+        if (distance && distance > PROXIMITY_GOOD && distance <= PROXIMITY_ACCEPTABLE) {
+            Alert.alert(
+                'Confirmar ubicación',
+                `Estás a ${(distance * 1000).toFixed(0)} metros del punto de encuentro.\n\n` +
+                '¿Confirmas que estás en el lugar correcto?',
+                [
+                    {
+                        text: 'No, ir a la ubicación',
+                        onPress: () => {
+                            const coords = meetingCoordinates || vehicleCoordinates;
+                            if (coords) {
+                                Linking.openURL(
+                                    `https://www.google.com/maps/dir/?api=1&destination=${coords.latitude},${coords.longitude}&travelmode=driving`
+                                );
+                            }
+                        },
+                        style: 'cancel'
+                    },
+                    {
+                        text: 'Sí, continuar',
+                        onPress: async () => {
+                            await performMarkReady();
+                        }
+                    }
+                ]
+            );
+            return;
+        }
+        
+        // Si está en rango perfecto o bueno, continuar directamente
+        await performMarkReady();
+    };
+    
+    const performMarkReady = async () => {
+        if (!checkInId) return;
 
         try {
             setLoading(true);
@@ -390,7 +462,7 @@ export default function CheckInStart() {
                         />
                         <View style={{ flex: 1 }}>
                             <Text style={styles.statusCardTitle}>
-                                {isOwner ? 'Tú (Anfitrión)' : 'Tú (Arrendatario)'}
+                                {isOwner ? 'Tú (Anfitrión)' : 'Tú (Viajero)'}
                             </Text>
                             <Text style={styles.statusCardSubtitle}>
                                 {isReady ? 'Listo para empezar' : 'Esperando confirmación'}
@@ -406,7 +478,7 @@ export default function CheckInStart() {
                         />
                         <View style={{ flex: 1 }}>
                             <Text style={styles.statusCardTitle}>
-                                {isOwner ? 'Arrendatario' : 'Anfitrión'}
+                                {isOwner ? 'Viajero' : 'Anfitrión'}
                             </Text>
                             <Text style={styles.statusCardSubtitle}>
                                 {otherPartyReady ? 'Listo para empezar' : 'Esperando confirmación'}
