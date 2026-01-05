@@ -26,12 +26,12 @@ export default function HomeArrendador() {
       const active = reservations.filter(r => 
         r.status === 'pending' || r.status === 'confirmed'
       ).length;
-      console.log('[HomeArrendador] Reservas activas:', active, '(pending + confirmed)');
+      // console.log('[HomeArrendador] Reservas activas:', active, '(pending + confirmed)');
       setActiveReservationsCount(active);
     } catch (error) {
       console.error('Error fetching active reservations:', error);
     }
-  }, [user]);
+  }, [user?.uid]);
 
   // Actualizar cuando la pantalla recibe foco
   useFocusEffect(
@@ -64,7 +64,7 @@ export default function HomeArrendador() {
       clearInterval(interval);
       unsubscribe();
     };
-  }, [fetchActiveReservations, user]);
+  }, [fetchActiveReservations, user?.uid]);
 
   return (
     <Tab.Navigator id={undefined}

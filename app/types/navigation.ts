@@ -79,6 +79,13 @@ export type RootStackParamList = {
   CheckInKeys: { reservation: Reservation; checkInId: string };
   CheckInSignature: { reservation: Reservation; checkInId: string };
   CheckInComplete: { reservation: Reservation; checkInId: string };
+  CheckInProcessExplanation: { reservation: Reservation; isArrendador?: boolean };
+  CheckOutStart: { reservation: Reservation };
+  CheckOutPhotos: { reservation: Reservation; checkOutId: string };
+  CheckOutConditions: { reservation: Reservation; checkOutId: string };
+  CheckOutReview: { reservation: Reservation; checkOutId: string };
+  RateExperience: { reservation: Reservation; checkOutId: string };
+  CheckOutComplete: { reservation: Reservation; checkOutId: string };
 };
 
 export type NavigationProps = NavigationProp<RootStackParamList>;

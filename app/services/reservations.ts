@@ -16,7 +16,7 @@ export interface Reservation {
   arrendadorId: string; // New field
   startDate: Timestamp;
   endDate: Timestamp;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'denied';
+  status: 'pending' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'denied';
   totalPrice: number;
   createdAt: Timestamp;
   pickupLocation?: string;

@@ -525,11 +525,11 @@ export default function TripDetails() {
                         <View style={styles.vehicleOverlay}>
                             <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
                                 <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
-                                    {reservation.status === 'pending' && '⏳ Pendiente'}
-                                    {reservation.status === 'confirmed' && '✅ Confirmada'}
-                                    {reservation.status === 'completed' && '🎉 Completada'}
-                                    {reservation.status === 'cancelled' && '❌ Cancelada'}
-                                    {reservation.status === 'denied' && '🚫 Denegada'}
+                                    {reservation.status === 'pending' ? '⏳ Pendiente' : ''}
+                                    {reservation.status === 'confirmed' ? '✅ Confirmada' : ''}
+                                    {reservation.status === 'completed' ? '🎉 Completada' : ''}
+                                    {reservation.status === 'cancelled' ? '❌ Cancelada' : ''}
+                                    {reservation.status === 'denied' ? '🚫 Denegada' : ''}
                                 </Text>
                             </View>
                         </View>
@@ -1073,6 +1073,79 @@ export default function TripDetails() {
                                 disabled={!canCheckIn}
                             >
                                 <Ionicons name="qr-code-outline" size={20} color="#fff" />
+                                <Text style={styles.checkInButtonText}>{buttonText}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                );
+            })()}
+
+            {/* Check-out button for in-progress trips */}
+            {reservation.status === 'in-progress' && (() => {
+                const endDate = reservation.endDate?.toDate();
+                const now = new Date();
+                
+                const msUntilEnd = endDate ? endDate.getTime() - now.getTime() : -1;
+                const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
+                
+                // Check-out disponible si:
+                // - Faltan menos de 24h para el fin, O
+                // - Ya pasó la fecha de fin (con tolerancia de 48h)
+                const canCheckOut = hoursUntilEnd <= 24 && hoursUntilEnd > -48;
+                
+                let buttonText = 'Iniciar Check-out';
+                let statusBanner = null;
+                
+                if (!canCheckOut) {
+                    if (hoursUntilEnd > 24) {
+                        const days = Math.ceil(hoursUntilEnd / 24);
+                        buttonText = `Check-out en ${days} día${days > 1 ? 's' : ''}`;
+                    } else if (hoursUntilEnd <= -48) {
+                        buttonText = 'Ventana expirada';
+                    }
+                } else if (hoursUntilEnd > 0 && hoursUntilEnd <= 24) {
+                    const hours = Math.floor(hoursUntilEnd);
+                    const minutes = Math.floor((hoursUntilEnd % 1) * 60);
+                    statusBanner = (
+                        <View style={styles.checkInBanner}>
+                            <Ionicons name="time-outline" size={18} color="#F59E0B" />
+                            <Text style={styles.checkInBannerText}>
+                                Check-out disponible • {hours}h {minutes}min para finalizar
+                            </Text>
+                        </View>
+                    );
+                } else if (hoursUntilEnd <= 0 && hoursUntilEnd > -48) {
+                    statusBanner = (
+                        <View style={[styles.checkInBanner, { backgroundColor: '#FEE2E2' }]}>
+                            <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                            <Text style={[styles.checkInBannerText, { color: '#991B1B' }]}>
+                                ¡Tiempo de devolución! Realiza el check-out
+                            </Text>
+                        </View>
+                    );
+                }
+
+                // Información del viaje activo
+                const tripInfoBanner = (
+                    <View style={[styles.checkInBanner, { backgroundColor: '#DBEAFE', marginBottom: 8 }]}>
+                        <Ionicons name="car-sport" size={18} color="#1E40AF" />
+                        <Text style={[styles.checkInBannerText, { color: '#1E3A8A' }]}>
+                            Viaje en progreso • Disfruta tu experiencia
+                        </Text>
+                    </View>
+                );
+
+                return (
+                    <>
+                        {tripInfoBanner}
+                        {statusBanner}
+                        <View style={styles.actionBar}>
+                            <TouchableOpacity 
+                                style={[styles.checkInButton, !canCheckOut && styles.buttonDisabled]} 
+                                onPress={() => navigation.navigate('CheckOutStart', { reservation })}
+                                disabled={!canCheckOut}
+                            >
+                                <Ionicons name="log-out-outline" size={20} color="#fff" />
                                 <Text style={styles.checkInButtonText}>{buttonText}</Text>
                             </TouchableOpacity>
                         </View>

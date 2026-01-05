@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../../FirebaseConfig';
 
 export interface CheckInReport {
@@ -17,6 +17,16 @@ export interface CheckInReport {
   
   // Location verification
   location?: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+  };
+  ownerLocation?: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+  };
+  renterLocation?: {
     latitude: number;
     longitude: number;
     accuracy: number;
@@ -83,6 +93,26 @@ export const startCheckIn = async (
   renterId: string,
   ownerId: string
 ): Promise<string> => {
+  console.log('[checkIn.ts] startCheckIn called for reservation:', reservationId);
+  
+  // Verificar si ya existe un check-in para esta reservación
+  const q = query(
+    collection(db, 'checkIns'),
+    where('reservationId', '==', reservationId),
+    where('status', 'in', ['pending', 'in-progress'])
+  );
+  
+  const querySnapshot = await getDocs(q);
+  
+  if (!querySnapshot.empty) {
+    // Ya existe un check-in, devolver el ID existente
+    const existingCheckInId = querySnapshot.docs[0].id;
+    console.log('[checkIn.ts] Existing check-in found:', existingCheckInId);
+    return existingCheckInId;
+  }
+  
+  // No existe, crear uno nuevo
+  console.log('[checkIn.ts] Creating new check-in document');
   const checkInData: Partial<CheckInReport> = {
     reservationId,
     vehicleId,
@@ -100,6 +130,7 @@ export const startCheckIn = async (
   };
 
   const docRef = await addDoc(collection(db, 'checkIns'), checkInData);
+  console.log('[checkIn.ts] New check-in created:', docRef.id);
   return docRef.id;
 };
 
@@ -112,21 +143,31 @@ export const markParticipantReady = async (
   isOwner: boolean,
   location?: { latitude: number; longitude: number; accuracy: number }
 ): Promise<void> => {
+  console.log('[checkIn.ts] markParticipantReady called:', { checkInId, userId, isOwner, hasLocation: !!location });
+  
   const updateData: any = {
     updatedAt: new Date(),
   };
 
   if (isOwner) {
     updateData.ownerReady = true;
+    if (location) {
+        updateData.ownerLocation = location;
+    }
   } else {
     updateData.renterReady = true;
+    if (location) {
+        updateData.renterLocation = location;
+    }
   }
 
   if (location) {
-    updateData.location = location;
+    updateData.location = location; // Keep legacy field for backward compatibility
   }
 
+  console.log('[checkIn.ts] Updating document with:', updateData);
   await updateDoc(doc(db, 'checkIns', checkInId), updateData);
+  console.log('[checkIn.ts] Participant marked ready successfully');
 };
 
 /**
@@ -136,6 +177,8 @@ export const updateCheckInStatus = async (
   checkInId: string,
   status: 'in-progress' | 'completed'
 ): Promise<void> => {
+  console.log('[checkIn.ts] updateCheckInStatus called:', { checkInId, status });
+  
   const updateData: any = {
     status,
     updatedAt: new Date(),
@@ -147,7 +190,9 @@ export const updateCheckInStatus = async (
     updateData.completedAt = new Date();
   }
 
+  console.log('[checkIn.ts] Updating document with:', updateData);
   await updateDoc(doc(db, 'checkIns', checkInId), updateData);
+  console.log('[checkIn.ts] Document updated successfully');
 };
 
 /**
@@ -179,10 +224,19 @@ export const subscribeToCheckIn = (
   checkInId: string,
   callback: (checkIn: CheckInReport | null) => void
 ): (() => void) => {
+  console.log('[checkIn.ts] subscribeToCheckIn: Setting up listener for', checkInId);
+  
   return onSnapshot(doc(db, 'checkIns', checkInId), (docSnap) => {
     if (docSnap.exists()) {
-      callback({ id: docSnap.id, ...docSnap.data() } as CheckInReport);
+      const data = { id: docSnap.id, ...docSnap.data() } as CheckInReport;
+      console.log('[checkIn.ts] subscribeToCheckIn: Document updated', {
+        ownerReady: data.ownerReady,
+        renterReady: data.renterReady,
+        status: data.status
+      });
+      callback(data);
     } else {
+      console.log('[checkIn.ts] subscribeToCheckIn: Document does not exist');
       callback(null);
     }
   });

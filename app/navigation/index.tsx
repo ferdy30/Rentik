@@ -16,6 +16,12 @@ import CheckInPreparation from '../Screens/CheckIn/CheckInPreparation';
 import CheckInProcessExplanation from '../Screens/CheckIn/CheckInProcessExplanation';
 import CheckInSignature from '../Screens/CheckIn/CheckInSignature';
 import CheckInStart from '../Screens/CheckIn/CheckInStart';
+import CheckOutComplete from '../Screens/CheckOut/CheckOutComplete';
+import CheckOutConditions from '../Screens/CheckOut/CheckOutConditions';
+import CheckOutPhotos from '../Screens/CheckOut/CheckOutPhotos';
+import CheckOutReview from '../Screens/CheckOut/CheckOutReview';
+import CheckOutStart from '../Screens/CheckOut/CheckOutStart';
+import RateExperience from '../Screens/CheckOut/RateExperience';
 import Details from '../Screens/Details';
 import HomeArrendatario from '../Screens/HomeArrendatario';
 import Login from '../Screens/Login';
@@ -124,12 +130,64 @@ export default function AppNavigation() {
             <Stack.Screen name="CheckInPreparation" component={CheckInPreparation} />
             <Stack.Screen name="CheckInProcessExplanation" component={CheckInProcessExplanation} />
             <Stack.Screen name="CheckInStart" component={CheckInStart} />
-            <Stack.Screen name="CheckInPhotos" component={CheckInPhotos} />
-            <Stack.Screen name="CheckInConditions" component={CheckInConditions} />
-            <Stack.Screen name="CheckInDamageReport" component={CheckInDamageReport} />
-            <Stack.Screen name="CheckInKeys" component={CheckInKeys} />
-            <Stack.Screen name="CheckInSignature" component={CheckInSignature} />
-            <Stack.Screen name="CheckInComplete" component={CheckInComplete} />
+            <Stack.Screen 
+              name="CheckInPhotos" 
+              component={CheckInPhotos} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="CheckInConditions" 
+              component={CheckInConditions} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="CheckInDamageReport" 
+              component={CheckInDamageReport} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="CheckInKeys" 
+              component={CheckInKeys} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="CheckInSignature" 
+              component={CheckInSignature} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="CheckInComplete" 
+              component={CheckInComplete} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            
+            {/* Check-out Flow */}
+            <Stack.Screen name="CheckOutStart" component={CheckOutStart} />
+            <Stack.Screen 
+              name="CheckOutPhotos" 
+              component={CheckOutPhotos} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="CheckOutConditions" 
+              component={CheckOutConditions} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="CheckOutReview" 
+              component={CheckOutReview} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="RateExperience" 
+              component={RateExperience} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="CheckOutComplete" 
+              component={CheckOutComplete} 
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
             
             {/* Flujo de Booking (Común o específico de arrendatario, pero accesible) */}
             <Stack.Screen name="BookingStep1Dates" component={BookingStep1Dates} />

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { doc, getDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -37,50 +37,112 @@ export default function CheckInStart() {
     const [vehicleCoordinates, setVehicleCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
     const [meetingCoordinates, setMeetingCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
     
+    const [otherPartyLocation, setOtherPartyLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    
     const isOwner = user?.uid === reservation.arrendadorId;
+
+    const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
+    
+    // Refs para evitar navegaciones múltiples
+    const hasNavigatedRef = useRef(false);
+    const checkInUnsubscribeRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
         initializeLocation();
         requestLocationPermission();
         initializeCheckIn();
+        
+        return () => {
+            // Limpiar suscripción de ubicación
+            if (locationSubscription) {
+                locationSubscription.remove();
+            }
+            // Limpiar listener de check-in
+            if (checkInUnsubscribeRef.current) {
+                console.log('[CheckInStart] Cleaning up check-in listener');
+                checkInUnsubscribeRef.current();
+            }
+        };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const mapRef = React.useRef<MapView>(null);
+
+    useEffect(() => {
+        if (userLocation && meetingCoordinates && mapRef.current) {
+            mapRef.current.fitToCoordinates([
+                { latitude: userLocation.latitude, longitude: userLocation.longitude },
+                { latitude: meetingCoordinates.latitude, longitude: meetingCoordinates.longitude }
+            ], {
+                edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                animated: true,
+            });
+        }
+        
+        // Recalculate distance whenever coordinates change
+        if (userLocation && meetingCoordinates) {
+            const dist = calculateDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                meetingCoordinates.latitude,
+                meetingCoordinates.longitude
+            );
+            setDistance(dist);
+        }
+    }, [userLocation, meetingCoordinates]);
+
+    // Effect to set meeting point based on role
+    useEffect(() => {
+        if (isOwner && userLocation) {
+            // Para el HOST: Su ubicación ES el punto de encuentro (vehículo)
+            setVehicleCoordinates(userLocation);
+            setMeetingCoordinates(userLocation);
+        }
+    }, [isOwner, userLocation]);
+
     const initializeLocation = async () => {
-        // 1. Get Vehicle Location (always needed as fallback or for non-delivery)
-        let vCoords = null;
-        try {
-            const vehicleDoc = await getDoc(doc(db, 'vehicles', reservation.vehicleId));
-            if (vehicleDoc.exists()) {
-                const data = vehicleDoc.data();
-                if (data.coordinates) {
-                    vCoords = data.coordinates;
-                    setVehicleCoordinates(vCoords);
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching vehicle location:', error);
+        // Solo geocodificar si NO es el host (para viajeros)
+        if (isOwner) {
+            // El host no necesita inicializar nada aquí
+            // Su ubicación será el punto de encuentro (se establece en el useEffect)
+            return;
         }
 
-        // 2. Determine Meeting Point
-        if (reservation.isDelivery && reservation.deliveryAddress) {
+        // Para VIAJEROS: Determinar punto de encuentro desde dirección o vehículo
+        const targetAddress = reservation.isDelivery 
+            ? reservation.deliveryAddress 
+            : (reservation.pickupLocation || '');
+
+        if (targetAddress) {
             try {
-                const geocoded = await Location.geocodeAsync(reservation.deliveryAddress);
+                const geocoded = await Location.geocodeAsync(targetAddress);
                 if (geocoded.length > 0) {
-                    setMeetingCoordinates({
+                    const coords = {
                         latitude: geocoded[0].latitude,
                         longitude: geocoded[0].longitude
-                    });
+                    };
+                    setMeetingCoordinates(coords);
+                    setVehicleCoordinates(coords);
                 } else {
-                    // Fallback if geocoding fails
-                    setMeetingCoordinates(vCoords);
+                    console.warn('Geocoding failed for address:', targetAddress);
                 }
             } catch (error) {
-                console.error('Error geocoding delivery address:', error);
-                setMeetingCoordinates(vCoords);
+                console.error('Error geocoding address:', error);
             }
         } else {
-            setMeetingCoordinates(vCoords);
+            // Fallback: intentar obtener coordenadas del vehículo
+            try {
+                const vehicleDoc = await getDoc(doc(db, 'vehicles', reservation.vehicleId));
+                if (vehicleDoc.exists()) {
+                    const data = vehicleDoc.data();
+                    if (data.coordinates) {
+                        setMeetingCoordinates(data.coordinates);
+                        setVehicleCoordinates(data.coordinates);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching vehicle location:', error);
+            }
         }
     };
 
@@ -89,7 +151,7 @@ export default function CheckInStart() {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status === 'granted') {
                 setLocationPermission(true);
-                getCurrentLocation();
+                startLocationTracking();
             } else {
                 Alert.alert(
                     'Permiso requerido',
@@ -102,33 +164,39 @@ export default function CheckInStart() {
         }
     };
 
-    const getCurrentLocation = async () => {
+    const startLocationTracking = async () => {
         try {
-            const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.High,
+            // Get initial position quickly
+            const current = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
             });
-            
-            const userCoords = {
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-            };
-            
-            setUserLocation(userCoords);
-            
-            // Calculate distance to meeting point if we have coordinates
-            if (meetingCoordinates) {
-                const dist = calculateDistance(
-                    userCoords.latitude,
-                    userCoords.longitude,
-                    meetingCoordinates.latitude,
-                    meetingCoordinates.longitude
-                );
-                setDistance(dist);
-            }
+            updateUserLocation(current);
+
+            // Start watching
+            const sub = await Location.watchPositionAsync(
+                {
+                    accuracy: Location.Accuracy.High,
+                    timeInterval: 5000, // Update every 5 seconds
+                    distanceInterval: 10, // Update every 10 meters
+                },
+                (location) => {
+                    updateUserLocation(location);
+                }
+            );
+            setLocationSubscription(sub);
         } catch (error) {
-            console.error('Error getting location:', error);
-            Alert.alert('Error', 'No se pudo obtener tu ubicación actual.');
+            console.error('Error starting location tracking:', error);
+            Alert.alert('Error', 'No se pudo obtener tu ubicación actual. Verifica que el GPS esté activado.');
         }
+    };
+
+    const updateUserLocation = (location: Location.LocationObject) => {
+        const userCoords = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+        };
+        
+        setUserLocation(userCoords);
     };
 
     const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -158,24 +226,65 @@ export default function CheckInStart() {
             
             // Subscribe to real-time updates
             const unsubscribe = subscribeToCheckIn(newCheckInId, (checkIn) => {
+                // Evitar procesar si ya navegamos
+                if (hasNavigatedRef.current) {
+                    console.log('[CheckInStart] Already navigated, ignoring update');
+                    return;
+                }
+                
+                console.log('[CheckInStart] CheckIn update received:', {
+                    ownerReady: checkIn?.ownerReady,
+                    renterReady: checkIn?.renterReady,
+                    status: checkIn?.status,
+                    isOwner,
+                });
+
                 if (checkIn) {
+                    // Update local states
                     if (isOwner) {
                         setIsReady(checkIn.ownerReady);
                         setOtherPartyReady(checkIn.renterReady);
+                        if (checkIn.renterLocation) {
+                            setOtherPartyLocation(checkIn.renterLocation);
+                        }
                     } else {
                         setIsReady(checkIn.renterReady);
                         setOtherPartyReady(checkIn.ownerReady);
+                        if (checkIn.ownerLocation) {
+                            setOtherPartyLocation(checkIn.ownerLocation);
+                        }
                     }
                     
                     // Check if both are ready
-                    if (checkIn.ownerReady && checkIn.renterReady && !bothReady) {
+                    const bothAreReady = checkIn.ownerReady && checkIn.renterReady;
+                    console.log('[CheckInStart] Both ready check:', bothAreReady, 'Status:', checkIn.status);
+                    
+                    if (bothAreReady && checkIn.status === 'pending') {
+                        console.log('[CheckInStart] Both ready! Initiating navigation...');
                         setBothReady(true);
                         handleBothReady(newCheckInId);
+                    } else if (checkIn.status === 'in-progress' || checkIn.status === 'completed') {
+                         // If already in progress, just navigate (maybe user re-opened app)
+                         console.log('[CheckInStart] Already in progress, navigating directly...');
+                         setBothReady(true);
+                         hasNavigatedRef.current = true;
+                         
+                         // Desuscribir antes de navegar
+                         if (checkInUnsubscribeRef.current) {
+                             checkInUnsubscribeRef.current();
+                             checkInUnsubscribeRef.current = null;
+                         }
+                         
+                         navigation.replace('CheckInPhotos', { 
+                            reservation, 
+                            checkInId: newCheckInId 
+                        });
                     }
                 }
             });
             
-            return () => unsubscribe();
+            // Guardar la función de desuscripción
+            checkInUnsubscribeRef.current = unsubscribe;
         } catch (error) {
             console.error('Error initializing check-in:', error);
             Alert.alert('Error', 'No se pudo iniciar el proceso de check-in.');
@@ -198,7 +307,7 @@ export default function CheckInStart() {
             Alert.alert(
                 'Ubicación incorrecta',
                 `Estás a ${distance.toFixed(2)} km del punto de encuentro.\n\n` +
-                'Debes estar dentro de 500 metros para continuar.',
+                'Lo ideal es estar dentro de 500 metros, pero si estás seguro de estar en el lugar correcto, puedes continuar.',
                 [
                     {
                         text: 'Ir a la ubicación',
@@ -226,7 +335,24 @@ export default function CheckInStart() {
                             });
                         }
                     },
-                    { text: 'Cancelar', style: 'cancel' }
+                    {
+                        text: 'Continuar (Riesgo)',
+                        style: 'destructive',
+                        onPress: () => {
+                            Alert.alert(
+                                '¿Estás seguro?',
+                                'Confirmar la ubicación incorrecta podría afectar reclamaciones de seguro futuras.',
+                                [
+                                    { text: 'Cancelar', style: 'cancel' },
+                                    { 
+                                        text: 'Sí, continuar', 
+                                        style: 'destructive',
+                                        onPress: async () => await performMarkReady() 
+                                    }
+                                ]
+                            );
+                        }
+                    }
                 ]
             );
             return;
@@ -290,18 +416,56 @@ export default function CheckInStart() {
     };
 
     const handleBothReady = async (id: string) => {
+        // Evitar llamadas múltiples
+        if (hasNavigatedRef.current) {
+            console.log('[CheckInStart] Already handling navigation, skipping');
+            return;
+        }
+        
+        hasNavigatedRef.current = true;
+        console.log('[CheckInStart] handleBothReady called with id:', id);
+        
         try {
+            // Only update if still pending to avoid race conditions
+            console.log('[CheckInStart] Updating status to in-progress...');
             await updateCheckInStatus(id, 'in-progress');
+            console.log('[CheckInStart] Status updated successfully');
             
-            // Navigate to photos screen after 2 seconds
+            // Desuscribir antes de navegar
+            if (checkInUnsubscribeRef.current) {
+                console.log('[CheckInStart] Unsubscribing before navigation');
+                checkInUnsubscribeRef.current();
+                checkInUnsubscribeRef.current = null;
+            }
+            
+            // Navigate to photos screen
+            // Use a slightly longer timeout to ensure UI feedback is seen
+            console.log('[CheckInStart] Scheduling navigation in 1.5s...');
             setTimeout(() => {
+                console.log('[CheckInStart] Navigating to CheckInPhotos...');
                 navigation.replace('CheckInPhotos', { 
                     reservation, 
                     checkInId: id 
                 });
-            }, 2000);
+            }, 1500);
         } catch (error) {
-            console.error('Error updating status:', error);
+            console.error('[CheckInStart] Error updating status:', error);
+            // Even if update fails (e.g. already updated), try to navigate
+            console.log('[CheckInStart] Error occurred, navigating anyway...');
+            
+            // Desuscribir de todos modos
+            if (checkInUnsubscribeRef.current) {
+                checkInUnsubscribeRef.current();
+                checkInUnsubscribeRef.current = null;
+            }
+            
+            setTimeout(() => {
+                console.log('[CheckInStart] Navigating to CheckInPhotos (fallback)...');
+                navigation.replace('CheckInPhotos', { 
+                    reservation, 
+                    checkInId: id 
+                });
+            }, 1500);
         }
     };
 
@@ -359,36 +523,88 @@ export default function CheckInStart() {
                 {/* Map */}
                 <View style={styles.mapContainer}>
                     {meetingCoordinates ? (
-                        <MapView
-                            provider={PROVIDER_GOOGLE}
-                            style={styles.map}
-                            initialRegion={{
-                                latitude: meetingCoordinates.latitude,
-                                longitude: meetingCoordinates.longitude,
-                                latitudeDelta: 0.01,
-                                longitudeDelta: 0.01,
-                            }}
-                        >
-                            <Marker
-                                coordinate={meetingCoordinates}
-                                title={reservation.isDelivery ? "Punto de Entrega" : "Vehículo"}
-                                description={reservation.isDelivery ? reservation.deliveryAddress : reservation.vehicleSnapshot?.modelo}
-                                pinColor={reservation.isDelivery ? "orange" : "red"}
-                            />
-                            <Circle
-                                center={meetingCoordinates}
-                                radius={500} // 500 meters allowed radius
-                                fillColor="rgba(11, 114, 157, 0.1)"
-                                strokeColor="rgba(11, 114, 157, 0.5)"
-                            />
-                            {userLocation && (
-                                <Marker
-                                    coordinate={userLocation}
-                                    title="Tú"
-                                    pinColor="blue"
-                                />
-                            )}
-                        </MapView>
+                        <>
+                            <MapView
+                                ref={mapRef}
+                                provider={PROVIDER_GOOGLE}
+                                style={styles.map}
+                                initialRegion={{
+                                    latitude: meetingCoordinates.latitude,
+                                    longitude: meetingCoordinates.longitude,
+                                    latitudeDelta: 0.01,
+                                    longitudeDelta: 0.01,
+                                }}
+                                showsUserLocation={false}
+                                showsMyLocationButton={true}
+                            >
+                                {/* Para HOST: Mostrar solo su ubicación y la del viajero */}
+                                {/* Para VIAJERO: Mostrar punto de encuentro y su ubicación */}
+                                
+                                {/* Tu ubicación */}
+                                {userLocation && (
+                                    <Marker
+                                        coordinate={userLocation}
+                                        title={isOwner ? "Tú (Anfitrión con Vehículo)" : "Tú (Viajero)"}
+                                        description={isOwner ? "Tu ubicación es donde está el vehículo" : "Tu ubicación actual"}
+                                    >
+                                        <View style={styles.markerContainer}>
+                                            <Ionicons name="person" size={30} color="#0B729D" />
+                                        </View>
+                                    </Marker>
+                                )}
+                                
+                                {/* Ubicación de la otra parte (en tiempo real) */}
+                                {otherPartyLocation && (
+                                    <Marker
+                                        coordinate={otherPartyLocation}
+                                        title={isOwner ? "Viajero" : "Anfitrión (Vehículo)"}
+                                        description={isOwner ? "Ubicación del viajero" : "Ubicación del anfitrión con el vehículo"}
+                                    >
+                                        <View style={styles.markerContainer}>
+                                            <Ionicons 
+                                                name={isOwner ? "walk" : "car"} 
+                                                size={30} 
+                                                color="#16A34A" 
+                                            />
+                                        </View>
+                                    </Marker>
+                                )}
+
+                                {/* Círculo de proximidad alrededor del punto de encuentro */}
+                                {meetingCoordinates && (
+                                    <Circle
+                                        center={meetingCoordinates}
+                                        radius={500}
+                                        fillColor="rgba(11, 114, 157, 0.1)"
+                                        strokeColor="rgba(11, 114, 157, 0.5)"
+                                    />
+                                )}
+                            </MapView>
+                            <TouchableOpacity 
+                                style={styles.refreshLocationButton}
+                                onPress={startLocationTracking}
+                            >
+                                <Ionicons name="refresh" size={20} color="#0B729D" />
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity 
+                                style={styles.centerLocationButton}
+                                onPress={() => {
+                                    if (userLocation && mapRef.current) {
+                                        mapRef.current.animateToRegion({
+                                            latitude: userLocation.latitude,
+                                            longitude: userLocation.longitude,
+                                            latitudeDelta: 0.005,
+                                            longitudeDelta: 0.005,
+                                        });
+                                    } else {
+                                        Alert.alert('Ubicación no disponible', 'Aún no tenemos tu ubicación actual.');
+                                    }
+                                }}
+                            >
+                                <Ionicons name="locate" size={20} color="#0B729D" />
+                            </TouchableOpacity>
+                        </>
                     ) : (
                         <View style={styles.mapPlaceholder}>
                             <Ionicons name="map-outline" size={48} color="#9CA3AF" />
@@ -408,13 +624,23 @@ export default function CheckInStart() {
                         <View style={{ flex: 1 }}>
                             <Text style={[styles.distanceText, { color: isWithinRange ? "#16A34A" : "#DC2626" }]}>
                                 {isWithinRange 
-                                    ? `Estás cerca del vehículo (${(distance * 1000).toFixed(0)}m)`
-                                    : `Estás lejos del vehículo (${distance.toFixed(2)} km)`
+                                    ? `Estás cerca del punto de encuentro (${(distance * 1000).toFixed(0)}m)`
+                                    : `Estás a ${distance.toFixed(2)} km del punto de encuentro`
                                 }
                             </Text>
-                            {!isWithinRange && (
+                            {!isWithinRange && !isOwner && (
                                 <Text style={styles.distanceSubtext}>
                                     Debes estar dentro de 500 metros para iniciar el check-in
+                                </Text>
+                            )}
+                            {!isWithinRange && isOwner && (
+                                <Text style={styles.distanceSubtext}>
+                                    Como anfitrión, tu ubicación define el punto de encuentro.
+                                </Text>
+                            )}
+                            {otherPartyLocation && (
+                                <Text style={[styles.distanceSubtext, { color: "#059669", marginTop: 4 }]}>
+                                    ✓ {isOwner ? "El viajero" : "El anfitrión"} está en el lugar
                                 </Text>
                             )}
                         </View>
@@ -428,7 +654,11 @@ export default function CheckInStart() {
                         <View style={styles.stepNumber}>
                             <Text style={styles.stepNumberText}>1</Text>
                         </View>
-                        <Text style={styles.stepText}>Ambas partes deben estar presentes y dentro de 500m del vehículo</Text>
+                        <Text style={styles.stepText}>
+                            {isOwner 
+                                ? "Como anfitrión, tú defines el punto de encuentro con tu ubicación"
+                                : "Dirígete al punto de encuentro donde está el anfitrión con el vehículo"}
+                        </Text>
                     </View>
                     <View style={styles.stepContainer}>
                         <View style={styles.stepNumber}>
@@ -501,7 +731,8 @@ export default function CheckInStart() {
             {/* Bottom action button */}
             {!bothReady && (
                 <View style={styles.bottomBar}>
-                    <TouchableOpacity 
+                    {/* Debug button - hidden for production excellence */}
+                    {/* <TouchableOpacity 
                         style={{ marginBottom: 12, alignItems: 'center', padding: 8 }}
                         onPress={() => {
                             if (checkInId) {
@@ -517,16 +748,16 @@ export default function CheckInStart() {
                         <Text style={{ color: '#6B7280', textDecorationLine: 'underline', fontSize: 14 }}>
                             Saltar validación (Solo prueba)
                         </Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
 
                     <TouchableOpacity
                         style={[
                             styles.readyButton,
                             isReady && styles.readyButtonDisabled,
-                            (!isWithinRange || !locationPermission) && styles.readyButtonDisabled
+                            (!locationPermission || (!isOwner && !isWithinRange)) && styles.readyButtonDisabled
                         ]}
                         onPress={handleMarkReady}
-                        disabled={isReady || loading || !isWithinRange || !locationPermission}
+                        disabled={isReady || loading || !locationPermission || (!isOwner && !isWithinRange)}
                     >
                         {loading ? (
                             <ActivityIndicator color="#fff" />
@@ -796,5 +1027,45 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '700',
+    },
+    refreshLocationButton: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        backgroundColor: 'white',
+        padding: 8,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 4,
+        zIndex: 10,
+    },
+    centerLocationButton: {
+        position: 'absolute',
+        top: 56,
+        right: 12,
+        backgroundColor: 'white',
+        padding: 8,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 4,
+        zIndex: 10,
+    },
+    markerContainer: {
+        backgroundColor: '#fff',
+        padding: 8,
+        borderRadius: 25,
+        borderWidth: 3,
+        borderColor: '#0B729D',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
     },
 });
