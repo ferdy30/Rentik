@@ -1,5 +1,5 @@
 import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { db, Firebaseauth } from '../../FirebaseConfig';
+import { db, Firebaseauth } from '../FirebaseConfig';
 
 export interface AvailabilityData {
   id?: string;
@@ -29,13 +29,18 @@ export interface Reservation {
   pickupCoords?: { latitude: number; longitude: number };
   pickupCoordinates?: { latitude: number; longitude: number };
   denialReason?: string;
-    cancellationReason?: string;
+  cancellationReason?: string;
   messageToHost?: string;
-    updatedAt?: Timestamp;
-    deniedAt?: Timestamp;
-    cancelledAt?: Timestamp;
-    archived?: boolean;
-    archivedAt?: Timestamp;
+  updatedAt?: Timestamp;
+  deniedAt?: Timestamp;
+  cancelledAt?: Timestamp;
+  archived?: boolean;
+  archivedAt?: Timestamp;
+  checkIn?: {
+    id: string;
+    completed: boolean;
+    startedAt?: Timestamp;
+  };
   vehicleSnapshot?: {
     marca: string;
     modelo: string;
@@ -217,7 +222,7 @@ export const checkReservationConflicts = async (
 
 export const updateReservationStatus = async (
   reservationId: string,
-  status: 'confirmed' | 'denied' | 'cancelled' | 'completed',
+  status: 'confirmed' | 'denied' | 'cancelled' | 'completed' | 'in-progress',
   reason?: string
 ) => {
   try {

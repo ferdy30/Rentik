@@ -41,7 +41,7 @@ interface ReservationCardProps {
   isDeleting?: boolean;
 }
 
-export default function ReservationCard({
+function ReservationCard({
   reservation,
   userProfile,
   onConfirm,
@@ -56,8 +56,9 @@ export default function ReservationCard({
   isDeleting,
 }: ReservationCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const [scaleAnim] = useState(new Animated.Value(1));
-  const [pulseAnim] = useState(new Animated.Value(1));
+  // Optimization: Use useRef for Animated values
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
   const [countdown, setCountdown] = useState('');
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -69,7 +70,7 @@ export default function ReservationCard({
   const vehicleImage = reservation.vehicleSnapshot?.imagen || null;
 
   // Status config
-  const getStatusConfig = () => {
+  const statusInfo = React.useMemo(() => {
     switch (reservation.status) {
       case 'pending':
         return { label: 'Pendiente', color: '#FEF9C3', textColor: '#854D0E', icon: 'time' };
@@ -84,9 +85,7 @@ export default function ReservationCard({
       default:
         return { label: reservation.status, color: '#F3F4F6', textColor: '#374151', icon: 'information-circle' };
     }
-  };
-
-  const statusInfo = getStatusConfig();
+  }, [reservation.status]);
 
   // Time calculations
   const now = new Date();
@@ -266,6 +265,7 @@ export default function ReservationCard({
                 style={styles.heroImage}
                 contentFit="cover"
                 transition={200}
+                cachePolicy="memory-disk"
               />
               <View style={styles.imageGradient} />
             </>
@@ -332,6 +332,7 @@ export default function ReservationCard({
                   source={{ uri: userProfile.photoURL }}
                   style={styles.avatar}
                   contentFit="cover"
+                  cachePolicy="memory-disk"
                 />
               ) : (
                 <View style={styles.avatarPlaceholder}>
@@ -558,6 +559,46 @@ export default function ReservationCard({
               )}
             </View>
             
+            {onViewDetails && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.viewMoreButton]}
+                onPress={onViewDetails}
+              >
+                <Ionicons name="eye" size={20} color="#0B729D" />
+                <Text style={[styles.actionButtonText, { color: '#0B729D' }]}>Ver detalles completos</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {reservation.status === 'in-progress' && (
+          <View style={styles.actionsSection}>
+            <View style={[styles.upcomingInfo, { backgroundColor: '#DCFCE7' }]}>
+                <Ionicons name="car-sport" size={18} color="#166534" />
+                <Text style={[styles.upcomingInfoText, { color: '#166534' }]}>
+                  Viaje en curso • Finaliza {formatDate(endDate)}
+                </Text>
+            </View>
+            
+             <View style={styles.quickActionsRow}>
+              {onChat && (
+                <TouchableOpacity
+                  style={[styles.quickActionButton, styles.chatQuickButton]}
+                  onPress={onChat}
+                  disabled={isLoadingChat}
+                >
+                  {isLoadingChat ? (
+                    <ActivityIndicator size="small" color="#0B729D" />
+                  ) : (
+                    <>
+                      <Ionicons name="chatbubbles" size={20} color="#0B729D" />
+                      <Text style={styles.chatQuickButtonText}>Chat</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+
             {onViewDetails && (
               <TouchableOpacity
                 style={[styles.actionButton, styles.viewMoreButton]}
@@ -1299,4 +1340,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
   },
+});
+
+// Memoize component to prevent unnecessary re-renders
+export default React.memo(ReservationCard, (prevProps, nextProps) => {
+  return (
+    prevProps.reservation.id === nextProps.reservation.id &&
+    prevProps.reservation.status === nextProps.reservation.status &&
+    prevProps.isProcessing === nextProps.isProcessing &&
+    prevProps.isLoadingChat === nextProps.isLoadingChat &&
+    prevProps.isDeleting === nextProps.isDeleting
+  );
 });

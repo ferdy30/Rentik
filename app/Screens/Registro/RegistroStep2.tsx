@@ -19,7 +19,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { functions } from '../../../FirebaseConfig';
+import { functions } from '../../FirebaseConfig';
 import { StepIndicator } from '../../components/StepIndicator';
 import { colors } from '../../constants/colors';
 import { RootStackParamList } from '../../types/navigation';

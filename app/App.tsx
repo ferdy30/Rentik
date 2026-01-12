@@ -1,7 +1,7 @@
 import React from 'react';
 import { LogBox } from 'react-native';
-import { AuthProvider } from '../context/Auth';
-import { ToastProvider } from '../context/ToastContext';
+import { AuthProvider } from './context/Auth';
+import { ToastProvider } from './context/ToastContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import AppNavigation from './navigation';
 

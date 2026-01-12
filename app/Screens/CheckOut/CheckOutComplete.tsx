@@ -10,8 +10,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { db } from '../../../FirebaseConfig';
-import { typography } from '../../constants/typography';
+import { db } from '../../FirebaseConfig';
 
 const { width } = Dimensions.get('window');
 
@@ -133,7 +132,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 24,
-        fontFamily: typography.fonts.extraBold,
+        fontWeight: '800',
         color: '#333333',
         marginBottom: 8,
         textAlign: 'center',
@@ -171,7 +170,7 @@ const styles = StyleSheet.create({
     },
     stepTitle: {
         fontSize: 16,
-        fontFamily: typography.fonts.bold,
+        fontWeight: '700',
         color: '#333333',
         marginBottom: 4,
     },
@@ -205,6 +204,6 @@ const styles = StyleSheet.create({
     buttonText: {
         color: '#fff',
         fontSize: 16,
-        fontFamily: typography.fonts.bold,
+        fontWeight: '700',
     },
 });

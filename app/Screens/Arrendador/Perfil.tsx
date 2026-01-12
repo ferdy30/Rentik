@@ -11,8 +11,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useAuth } from '../../../context/Auth';
-import { Firebaseauth } from '../../../FirebaseConfig';
+import { useAuth } from '../../context/Auth';
+import { Firebaseauth } from '../../FirebaseConfig';
 
 export default function PerfilScreen() {
   const { user, userData } = useAuth();

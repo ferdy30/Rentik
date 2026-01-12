@@ -13,7 +13,7 @@ import {
     updateDoc,
     where
 } from 'firebase/firestore';
-import { db } from '../../FirebaseConfig';
+import { db } from '../FirebaseConfig';
 
 export interface VehicleSnapshot {
   marca: string;

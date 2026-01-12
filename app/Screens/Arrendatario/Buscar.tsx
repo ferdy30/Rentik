@@ -20,13 +20,13 @@ import {
     View
 } from 'react-native';
 import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { useToast } from '../../../context/ToastContext';
 import EmptyState from '../../components/EmptyState';
 import FilterModal, { type FilterOptions } from '../../components/FilterModal';
 import VehicleCard from '../../components/VehicleCard';
 import VehicleCardSkeleton from '../../components/VehicleCardSkeleton';
 import { Vehicle } from '../../constants/vehicles';
 import { useFavorites } from '../../context/FavoritesContext';
+import { useToast } from '../../context/ToastContext';
 import { getAllVehicles } from '../../services/vehicles';
 import type { Coordinates } from '../../utils/distance';
 import { addDistanceToItems, filterByRadius, sortByDistance } from '../../utils/distance';
@@ -45,6 +45,16 @@ const PROMOTIONS = [
   { id: '3', title: 'Viaja Seguro', subtitle: 'Atención 24/7 para ti', image: 'https://media.istockphoto.com/id/1469729479/es/foto/atardecer-en-la-playa.jpg?s=612x612&w=0&k=20&c=sk24uTMckudyN9oeLoNRUTjgWgMi6ymtpFpx6EcTCHA=' },
 ];
 
+// Filtros por defecto limpios
+const DEFAULT_FILTERS: FilterOptions = {
+  priceRange: [0, 300], // Rango amplio para no filtrar vehículos
+  vehicleTypes: [],
+  transmision: [],
+  fuelTypes: [],
+  yearRange: [2000, 2030],
+  features: [],
+};
+
 export default function BuscarScreen() {
   const navigation = useNavigation<any>();
   const { showToast } = useToast();
@@ -53,14 +63,7 @@ export default function BuscarScreen() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [advancedFilters, setAdvancedFilters] = useState<FilterOptions>({
-    priceRange: [0, 100],
-    vehicleTypes: [],
-    transmision: [],
-    fuelTypes: [],
-    yearRange: [2015, 2025],
-    features: [],
-  });
+  const [advancedFilters, setAdvancedFilters] = useState<FilterOptions>(DEFAULT_FILTERS);
   const { isFavorite, toggleFavorite } = useFavorites();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,8 +106,15 @@ export default function BuscarScreen() {
     requestLocationPermission();
   }, [requestLocationPermission]);
 
+  // Resetear filtros y cargar vehículos cuando la pantalla recibe foco
   useFocusEffect(
     useCallback(() => {
+      // Limpiar filtros cada vez que se entra a la pantalla
+      setAdvancedFilters(DEFAULT_FILTERS);
+      setSearchQuery('');
+      setDebouncedSearchQuery('');
+      setSelectedCategory('all');
+      
       loadVehicles();
     }, [loadVehicles])
   );
@@ -177,16 +187,6 @@ export default function BuscarScreen() {
       
       const data = await getAllVehicles();
       
-      // Log first vehicle to debug
-      if (data.length > 0) {
-        console.log('🔍 Sample vehicle from Firestore:', {
-          id: data[0].id,
-          marca: data[0].marca,
-          arrendadorId: data[0].arrendadorId,
-          hasArrendadorId: !!data[0].arrendadorId
-        });
-      }
-      
       // Pasar el vehículo completo normalizado, no solo algunos campos
       const mappedVehicles: Vehicle[] = data.map(v => ({
         ...v, // Incluir TODOS los campos (características, descripción, etc.)
@@ -196,7 +196,8 @@ export default function BuscarScreen() {
         rating: v.rating || 0,
         reviewCount: v.trips || 0,
         badges: v.status === 'active' ? ['Verificado'] : [],
-        disponible: v.status === 'active',
+        // NO sobreescribir disponible - usar el valor calculado en getAllVehicles
+        disponible: v.disponible,
         propietarioId: v.arrendadorId,
       }));
       
@@ -263,6 +264,10 @@ export default function BuscarScreen() {
       return false;
     }
     if (advancedFilters.features.length > 0) {
+      // Verificar que caracteristicas exista y sea un array
+      if (!vehicle.caracteristicas || !Array.isArray(vehicle.caracteristicas)) {
+        return false; // Si no tiene características, no puede cumplir con los filtros
+      }
       const hasAllFeatures = advancedFilters.features.every((feat) => vehicle.caracteristicas.includes(feat));
       if (!hasAllFeatures) return false;
     }

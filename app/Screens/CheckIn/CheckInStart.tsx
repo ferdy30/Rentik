@@ -15,8 +15,8 @@ import {
     View
 } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { db } from '../../../FirebaseConfig';
-import { useAuth } from '../../../context/Auth';
+import { db } from '../../FirebaseConfig';
+import { useAuth } from '../../context/Auth';
 import { markParticipantReady, startCheckIn, subscribeToCheckIn, updateCheckInStatus } from '../../services/checkIn';
 import { Reservation } from '../../services/reservations';
 
@@ -24,9 +24,28 @@ export default function CheckInStart() {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { user } = useAuth();
-    const { reservation } = route.params as { reservation: Reservation };
+    const params = route.params as { reservation: Reservation } | undefined;
+    const reservation = params?.reservation;
     
+    // Safety check BEFORE hooks that depend on reservation
+    if (!reservation) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text>Error: Datos de reserva no encontrados.</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 20, padding: 10 }}>
+                    <Text style={{ color: 'blue' }}>Volver</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+    
+    // Hooks should be called unconditionally in the same order, but since we return early above, 
+    // we need to make sure we don't violate Rules of Hooks if reservation WAS present in previous render.
+    // Ideally, we move the check inside the render or ensure it's stable.
+    // For now, let's assume if it's missing, it's missing from the start.
+
     const [loading, setLoading] = useState(false);
+    const [initializing, setInitializing] = useState(true); // New state for initial data fetch
     const [checkInId, setCheckInId] = useState<string | null>(null);
     const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [locationPermission, setLocationPermission] = useState<boolean>(false);
@@ -38,33 +57,53 @@ export default function CheckInStart() {
     const [meetingCoordinates, setMeetingCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
     
     const [otherPartyLocation, setOtherPartyLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-    
-    const isOwner = user?.uid === reservation.arrendadorId;
 
     const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
     
-    // Refs para evitar navegaciones múltiples
+    // Refs para evitar navegaciones múltiples y llamadas duplicadas
     const hasNavigatedRef = useRef(false);
     const checkInUnsubscribeRef = useRef<(() => void) | null>(null);
+    const hasInitializedCheckInRef = useRef(false);
+
+    // ✅ Refetch Reservation to ensure fresh state (especially checkIn status)
+    const [freshReservation, setFreshReservation] = useState<Reservation>(reservation);
+
+    const isOwner = user?.uid === freshReservation.arrendadorId;
+
+    useEffect(() => {
+        const fetchReservation = async () => {
+            try {
+                const docSnap = await getDoc(doc(db, 'reservations', reservation.id));
+                if (docSnap.exists()) {
+                    setFreshReservation({ id: docSnap.id, ...docSnap.data() } as Reservation);
+                }
+            } catch (e) {
+                console.error("Error fetching reservation:", e);
+            }
+        };
+        fetchReservation();
+    }, [reservation.id]);
 
     useEffect(() => {
         initializeLocation();
         requestLocationPermission();
-        initializeCheckIn();
         
         return () => {
-            // Limpiar suscripción de ubicación
-            if (locationSubscription) {
-                locationSubscription.remove();
-            }
-            // Limpiar listener de check-in
-            if (checkInUnsubscribeRef.current) {
-                console.log('[CheckInStart] Cleaning up check-in listener');
-                checkInUnsubscribeRef.current();
-            }
+             if (locationSubscription) locationSubscription.remove();
+             if (checkInUnsubscribeRef.current) checkInUnsubscribeRef.current();
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+    
+    // Separate effect for check-in initialization
+    useEffect(() => {
+        if (!hasInitializedCheckInRef.current && freshReservation && freshReservation.id) {
+            hasInitializedCheckInRef.current = true;
+            console.log('[CheckInStart] Initializing check-in for reservation:', freshReservation.id);
+            initializeCheckIn();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [freshReservation]);
 
     const mapRef = React.useRef<MapView>(null);
 
@@ -97,14 +136,23 @@ export default function CheckInStart() {
             // Para el HOST: Su ubicación ES el punto de encuentro (vehículo)
             setVehicleCoordinates(userLocation);
             setMeetingCoordinates(userLocation);
+        } else if (!isOwner && otherPartyLocation) {
+            // Para el RENTER: Si el Host ya llegó (tiene ubicación), ese es el punto de encuentro REAL
+            setMeetingCoordinates(otherPartyLocation);
         }
-    }, [isOwner, userLocation]);
+    }, [isOwner, userLocation, otherPartyLocation]);
 
     const initializeLocation = async () => {
         // Solo geocodificar si NO es el host (para viajeros)
         if (isOwner) {
             // El host no necesita inicializar nada aquí
             // Su ubicación será el punto de encuentro (se establece en el useEffect)
+            return;
+        }
+
+        // Si ya tenemos la ubicación del Host (porque estamos retomando el check-in), usar esa
+        if (otherPartyLocation) {
+            setMeetingCoordinates(otherPartyLocation);
             return;
         }
 
@@ -121,7 +169,8 @@ export default function CheckInStart() {
                         latitude: geocoded[0].latitude,
                         longitude: geocoded[0].longitude
                     };
-                    setMeetingCoordinates(coords);
+                    // Solo establecer si NO tenemos ya la ubicación precisa del Host
+                    setMeetingCoordinates(prev => otherPartyLocation || coords);
                     setVehicleCoordinates(coords);
                 } else {
                     console.warn('Geocoding failed for address:', targetAddress);
@@ -129,21 +178,8 @@ export default function CheckInStart() {
             } catch (error) {
                 console.error('Error geocoding address:', error);
             }
-        } else {
-            // Fallback: intentar obtener coordenadas del vehículo
-            try {
-                const vehicleDoc = await getDoc(doc(db, 'vehicles', reservation.vehicleId));
-                if (vehicleDoc.exists()) {
-                    const data = vehicleDoc.data();
-                    if (data.coordinates) {
-                        setMeetingCoordinates(data.coordinates);
-                        setVehicleCoordinates(data.coordinates);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching vehicle location:', error);
-            }
         }
+        // NOTA: Se eliminó el fallback a coordenadas del vehículo según requerimiento
     };
 
     const requestLocationPermission = async () => {
@@ -211,83 +247,138 @@ export default function CheckInStart() {
         return R * c; // Distancia en km
     };
 
+    // ✅ Handler centralizado para actualizaciones de check-in
+    const handleCheckInUpdate = (checkIn: any, currentCheckInId: string) => {
+        // Evitar procesar si ya navegamos
+        if (hasNavigatedRef.current) {
+            return;
+        }
+
+        if (checkIn) {
+            // Update local states
+            if (isOwner) {
+                setIsReady(checkIn.ownerReady);
+                setOtherPartyReady(checkIn.renterReady);
+                if (checkIn.renterLocation) {
+                    setOtherPartyLocation(checkIn.renterLocation);
+                }
+            } else {
+                setIsReady(checkIn.renterReady);
+                setOtherPartyReady(checkIn.ownerReady);
+                if (checkIn.ownerLocation) {
+                    setOtherPartyLocation(checkIn.ownerLocation);
+                }
+            }
+            
+            // Mark initialization as done once we have data
+            setInitializing(false);
+            
+            // Check if both are ready
+            const bothAreReady = checkIn.ownerReady && checkIn.renterReady;
+            
+            if (bothAreReady && checkIn.status === 'pending') {
+                setBothReady(true);
+                handleBothReady(currentCheckInId);
+            } else if (checkIn.status === 'in-progress' || checkIn.status === 'completed') {
+                // ✅ NAVEGACIÓN INTELIGENTE: Determinar dónde continuar basado en progreso
+                const userRole = isOwner ? 'owner' : 'renter';
+                const userHasSigned = checkIn.signatures?.[userRole];
+                const bothSigned = checkIn.signatures?.renter && checkIn.signatures?.owner;
+                const hasPhotos = checkIn.photos && Object.keys(checkIn.photos).length >= 8;
+                const hasConditions = checkIn.conditions !== undefined;
+                const hasKeys = checkIn.keys?.handoverCode !== undefined;
+                
+                setBothReady(true);
+                hasNavigatedRef.current = true;
+                
+                // Desuscribir antes de navegar
+                if (checkInUnsubscribeRef.current) {
+                    checkInUnsubscribeRef.current();
+                    checkInUnsubscribeRef.current = null;
+                }
+                
+                // Determinar siguiente pantalla según progreso
+                let nextScreen = 'CheckInPhotos';
+                
+                if (checkIn.status === 'completed' && bothSigned) {
+                    // ✅ Check-in COMPLETAMENTE finalizado (ambos firmaron)
+                    nextScreen = 'CheckInComplete';
+                    console.log('[CheckInStart] Check-in completed, navigating to CheckInComplete');
+                } else if (userHasSigned && !bothSigned) {
+                    // ✅ Usuario ya firmó, pero el otro NO - quedarse en CheckInSignature mostrando espera
+                    nextScreen = 'CheckInSignature';
+                    console.log('[CheckInStart] User signed, waiting for other party');
+                } else if (hasPhotos && hasConditions && hasKeys && !userHasSigned) {
+                    // ✅ Todo listo pero usuario AÚN NO firma
+                    nextScreen = 'CheckInSignature';
+                    console.log('[CheckInStart] Ready for user signature');
+                } else if (hasPhotos && hasConditions) {
+                    // Faltan llaves
+                    nextScreen = 'CheckInKeys';
+                    console.log('[CheckInStart] Need keys handover');
+                } else if (hasPhotos) {
+                    // Faltan condiciones y daños
+                    nextScreen = 'CheckInConditions';
+                    console.log('[CheckInStart] Need conditions check');
+                } else {
+                    // Faltan fotos (inicio del flujo)
+                    nextScreen = 'CheckInPhotos';
+                    console.log('[CheckInStart] Starting from photos');
+                }
+                
+                navigation.replace(nextScreen as any, { 
+                    reservation, 
+                    checkInId: currentCheckInId 
+                });
+            }
+        }
+    };
+
     const initializeCheckIn = async () => {
         try {
             setLoading(true);
-            // Create or get existing check-in document
+            
+            // Validate critical IDs
+            if (!freshReservation.userId || !freshReservation.arrendadorId) {
+                Alert.alert("Error", "Datos de reservación incompletos (Falta ID de usuario/arrendador).");
+                setLoading(false);
+                return;
+            }
+
+            // ✅ PRIMERO: Verificar si la reservación YA tiene un check-in ID (usando freshReservation)
+            if (freshReservation.checkIn?.id) {
+                setCheckInId(freshReservation.checkIn.id);
+                
+                // Suscribirse al check-in existente
+                const unsubscribe = subscribeToCheckIn(freshReservation.checkIn.id, (checkIn) => 
+                    handleCheckInUpdate(checkIn, freshReservation.checkIn!.id!)
+                );
+                checkInUnsubscribeRef.current = unsubscribe;
+                setLoading(false);
+                return;
+            }
+            
+            // ✅ SEGUNDO: Solo crear/obtener si NO existe
             const newCheckInId = await startCheckIn(
-                reservation.id,
-                reservation.vehicleId,
-                reservation.userId,
-                reservation.arrendadorId
+                freshReservation.id,
+                freshReservation.vehicleId,
+                freshReservation.userId,
+                freshReservation.arrendadorId
             );
             
             setCheckInId(newCheckInId);
             
             // Subscribe to real-time updates
-            const unsubscribe = subscribeToCheckIn(newCheckInId, (checkIn) => {
-                // Evitar procesar si ya navegamos
-                if (hasNavigatedRef.current) {
-                    console.log('[CheckInStart] Already navigated, ignoring update');
-                    return;
-                }
-                
-                console.log('[CheckInStart] CheckIn update received:', {
-                    ownerReady: checkIn?.ownerReady,
-                    renterReady: checkIn?.renterReady,
-                    status: checkIn?.status,
-                    isOwner,
-                });
-
-                if (checkIn) {
-                    // Update local states
-                    if (isOwner) {
-                        setIsReady(checkIn.ownerReady);
-                        setOtherPartyReady(checkIn.renterReady);
-                        if (checkIn.renterLocation) {
-                            setOtherPartyLocation(checkIn.renterLocation);
-                        }
-                    } else {
-                        setIsReady(checkIn.renterReady);
-                        setOtherPartyReady(checkIn.ownerReady);
-                        if (checkIn.ownerLocation) {
-                            setOtherPartyLocation(checkIn.ownerLocation);
-                        }
-                    }
-                    
-                    // Check if both are ready
-                    const bothAreReady = checkIn.ownerReady && checkIn.renterReady;
-                    console.log('[CheckInStart] Both ready check:', bothAreReady, 'Status:', checkIn.status);
-                    
-                    if (bothAreReady && checkIn.status === 'pending') {
-                        console.log('[CheckInStart] Both ready! Initiating navigation...');
-                        setBothReady(true);
-                        handleBothReady(newCheckInId);
-                    } else if (checkIn.status === 'in-progress' || checkIn.status === 'completed') {
-                         // If already in progress, just navigate (maybe user re-opened app)
-                         console.log('[CheckInStart] Already in progress, navigating directly...');
-                         setBothReady(true);
-                         hasNavigatedRef.current = true;
-                         
-                         // Desuscribir antes de navegar
-                         if (checkInUnsubscribeRef.current) {
-                             checkInUnsubscribeRef.current();
-                             checkInUnsubscribeRef.current = null;
-                         }
-                         
-                         navigation.replace('CheckInPhotos', { 
-                            reservation, 
-                            checkInId: newCheckInId 
-                        });
-                    }
-                }
-            });
+            const unsubscribe = subscribeToCheckIn(newCheckInId, (checkIn) => 
+                handleCheckInUpdate(checkIn, newCheckInId)
+            );
             
             // Guardar la función de desuscripción
             checkInUnsubscribeRef.current = unsubscribe;
         } catch (error) {
             console.error('Error initializing check-in:', error);
             Alert.alert('Error', 'No se pudo iniciar el proceso de check-in.');
+            setInitializing(false); // Stop loading on error
         } finally {
             setLoading(false);
         }
@@ -296,114 +387,61 @@ export default function CheckInStart() {
     const handleMarkReady = async () => {
         if (!checkInId) return;
         
-        // Rangos de proximidad más flexibles
-        const PROXIMITY_PERFECT = 0.1;    // 100m - Verde (ideal)
-        const PROXIMITY_GOOD = 0.3;       // 300m - Amarillo (bueno)
-        const PROXIMITY_ACCEPTABLE = 0.5; // 500m - Naranja (aceptable)
-        // >500m - Rojo (muy lejos)
-        
-        if (distance && distance > PROXIMITY_ACCEPTABLE) {
-            // Muy lejos - ofrecer opciones
-            Alert.alert(
-                'Ubicación incorrecta',
-                `Estás a ${distance.toFixed(2)} km del punto de encuentro.\n\n` +
-                'Lo ideal es estar dentro de 500 metros, pero si estás seguro de estar en el lugar correcto, puedes continuar.',
-                [
-                    {
-                        text: 'Ir a la ubicación',
-                        onPress: () => {
-                            const coords = meetingCoordinates || vehicleCoordinates;
-                            if (coords) {
-                                Linking.openURL(
-                                    `https://www.google.com/maps/dir/?api=1&destination=${coords.latitude},${coords.longitude}&travelmode=driving`
-                                );
-                            }
-                        }
-                    },
-                    {
-                        text: 'Contactar',
-                        onPress: async () => {
-                            // Navegar al chat o llamar
-                            navigation.navigate('ChatRoom', {
-                                reservationId: reservation.id,
-                                participants: [reservation.userId, reservation.arrendadorId],
-                                vehicleInfo: {
-                                    marca: reservation.vehicleSnapshot?.marca || '',
-                                    modelo: reservation.vehicleSnapshot?.modelo || '',
-                                    imagen: reservation.vehicleSnapshot?.imagen || ''
-                                }
-                            });
-                        }
-                    },
-                    {
-                        text: 'Continuar (Riesgo)',
-                        style: 'destructive',
-                        onPress: () => {
-                            Alert.alert(
-                                '¿Estás seguro?',
-                                'Confirmar la ubicación incorrecta podría afectar reclamaciones de seguro futuras.',
-                                [
-                                    { text: 'Cancelar', style: 'cancel' },
-                                    { 
-                                        text: 'Sí, continuar', 
-                                        style: 'destructive',
-                                        onPress: async () => await performMarkReady() 
-                                    }
-                                ]
-                            );
-                        }
-                    }
-                ]
-            );
-            return;
-        }
-        
-        // Distancia aceptable pero no perfecta - advertir pero permitir
-        if (distance && distance > PROXIMITY_GOOD && distance <= PROXIMITY_ACCEPTABLE) {
-            Alert.alert(
-                'Confirmar ubicación',
-                `Estás a ${(distance * 1000).toFixed(0)} metros del punto de encuentro.\n\n` +
-                '¿Confirmas que estás en el lugar correcto?',
-                [
-                    {
-                        text: 'No, ir a la ubicación',
-                        onPress: () => {
-                            const coords = meetingCoordinates || vehicleCoordinates;
-                            if (coords) {
-                                Linking.openURL(
-                                    `https://www.google.com/maps/dir/?api=1&destination=${coords.latitude},${coords.longitude}&travelmode=driving`
-                                );
-                            }
-                        },
-                        style: 'cancel'
-                    },
-                    {
-                        text: 'Sí, continuar',
-                        onPress: async () => {
-                            await performMarkReady();
-                        }
-                    }
-                ]
-            );
-            return;
-        }
-        
-        // Si está en rango perfecto o bueno, continuar directamente
-        await performMarkReady();
-    };
-    
-    const performMarkReady = async () => {
-        if (!checkInId) return;
-
         try {
             setLoading(true);
-            
-            const locationData = userLocation ? {
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                accuracy: 10, // meters
-            } : undefined;
 
+            // 1. Obtener ubicación actual fresca
+            // El usuario solicitó solo tomar las dos ubicaciones sin validación estricta de distancia
+            let locationData: any = undefined;
+            
+            try {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                
+                if (status === 'granted') {
+                    // Forzar alta precisión para asegurar que tenemos el dato real
+                    const location = await Location.getCurrentPositionAsync({ 
+                        accuracy: Location.Accuracy.High 
+                    });
+                    
+                    setUserLocation(location.coords);
+                    locationData = {
+                        latitude: location.coords.latitude,
+                        longitude: location.coords.longitude,
+                        accuracy: location.coords.accuracy || 10,
+                    };
+                } else {
+                    // Si no da permiso, intentamos usar la última conocida o fallamos suave
+                    console.warn('[CheckInStart] Location permission not granted');
+                    if (userLocation) {
+                        locationData = {
+                            latitude: userLocation.latitude,
+                            longitude: userLocation.longitude,
+                            accuracy: 10,
+                        };
+                    }
+                }
+            } catch (locError) {
+                console.error('[CheckInStart] Error refreshing location:', locError);
+                // Si falla obtener, usamos la que tengamos en estado
+                if (userLocation) {
+                    locationData = {
+                        latitude: userLocation.latitude,
+                        longitude: userLocation.longitude,
+                        accuracy: 10,
+                    };
+                }
+            }
+
+            // Validar que tenemos ubicación
+            if (!locationData) {
+                Alert.alert(
+                    'Ubicación necesaria',
+                    'Para seguridad del proceso, necesitamos registrar tu ubicación al iniciar el check-in. Por favor verifica tus permisos de ubicación.'
+                );
+                return;
+            }
+
+            // 2. Marcar como listo directamente (sin checks de distancia)
             await markParticipantReady(checkInId, user!.uid, isOwner, locationData);
             setIsReady(true);
             
@@ -414,6 +452,8 @@ export default function CheckInStart() {
             setLoading(false);
         }
     };
+    
+    // Función eliminada: performMarkReady (integrada en handleMarkReady)
 
     const handleBothReady = async (id: string) => {
         // Evitar llamadas múltiples
@@ -427,49 +467,35 @@ export default function CheckInStart() {
         
         try {
             // Only update if still pending to avoid race conditions
-            console.log('[CheckInStart] Updating status to in-progress...');
             await updateCheckInStatus(id, 'in-progress');
-            console.log('[CheckInStart] Status updated successfully');
-            
-            // Desuscribir antes de navegar
-            if (checkInUnsubscribeRef.current) {
-                console.log('[CheckInStart] Unsubscribing before navigation');
-                checkInUnsubscribeRef.current();
-                checkInUnsubscribeRef.current = null;
-            }
-            
-            // Navigate to photos screen
-            // Use a slightly longer timeout to ensure UI feedback is seen
-            console.log('[CheckInStart] Scheduling navigation in 1.5s...');
-            setTimeout(() => {
-                console.log('[CheckInStart] Navigating to CheckInPhotos...');
-                navigation.replace('CheckInPhotos', { 
-                    reservation, 
-                    checkInId: id 
-                });
-            }, 1500);
         } catch (error) {
             console.error('[CheckInStart] Error updating status:', error);
-            // Even if update fails (e.g. already updated), try to navigate
-            console.log('[CheckInStart] Error occurred, navigating anyway...');
-            
-            // Desuscribir de todos modos
-            if (checkInUnsubscribeRef.current) {
-                checkInUnsubscribeRef.current();
-                checkInUnsubscribeRef.current = null;
-            }
-            
-            setTimeout(() => {
-                console.log('[CheckInStart] Navigating to CheckInPhotos (fallback)...');
-                navigation.replace('CheckInPhotos', { 
-                    reservation, 
-                    checkInId: id 
-                });
-            }, 1500);
+            // Continue to navigate even if update fails
         }
+        
+        // Desuscribir antes de navegar
+        if (checkInUnsubscribeRef.current) {
+            checkInUnsubscribeRef.current();
+            checkInUnsubscribeRef.current = null;
+        }
+        
+        // Navigate immediately (sin setTimeout innecesario)
+        navigation.replace('CheckInPhotos', { 
+            reservation, 
+            checkInId: id 
+        });
     };
 
     const isWithinRange = distance !== null && distance <= 0.5; // 500 meters
+
+    if (initializing) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+                <ActivityIndicator size="large" color="#0B729D" />
+                <Text style={{ marginTop: 20, color: '#6B7280' }}>Cargando Check-in...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -763,9 +789,13 @@ export default function CheckInStart() {
                             <ActivityIndicator color="#fff" />
                         ) : (
                             <>
-                                <Ionicons name="checkmark-circle-outline" size={24} color="#fff" />
+                                <Ionicons 
+                                    name={isReady ? "hourglass-outline" : "checkmark-circle-outline"} 
+                                    size={24} 
+                                    color="#fff" 
+                                />
                                 <Text style={styles.readyButtonText}>
-                                    {isReady ? 'Esperando a la otra parte...' : 'Estoy listo para empezar'}
+                                    {isReady ? 'Esperando a que la otra parte confirme...' : 'Estoy listo para empezar'}
                                 </Text>
                             </>
                         )}

@@ -15,7 +15,7 @@ interface TripCardProps {
   onQuickAction?: (action: 'chat' | 'navigate' | 'checkin') => void;
 }
 
-export default function TripCard({ 
+function TripCard({ 
   reservation, 
   onPress, 
   onDelete, 
@@ -109,6 +109,7 @@ export default function TripCard({
                 style={styles.heroImage}
                 contentFit="cover"
                 transition={200}
+                cachePolicy="memory-disk"
               />
               <View style={styles.imageGradient} />
             </>
@@ -811,4 +812,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#DC2626',
   },
+});
+
+// Memoize component to prevent unnecessary re-renders
+export default React.memo(TripCard, (prevProps, nextProps) => {
+  return (
+    prevProps.reservation.id === nextProps.reservation.id &&
+    prevProps.reservation.status === nextProps.reservation.status &&
+    prevProps.isDeleting === nextProps.isDeleting
+  );
 });

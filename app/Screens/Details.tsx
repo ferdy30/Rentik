@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, Modal, Platform, ScrollView, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { db } from '../../FirebaseConfig';
+import { db } from '../FirebaseConfig';
 import BottomActionBar from '../components/Details/BottomActionBar';
 import DetailsSkeleton from '../components/Details/DetailsSkeleton';
 import FadeInSection from '../components/Details/FadeInSection';
@@ -39,14 +39,6 @@ export default function Details() {
   // Normalizar datos para asegurar consistencia
   const vehicle = React.useMemo(() => {
     const normalized = normalizeVehicleData(rawVehicle.id || '', rawVehicle);
-    console.log('📋 Vehicle Data en Details:', {
-      id: normalized.id,
-      marca: normalized.marca,
-      modelo: normalized.modelo,
-      descripcion: normalized.descripcion,
-      caracteristicas: normalized.caracteristicas,
-      caracteristicasLength: normalized.caracteristicas?.length
-    });
     return normalized;
   }, [rawVehicle]);
 
@@ -191,11 +183,11 @@ export default function Details() {
                 {vehicle.disponible ? "Disponible ahora" : "No disponible"}
               </Text>
             </View>
-            {vehicle.disponible && (
+            {vehicle.disponible ? (
               <Text style={styles.availabilitySubtext}>
                 Reserva instantánea • Respuesta rápida
               </Text>
-            )}
+            ) : null}
             </View>
           </FadeInSection>
 
@@ -229,25 +221,25 @@ export default function Details() {
 			<View style={styles.divider} />
 
             {/* Descuentos */}
-            {(vehicle.discounts?.weekly > 0 || vehicle.discounts?.monthly > 0) && (
+            {(vehicle.discounts?.weekly > 0 || vehicle.discounts?.monthly > 0) ? (
                 <>
                     <View style={{ marginBottom: 24 }}>
                         <Text style={styles.sectionTitle}>Descuentos</Text>
                         <View style={{ backgroundColor: '#EFF6FF', padding: 14, borderRadius: 12, flexDirection: 'row', alignItems: 'center' }}>
                             <Ionicons name="pricetag" size={20} color="#0B729D" style={{ marginRight: 10 }} />
                             <View>
-                                {vehicle.discounts.weekly > 0 && (
+                                {vehicle.discounts.weekly > 0 ? (
                                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#0B729D' }}>{vehicle.discounts.weekly}% descuento semanal</Text>
-                                )}
-                                {vehicle.discounts.monthly > 0 && (
+                                ) : null}
+                                {vehicle.discounts.monthly > 0 ? (
                                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#0B729D' }}>{vehicle.discounts.monthly}% descuento mensual</Text>
-                                )}
+                                ) : null}
                             </View>
                         </View>
                     </View>
                     <View style={styles.divider} />
                 </>
-            )}
+            ) : null}
 
           <FadeInSection delay={500}>
             <VehicleFeatures features={vehicle.caracteristicas} />
@@ -314,11 +306,11 @@ export default function Details() {
             ) : (
               <HostInfo name={hostName} joinedDate={hostJoined} photoURL={hostPhoto} rating={hostRating} completedTrips={hostTrips} />
             )}
-            {errorHost && (
+            {errorHost ? (
               <View style={{ marginTop: 8 }}>
                 <Text style={{ color: '#DC2626', fontSize: 12 }}>{errorHost}</Text>
               </View>
-            )}
+            ) : null}
           </FadeInSection>
 
           <View style={{ height: 100 }} />

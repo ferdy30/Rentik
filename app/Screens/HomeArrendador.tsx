@@ -3,9 +3,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useAuth } from '../../context/Auth';
+import { useAuth } from '../context/Auth';
 import { subscribeToUserChats } from '../services/chat';
 import { getOwnerReservations } from '../services/reservations';
+import { logger } from '../utils/logger';
 import ChatScreen from './Arrendador/Chat';
 import DashboardScreen from './Arrendador/Dashboard';
 import MisAutosScreen from './Arrendador/MisAutos';
@@ -20,16 +21,15 @@ export default function HomeArrendador() {
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
 
   const fetchActiveReservations = useCallback(async () => {
-    if (!user) return;
+    if (!user?.uid) return;
     try {
       const reservations = await getOwnerReservations(user.uid);
       const active = reservations.filter(r => 
         r.status === 'pending' || r.status === 'confirmed'
       ).length;
-      // console.log('[HomeArrendador] Reservas activas:', active, '(pending + confirmed)');
       setActiveReservationsCount(active);
     } catch (error) {
-      console.error('Error fetching active reservations:', error);
+      logger.error('Error fetching active reservations:', error);
     }
   }, [user?.uid]);
 
@@ -41,11 +41,10 @@ export default function HomeArrendador() {
   );
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     
+    // Initial fetch
     fetchActiveReservations();
-    // Poll every 30 seconds for updates
-    const interval = setInterval(fetchActiveReservations, 30000);
     
     // Subscribe to chats for unread count
     const unsubscribe = subscribeToUserChats(
@@ -57,14 +56,13 @@ export default function HomeArrendador() {
         }, 0);
         setUnreadChatsCount(unread);
       },
-      (error) => console.error('Error subscribing to chats:', error)
+      (error) => logger.error('Error subscribing to chats:', error)
     );
     
     return () => {
-      clearInterval(interval);
       unsubscribe();
     };
-  }, [fetchActiveReservations, user?.uid]);
+  }, [user?.uid]); // Removed fetchActiveReservations from deps to avoid re-subscription
 
   return (
     <Tab.Navigator id={undefined}

@@ -1,5 +1,5 @@
 import { addDoc, collection, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { db } from '../../FirebaseConfig';
+import { db } from '../FirebaseConfig';
 
 export interface CheckOutReport {
   id?: string;
@@ -179,14 +179,28 @@ export const saveCheckOutSignatures = async (
 };
 
 /**
- * Finalizar check-out
+ * Finalizar check-out y actualizar la reservación a 'completed'
  */
 export const completeCheckOut = async (
-  checkOutId: string
+  checkOutId: string,
+  reservationId: string
 ): Promise<void> => {
+  // Actualizar el check-out
   await updateDoc(doc(db, 'checkOuts', checkOutId), {
     status: 'completed',
     completedAt: new Date(),
+    keysReturned: true,
+    updatedAt: new Date(),
+  });
+
+  // Actualizar la reservación a 'completed'
+  await updateDoc(doc(db, 'reservations', reservationId), {
+    status: 'completed',
+    checkOut: {
+      id: checkOutId,
+      completed: true,
+      completedAt: new Date(),
+    },
     updatedAt: new Date(),
   });
 };

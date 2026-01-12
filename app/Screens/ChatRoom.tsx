@@ -19,8 +19,8 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { db, storage } from '../../FirebaseConfig';
-import { useAuth } from '../../context/Auth';
+import { db, storage } from '../FirebaseConfig';
+import { useAuth } from '../context/Auth';
 import {
     createChatIfNotExists,
     loadOlderMessages,

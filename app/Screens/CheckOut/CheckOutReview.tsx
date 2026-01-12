@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { collection, doc, getDoc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -14,11 +14,11 @@ import {
     View
 } from 'react-native';
 import SignatureScreen from 'react-native-signature-canvas';
-import { db } from '../../../FirebaseConfig';
+import { db } from '../../FirebaseConfig';
+import { typography } from '../../constants/typography';
 import { CheckInReport } from '../../services/checkIn';
 import { CheckOutReport } from '../../services/checkOut';
 import { Reservation } from '../../services/reservations';
-import { typography } from '../../constants/typography';
 
 export default function CheckOutReview() {
     const navigation = useNavigation<any>();
@@ -199,14 +199,6 @@ export default function CheckOutReview() {
                 status: 'completed',
                 updatedAt: new Date()
             });
-
-            // 3. Update Vehicle (Make it available again)
-            if (reservation?.vehicleId) {
-                const vehicleRef = doc(db, 'vehicles', reservation.vehicleId);
-                batch.update(vehicleRef, {
-                    status: 'available'
-                });
-            }
 
             await batch.commit();
 
@@ -391,22 +383,10 @@ export default function CheckOutReview() {
                                             return;
                                         }
 
-                                        // Wait a bit for state to update then submit
+                                        // Use the proper handleFinalize after setting signature
                                         setTimeout(() => {
-                                            // We need to manually trigger the logic since handleFinalize checks for signature state which might not be updated in closure immediately if we just called it.
-                                            // But actually, we can just call the update logic directly here.
-                                            setSubmitting(true);
-                                            updateDoc(doc(db, 'checkOuts', checkOutId), {
-                                                'signatures.renter': mockSignature,
-                                                status: 'completed',
-                                                updatedAt: new Date()
-                                            }).then(() => {
-                                                navigation.navigate('CheckOutComplete', { checkOutId, reservationId });
-                                            }).catch(err => {
-                                                console.error(err);
-                                                setSubmitting(false);
-                                            });
-                                        }, 100);
+                                            handleFinalize();
+                                        }, 300);
                                     }
                                 }
                             ]

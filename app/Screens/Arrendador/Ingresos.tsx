@@ -10,7 +10,7 @@ import {
     Text,
     View
 } from 'react-native';
-import { useAuth } from '../../../context/Auth';
+import { useAuth } from '../../context/Auth';
 import { getOwnerReservations } from '../../services/reservations';
 
 export default function IngresosScreen() {

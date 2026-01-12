@@ -276,11 +276,15 @@ export default function BookingStep1Dates() {
         if (days === 0) return 0;
         const basePrice = days * vehicle.precio;
         // Apply discount based on duration
-        if (days >= 30) return basePrice * 0.75;
-        if (days >= 15) return basePrice * 0.80;
-        if (days >= 8) return basePrice * 0.85;
-        if (days >= 4) return basePrice * 0.90;
-        return basePrice;
+        let discountedPrice = basePrice;
+        if (days >= 30) discountedPrice = basePrice * 0.75;
+        else if (days >= 15) discountedPrice = basePrice * 0.80;
+        else if (days >= 8) discountedPrice = basePrice * 0.85;
+        else if (days >= 4) discountedPrice = basePrice * 0.90;
+        // Add Rentik commission: 10% on top (customer pays 10% more)
+        const rentalCost = discountedPrice;
+        const commission = rentalCost * 0.10;
+        return rentalCost + commission;
     };
 
     return (

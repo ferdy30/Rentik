@@ -21,7 +21,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { Firebaseauth, db } from '../../FirebaseConfig';
+import { Firebaseauth, db } from '../FirebaseConfig';
 import { colors } from '../constants/colors';
 
 const { width } = Dimensions.get('window');
@@ -235,7 +235,8 @@ const Login = ({ navigation }: any) => {
                 <Ionicons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
               </TouchableOpacity>
 
-              <View style={styles.dividerContainer}>
+              {/* Social login deshabilitado temporalmente */}
+              {/* <View style={styles.dividerContainer}>
                 <View style={styles.divider} />
                 <Text style={styles.dividerText}>O continúa con</Text>
                 <View style={styles.divider} />
@@ -248,7 +249,7 @@ const Login = ({ navigation }: any) => {
                 <TouchableOpacity style={styles.socialButton}>
                     <Ionicons name="logo-apple" size={24} color="black" />
                 </TouchableOpacity>
-              </View>
+              </View> */}
             </View>
           )}
         </View>

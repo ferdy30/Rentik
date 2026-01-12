@@ -15,11 +15,11 @@ import {
     View
 } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { db } from '../../../FirebaseConfig';
-import { useAuth } from '../../../context/Auth';
+import { db } from '../../FirebaseConfig';
+import { typography } from '../../constants/typography';
+import { useAuth } from '../../context/Auth';
 import { startCheckOut } from '../../services/checkOut';
 import { Reservation } from '../../services/reservations';
-import { typography } from '../../constants/typography';
 
 export default function CheckOutStart() {
     const navigation = useNavigation<any>();
@@ -39,18 +39,14 @@ export default function CheckOutStart() {
     }, []);
 
     const initializeLocation = async () => {
-        console.log('=== Initializing Return Location ===');
-        console.log('Is Delivery:', reservation.isDelivery);
-        console.log('Return Coordinates:', reservation.returnCoordinates);
-        console.log('Pickup Coordinates:', reservation.pickupCoordinates);
+
         
-        // ? NUEVA L�GICA: Usar coordenadas guardadas en la reserva
+        // ✅ NUEVA LÓGICA: Usar coordenadas guardadas en la reserva
         let returnPoint = null;
 
         // 1. Prioridad: Usar returnCoordinates si existe en la reserva
         if (reservation.returnCoordinates) {
             returnPoint = reservation.returnCoordinates;
-            console.log('? Using saved return coordinates:', returnPoint);
         }
         // 2. Fallback: En modo delivery, el retorno puede ser:
         //    - El mismo lugar de entrega (si returnCoordinates no existe)
@@ -58,42 +54,38 @@ export default function CheckOutStart() {
         else if (reservation.isDelivery) {
             if (reservation.deliveryCoordinates) {
                 returnPoint = reservation.deliveryCoordinates;
-                console.log('?? Using delivery coordinates as return point:', returnPoint);
             } else if (reservation.pickupCoordinates) {
                 returnPoint = reservation.pickupCoordinates;
-                console.log('?? Using pickup coordinates as return point:', returnPoint);
             }
         }
         // 3. Si fue pickup normal, retornar al mismo lugar
         else if (reservation.pickupCoordinates) {
             returnPoint = reservation.pickupCoordinates;
-            console.log('? Using pickup coordinates for return:', returnPoint);
+            console.log('✅ Using pickup coordinates for return:', returnPoint);
         }
-        // 4. �ltimo recurso: buscar coordenadas del veh�culo (solo para reservas antiguas)
+        
+        // 4. Último recurso: buscar coordenadas del vehículo (solo para reservas antiguas)
         else {
-            console.log('?? No coordinates saved, fetching vehicle location...');
             try {
                 const vehicleDoc = await getDoc(doc(db, 'vehicles', reservation.vehicleId));
                 if (vehicleDoc.exists()) {
                     const data = vehicleDoc.data();
                     if (data.coordinates) {
                         returnPoint = data.coordinates;
-                        console.log('? Using vehicle coordinates:', returnPoint);
                     }
                 }
             } catch (error) {
-                console.error('? Error fetching vehicle location:', error);
+                console.error('⚠️ Error fetching vehicle location:', error);
             }
         }
 
         if (returnPoint) {
             setReturnCoordinates(returnPoint);
-            console.log('? Return point set successfully');
         } else {
-            console.error('? Could not determine return point');
+            console.error('❌ Could not determine return point');
             Alert.alert(
-                'Error de ubicaci�n',
-                'No se pudo determinar el punto de devoluci�n. Por favor contacta con el host.',
+                'Error de ubicación',
+                'No se pudo determinar el punto de devolución. Por favor contacta con el host.',
                 [{ text: 'Entendido' }]
             );
         }
@@ -291,22 +283,22 @@ export default function CheckOutStart() {
                         />
                         <Text style={[styles.distanceText, { color: isWithinRange ? "#16A34A" : "#DC2626" }]}>
                             {isWithinRange 
-                                ? "Est�s en el punto de devoluci�n"
-                                : `Est�s a ${(distance).toFixed(2)} km del punto de entrega`
+                                ? "Estás en el punto de devolución"
+                                : `Estás a ${(distance).toFixed(2)} km del punto de entrega`
                             }
                         </Text>
                     </View>
                 )}
 
                 <View style={styles.stepsCard}>
-                    <Text style={styles.stepsTitle}>?? Proceso de Devoluci�n</Text>
+                    <Text style={styles.stepsTitle}>📋 Proceso de Devolución</Text>
                     
                     <View style={styles.step}>
                         <View style={styles.stepBadge}>
                             <Text style={styles.stepNum}>1</Text>
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.stepTitle}>Ubicaci�n</Text>
+                            <Text style={styles.stepTitle}>Ubicación</Text>
                             <Text style={styles.stepDesc}>Estaciona en un lugar seguro cerca del punto acordado</Text>
                         </View>
                         <Ionicons name="location" size={20} color="#6B7280" />
@@ -385,7 +377,7 @@ export default function CheckOutStart() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: '#F9FAFB',
     },
     header: {
         flexDirection: 'row',
@@ -395,46 +387,56 @@ const styles = StyleSheet.create({
         paddingTop: Platform.OS === 'ios' ? 60 : 40,
         paddingBottom: 16,
         backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#FAFAFA',
     },
     backButton: {
         padding: 8,
     },
     headerTitle: {
-        fontSize: 18,
-        fontFamily: typography.fonts.bold,
-        color: '#333333',
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#111827',
+        letterSpacing: -0.5,
     },
     content: {
         flex: 1,
-        padding: 20,
+        padding: 24,
     },
     infoCard: {
         flexDirection: 'row',
         backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 12,
+        padding: 20,
+        borderRadius: 16,
         gap: 16,
-        marginBottom: 16,
+        marginBottom: 20,
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
     cardTitle: {
-        fontSize: 16,
-        fontFamily: typography.fonts.bold,
-        color: '#333333',
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 6,
     },
     cardText: {
         fontSize: 14,
-        color: '#757575',
-        marginTop: 4,
+        color: '#6B7280',
+        lineHeight: 20,
     },
     mapContainer: {
-        height: 200,
-        borderRadius: 12,
+        height: 220,
+        borderRadius: 16,
         overflow: 'hidden',
-        marginBottom: 16,
-        backgroundColor: '#E0E0E0',
+        marginBottom: 20,
+        backgroundColor: '#E5E7EB',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
     map: {
         width: '100%',
@@ -448,100 +450,109 @@ const styles = StyleSheet.create({
     distanceCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
-        borderRadius: 12,
+        padding: 16,
+        borderRadius: 16,
         gap: 12,
-        marginBottom: 16,
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
     distanceOk: {
-        backgroundColor: '#DCFCE7',
+        backgroundColor: '#D1FAE5',
     },
     distanceFar: {
         backgroundColor: '#FEE2E2',
     },
     distanceText: {
-        fontFamily: typography.fonts.semiBold,
-        fontSize: 14,
+        fontWeight: '700',
+        fontSize: 15,
+        flex: 1,
     },
     vehicleCard: {
         backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
+        borderRadius: 20,
+        padding: 20,
+        marginBottom: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 3,
     },
     vehicleHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 16,
     },
     vehicleName: {
-        fontSize: 18,
-        fontFamily: typography.fonts.extraBold,
+        fontSize: 19,
+        fontWeight: '800',
         color: '#111827',
+        letterSpacing: -0.3,
     },
     vehicleYear: {
-        fontSize: 14,
+        fontSize: 15,
         color: '#6B7280',
-        marginTop: 2,
+        marginTop: 4,
+        fontWeight: '500',
     },
     stepsCard: {
         backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 16,
+        padding: 24,
+        borderRadius: 20,
         marginBottom: 100,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 3,
     },
     stepsTitle: {
-        fontSize: 18,
-        fontFamily: typography.fonts.extraBold,
+        fontSize: 20,
+        fontWeight: '800',
         color: '#111827',
-        marginBottom: 20,
+        marginBottom: 24,
+        letterSpacing: -0.5,
     },
     step: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
     },
     stepBadge: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: '#EFF6FF',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: '#BFDBFE',
+        borderColor: '#93C5FD',
     },
     stepNum: {
-        fontSize: 16,
-        fontFamily: typography.fonts.extraBold,
+        fontSize: 17,
+        fontWeight: '800',
         color: '#0B729D',
     },
     stepTitle: {
-        fontSize: 15,
-        fontFamily: typography.fonts.bold,
+        fontSize: 16,
+        fontWeight: '700',
         color: '#111827',
-        marginBottom: 2,
+        marginBottom: 4,
     },
     stepDesc: {
-        fontSize: 13,
+        fontSize: 14,
         color: '#6B7280',
-        lineHeight: 18,
+        lineHeight: 20,
     },
     stepDivider: {
         height: 1,
-        backgroundColor: '#F3F4F6',
-        marginVertical: 16,
-        marginLeft: 52,
+        backgroundColor: '#E5E7EB',
+        marginVertical: 18,
+        marginLeft: 58,
     },
     footer: {
         position: 'absolute',
@@ -549,18 +560,23 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: '#fff',
-        padding: 20,
-        borderTopWidth: 1,
-        borderTopColor: '#FAFAFA',
+        padding: 24,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 8,
     },
     button: {
         backgroundColor: '#0B729D',
-        padding: 16,
-        borderRadius: 14,
+        paddingVertical: 18,
+        paddingHorizontal: 24,
+        borderRadius: 16,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        gap: 10,
         shadowColor: '#0B729D',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
@@ -569,22 +585,24 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#fff',
-        fontFamily: typography.fonts.extraBold,
-        fontSize: 16,
+        fontWeight: '800',
+        fontSize: 17,
+        letterSpacing: 0.3,
     },
     warningCard: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FEF3C7',
-        padding: 12,
-        borderRadius: 10,
+        padding: 14,
+        borderRadius: 12,
         marginTop: 12,
-        gap: 8,
+        gap: 10,
     },
     warningText: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 14,
         color: '#92400E',
-        fontFamily: typography.fonts.semiBold,
+        fontWeight: '600',
+        lineHeight: 20,
     },
 });

@@ -12,8 +12,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useAuth } from '../../../context/Auth';
-import { useToast } from '../../../context/ToastContext';
+import { useAuth } from '../../context/Auth';
+import { useToast } from '../../context/ToastContext';
 import TripCard from '../../components/TripCard';
 import { archiveReservation, deleteReservation, getUserReservations, type Reservation } from '../../services/reservations';
 import { styles } from './styles';

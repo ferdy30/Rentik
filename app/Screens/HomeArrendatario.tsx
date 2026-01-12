@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useAuth } from '../../context/Auth';
+import { useAuth } from '../context/Auth';
 import { subscribeToUserChats } from '../services/chat';
 import { getUserReservations } from '../services/reservations';
+import { logger } from '../utils/logger';
 import BuscarScreen from './Arrendatario/Buscar';
 import ChatScreen from './Arrendatario/Chat';
 import FavoritosScreen from './Arrendatario/Favoritos';
@@ -19,9 +20,9 @@ export default function Home() {
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
 
-    // Suscribirse a viajes activos
+    // Load active trips count
     const loadReservations = async () => {
       try {
         const reservations = await getUserReservations(user.uid);
@@ -30,13 +31,13 @@ export default function Home() {
         ).length;
         setActiveTripsCount(active);
       } catch (error) {
-        console.error('Error loading reservations:', error);
+        logger.error('Error loading reservations:', error);
       }
     };
 
     loadReservations();
 
-    // Suscribirse a chats no leídos
+    // Subscribe to chats for unread count
     const unsubscribe = subscribeToUserChats(
       user.uid,
       20,
@@ -46,11 +47,11 @@ export default function Home() {
         }, 0);
         setUnreadChatsCount(unread);
       },
-      (error) => console.error('Error subscribing to chats:', error)
+      (error) => logger.error('Error subscribing to chats:', error)
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]); // Only depend on uid to avoid re-subscription
 
   const renderTabBarIcon = useCallback(({ route, color, focused }: any) => {
     let iconName: keyof typeof Ionicons.glyphMap = 'ellipse-outline';

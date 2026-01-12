@@ -17,7 +17,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { Firebaseauth, storage } from '../../../FirebaseConfig';
+import { Firebaseauth, storage } from '../../FirebaseConfig';
 import { saveCheckInConditions } from '../../services/checkIn';
 import { Reservation } from '../../services/reservations';
 
@@ -54,7 +54,7 @@ export default function CheckInConditions() {
     const handleTakeFuelPhoto = async () => {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permiso denegado', 'Necesitamos acceso a la cámara para verificar el combustible.');
+            Alert.alert('Permiso denegado', 'Necesitamos acceso a la c�mara para verificar el combustible.');
             return;
         }
 
@@ -91,7 +91,7 @@ export default function CheckInConditions() {
     const handleContinue = async () => {
         // Validate odometer
         if (!odometer || parseInt(odometer) <= 0) {
-            Alert.alert('Error', 'Por favor ingresa el kilometraje actual del vehículo.');
+            Alert.alert('Error', 'Por favor ingresa el kilometraje actual del veh�culo.');
             return;
         }
 
@@ -120,7 +120,7 @@ export default function CheckInConditions() {
             await saveCheckInConditions(checkInId, conditions);
             
             // Navigate to damage report screen
-            navigation.navigate('CheckInDamageReport', { 
+            navigation.replace('CheckInDamageReport', { 
                 reservation, 
                 checkInId 
             });
@@ -139,11 +139,14 @@ export default function CheckInConditions() {
             
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#111827" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Condiciones del vehículo</Text>
                 <View style={{ width: 40 }} />
+                <View style={{ flex: 1, marginLeft: 16 }}>
+                    <Text style={styles.headerTitle}>Condiciones del Vehículo</Text>
+                    <Text style={styles.headerSubtitle}>Paso 3 de 5</Text>
+                </View>
+                <View style={styles.progressCircle}>
+                    <Text style={styles.progressText}>3/5</Text>
+                </View>
             </View>
 
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -151,7 +154,7 @@ export default function CheckInConditions() {
                 <View style={styles.instructionsCard}>
                     <Ionicons name="clipboard-outline" size={24} color="#0B729D" />
                     <Text style={styles.instructionsText}>
-                        Completa el checklist para registrar el estado actual del vehículo.
+                        Completa el checklist para registrar el estado actual del veh�culo.
                     </Text>
                 </View>
 
@@ -167,7 +170,7 @@ export default function CheckInConditions() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Kilometraje actual</Text>
                     <View style={styles.inputContainer}>
-                        <Ionicons name="speedometer-outline" size={24} color="#6B7280" />
+                        <Ionicons name="speedometer-outline" size={24} color="#757575" />
                         <TextInput
                             style={styles.input}
                             placeholder="Ej: 45000"
@@ -202,11 +205,11 @@ export default function CheckInConditions() {
                             value={fuelLevel}
                             onValueChange={setFuelLevel}
                             minimumTrackTintColor="#0B729D"
-                            maximumTrackTintColor="#E5E7EB"
+                            maximumTrackTintColor="#E0E0E0"
                             thumbTintColor="#0B729D"
                         />
                         <View style={styles.sliderLabels}>
-                            <Text style={styles.sliderLabel}>Vacío</Text>
+                            <Text style={styles.sliderLabel}>Vac�o</Text>
                             <Text style={styles.sliderLabel}>1/4</Text>
                             <Text style={styles.sliderLabel}>1/2</Text>
                             <Text style={styles.sliderLabel}>3/4</Text>
@@ -244,7 +247,7 @@ export default function CheckInConditions() {
                         value={exteriorCleanliness}
                         onValueChange={setExteriorCleanliness}
                         minimumTrackTintColor={getRatingColor(exteriorCleanliness)}
-                        maximumTrackTintColor="#E5E7EB"
+                        maximumTrackTintColor="#E0E0E0"
                         thumbTintColor={getRatingColor(exteriorCleanliness)}
                     />
                     <View style={styles.ratingDots}>
@@ -278,7 +281,7 @@ export default function CheckInConditions() {
                         value={interiorCleanliness}
                         onValueChange={setInteriorCleanliness}
                         minimumTrackTintColor={getRatingColor(interiorCleanliness)}
-                        maximumTrackTintColor="#E5E7EB"
+                        maximumTrackTintColor="#E0E0E0"
                         thumbTintColor={getRatingColor(interiorCleanliness)}
                     />
                     <View style={styles.ratingDots}>
@@ -304,7 +307,7 @@ export default function CheckInConditions() {
                                 color={!smells ? '#16A34A' : '#DC2626'} 
                             />
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.toggleTitle}>Olores extraños</Text>
+                                <Text style={styles.toggleTitle}>Olores extra�os</Text>
                                 <Text style={styles.toggleSubtitle}>
                                     {smells ? 'Se detectan malos olores (cigarrillo, humedad, etc.)' : 'Sin olores detectados'}
                                 </Text>
@@ -319,7 +322,7 @@ export default function CheckInConditions() {
                 {/* Tires condition */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Estado de llantas y presión</Text>
+                        <Text style={styles.sectionTitle}>Estado de llantas y presi�n</Text>
                         <View style={[styles.badge, { backgroundColor: getRatingColor(tiresCondition) + '20' }]}>
                             <Text style={[styles.badgeText, { color: getRatingColor(tiresCondition) }]}>
                                 {getRatingLabel(tiresCondition)}
@@ -334,7 +337,7 @@ export default function CheckInConditions() {
                         value={tiresCondition}
                         onValueChange={setTiresCondition}
                         minimumTrackTintColor={getRatingColor(tiresCondition)}
-                        maximumTrackTintColor="#E5E7EB"
+                        maximumTrackTintColor="#E0E0E0"
                         thumbTintColor={getRatingColor(tiresCondition)}
                     />
                     <View style={styles.ratingDots}>
@@ -386,7 +389,7 @@ export default function CheckInConditions() {
                             />
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.toggleTitle}>Documentos presentes</Text>
-                                <Text style={styles.toggleSubtitle}>Tarjeta de circulación y póliza</Text>
+                                <Text style={styles.toggleSubtitle}>Tarjeta de circulaci�n y p�liza</Text>
                             </View>
                         </View>
                         <View style={[styles.toggle, documentsPresent && styles.toggleActive]}>
@@ -398,16 +401,61 @@ export default function CheckInConditions() {
 
             {/* Bottom action button */}
             <View style={styles.bottomBar}>
+                <TouchableOpacity 
+                    style={{ marginBottom: 12, alignItems: 'center', padding: 8 }}
+                    onPress={() => {
+                        Alert.alert(
+                            'Modo Desarrollo',
+                            'Guardando condiciones con datos simulados...',
+                            [
+                                { text: 'Cancelar', style: 'cancel' },
+                                {
+                                    text: 'Saltar',
+                                    onPress: async () => {
+                                        try {
+                                            setSaving(true);
+                                            const mockConditions = {
+                                                odometer: 50000,
+                                                fuelLevel: 75,
+                                                fuelGaugePhoto: 'https://via.placeholder.com/300',
+                                                exteriorCleanliness: 5,
+                                                interiorCleanliness: 5,
+                                                smells: false,
+                                                tiresCondition: 5,
+                                                lightsWorking: true,
+                                                documentsPresent: true,
+                                            };
+                                            await saveCheckInConditions(checkInId, mockConditions);
+                                            navigation.navigate('CheckInDamageReport', { 
+                                                reservation, 
+                                                checkInId 
+                                            });
+                                        } catch (error) {
+                                            Alert.alert('Error', 'No se pudieron guardar las condiciones.');
+                                        } finally {
+                                            setSaving(false);
+                                        }
+                                    }
+                                }
+                            ]
+                        );
+                    }}
+                >
+                    <Text style={{ color: '#757575', textDecorationLine: 'underline', fontSize: 14 }}>
+                        [DEV] Saltar condiciones
+                    </Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity
-                    style={styles.continueButton}
+                    style={[styles.continueButton, (!odometer || !fuelGaugePhoto) && { opacity: 0.6 }]}
                     onPress={handleContinue}
-                    disabled={saving || !odometer}
+                    disabled={saving || !odometer || !fuelGaugePhoto}
                 >
                     {saving ? (
                         <ActivityIndicator color="#fff" />
                     ) : (
                         <>
-                            <Text style={styles.continueButtonText}>Continuar al reporte de daños</Text>
+                            <Text style={styles.continueButtonText}>Continuar al reporte de da�os</Text>
                             <Ionicons name="arrow-forward" size={20} color="#fff" />
                         </>
                     )}
@@ -420,7 +468,7 @@ export default function CheckInConditions() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: '#F5F5F5',
     },
     header: {
         flexDirection: 'row',
@@ -431,7 +479,7 @@ const styles = StyleSheet.create({
         paddingBottom: 16,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: '#FAFAFA',
     },
     backButton: {
         padding: 8,
@@ -439,7 +487,25 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#111827',
+        color: '#333333',
+    },
+    headerSubtitle: {
+        fontSize: 12,
+        color: '#757575',
+        marginTop: 2,
+    },
+    progressCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#E0F2FE',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    progressText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#0B729D',
     },
     content: {
         flex: 1,
@@ -471,11 +537,11 @@ const styles = StyleSheet.create({
     vehicleName: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#111827',
+        color: '#333333',
     },
     vehicleYear: {
         fontSize: 14,
-        color: '#6B7280',
+        color: '#757575',
         marginTop: 2,
     },
     section: {
@@ -485,12 +551,12 @@ const styles = StyleSheet.create({
         marginTop: 16,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#E0E0E0',
     },
     sectionTitle: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#111827',
+        color: '#333333',
         marginBottom: 12,
     },
     sectionHeader: {
@@ -511,23 +577,23 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F9FAFB',
+        backgroundColor: '#F5F5F5',
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#E0E0E0',
         gap: 12,
     },
     input: {
         flex: 1,
         fontSize: 16,
-        color: '#111827',
+        color: '#333333',
         fontWeight: '600',
     },
     inputSuffix: {
         fontSize: 14,
-        color: '#6B7280',
+        color: '#757575',
         fontWeight: '600',
     },
     sliderContainer: {
@@ -542,7 +608,7 @@ const styles = StyleSheet.create({
     fuelBar: {
         flex: 1,
         height: 8,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: '#E0E0E0',
         borderRadius: 4,
         overflow: 'hidden',
     },
@@ -561,7 +627,7 @@ const styles = StyleSheet.create({
     },
     sliderLabel: {
         fontSize: 11,
-        color: '#6B7280',
+        color: '#757575',
     },
     ratingDots: {
         flexDirection: 'row',
@@ -572,18 +638,18 @@ const styles = StyleSheet.create({
         width: 40,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: '#E0E0E0',
     },
     toggleCard: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#F9FAFB',
+        backgroundColor: '#F5F5F5',
         padding: 16,
         borderRadius: 12,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#E0E0E0',
     },
     toggleLeft: {
         flexDirection: 'row',
@@ -594,18 +660,18 @@ const styles = StyleSheet.create({
     toggleTitle: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#111827',
+        color: '#333333',
     },
     toggleSubtitle: {
         fontSize: 12,
-        color: '#6B7280',
+        color: '#757575',
         marginTop: 2,
     },
     toggle: {
         width: 52,
         height: 28,
         borderRadius: 14,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: '#E0E0E0',
         padding: 2,
         justifyContent: 'center',
     },
@@ -633,7 +699,7 @@ const styles = StyleSheet.create({
         padding: 20,
         paddingBottom: Platform.OS === 'ios' ? 34 : 20,
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
+        borderTopColor: '#FAFAFA',
     },
     continueButton: {
         flexDirection: 'row',
@@ -653,12 +719,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#FAFAFA',
         padding: 12,
         borderRadius: 12,
         marginTop: 16,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#E0E0E0',
         borderStyle: 'dashed',
     },
     photoPlaceholder: {

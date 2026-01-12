@@ -6,15 +6,15 @@ import Step2Specs from '../Screens/Arrendador/AddVehicle/Step2Specs';
 import Step3Photos from '../Screens/Arrendador/AddVehicle/Step3Photos';
 import Step4Price from '../Screens/Arrendador/AddVehicle/Step4Price';
 import EditVehicle from '../Screens/Arrendador/EditVehicle_New';
+import RateRenter from '../Screens/Arrendador/RateRenter';
 import ReservationDetails from '../Screens/Arrendador/ReservationDetails';
-import Details from '../Screens/Details';
 import HomeArrendador from '../Screens/HomeArrendador';
 
 export type ArrendadorStackParamList = {
 	HomeArrendador: undefined;
-	Details: { id: string };
 	EditVehicle: { vehicle: any };
 	ReservationDetails: { reservation: any };
+	RateRenter: { reservation: any };
 	AddVehicleStep1Basic: undefined;
 	AddVehicleStep2Specs: { vehicleData: any };
 	AddVehicleStep2Features: { vehicleData: any };
@@ -35,9 +35,9 @@ export default function ArrendadorStack() {
 			}}
 		>
 			<Stack.Screen name="HomeArrendador" component={HomeArrendador} />
-			<Stack.Screen name="Details" component={Details} />
 			<Stack.Screen name="EditVehicle" component={EditVehicle} />
 			<Stack.Screen name="ReservationDetails" component={ReservationDetails} />
+			<Stack.Screen name="RateRenter" component={RateRenter} />
 			<Stack.Screen name="AddVehicleStep1Basic" component={Step1Basic} />
 			<Stack.Screen name="AddVehicleStep2Specs" component={Step2Specs} />
 			<Stack.Screen name="AddVehicleStep2Features" component={Step2Features} />

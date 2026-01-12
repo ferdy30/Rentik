@@ -14,9 +14,9 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useAuth } from '../../../context/Auth';
-import { useToast } from '../../../context/ToastContext';
-import { Firebaseauth } from '../../../FirebaseConfig';
+import { useAuth } from '../../context/Auth';
+import { useToast } from '../../context/ToastContext';
+import { Firebaseauth } from '../../FirebaseConfig';
 import VehicleCardSkeleton from '../../components/VehicleCardSkeleton';
 import { ArrendadorStackParamList } from '../../navigation/ArrendadorStack';
 import { deleteVehicle, subscribeToOwnerVehicles, VehicleData } from '../../services/vehicles';

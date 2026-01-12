@@ -59,7 +59,7 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
           return;
         }
         result = await ImagePicker.launchCameraAsync({
-          mediaTypes: [ImagePicker.MediaType.Images],
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
           quality: 0.8,
           allowsEditing: true,
           aspect: [4, 3],
@@ -71,7 +71,7 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: [ImagePicker.MediaType.Images],
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
           quality: 0.8,
           allowsMultipleSelection: true,
         });

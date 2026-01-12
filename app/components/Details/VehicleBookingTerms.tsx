@@ -76,9 +76,9 @@ export default function VehicleBookingTerms({
             <View style={styles.termContent}>
               <Text style={styles.termLabel}>Duración del viaje</Text>
               <Text style={styles.termValue}>
-                {minTripDuration && `Mín: ${minTripDuration} día${minTripDuration > 1 ? 's' : ''}`}
-                {minTripDuration && maxTripDuration && ' • '}
-                {maxTripDuration && `Máx: ${maxTripDuration} días`}
+                {minTripDuration ? `Mín: ${minTripDuration} día${minTripDuration > 1 ? 's' : ''}` : ''}
+                {minTripDuration && maxTripDuration ? ' • ' : ''}
+                {maxTripDuration ? `Máx: ${maxTripDuration} días` : ''}
               </Text>
             </View>
           </View>

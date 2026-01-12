@@ -1,53 +1,72 @@
 import { Ionicons } from '@expo/vector-icons';
-import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { NavigationProp, RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Linking,
-    Modal,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { db } from '../../../FirebaseConfig';
+import { db } from '../../FirebaseConfig';
 import TripTimeline from '../../components/TripTimeline';
+import { createChatIfNotExists } from '../../services/chat';
 import { Reservation, updateReservationStatus } from '../../services/reservations';
 import { formatDate } from '../../utils/date';
 import { scheduleReservationReminders } from '../../utils/tripNotifications';
 
 type ReservationDetailsRouteProp = RouteProp<{ ReservationDetails: { reservation: Reservation } }, 'ReservationDetails'>;
 
+
 interface UserProfile {
   nombre: string;
-  apellido?: string;
-  email: string;
+  apellido: string;
   photoURL?: string;
-  telefono?: string;
-  createdAt?: any;
-  completedTrips?: number;
   rating?: number;
+  completedTrips?: number;
   verified?: {
-    email?: boolean;
-    phone?: boolean;
-    license?: boolean;
-    identity?: boolean;
+    email: boolean;
+    phone: boolean;
+    license: boolean;
+    identity: boolean;
   };
+  email?: string;
+  telefono?: string;
 }
 
 export default function ReservationDetails() {
   const navigation = useNavigation<NavigationProp<any>>();
   const route = useRoute<ReservationDetailsRouteProp>();
-  const { reservation } = route.params;
+  const params = route.params;
+  
+  // Dummy reservation to prevent hooks from crashing if params are missing
+  const dummyReservation = { 
+    id: '', 
+    vehicleId: '', 
+    userId: '', 
+    arrendadorId: '',
+    startDate: { toDate: () => new Date() }, 
+    endDate: { toDate: () => new Date() }, 
+    status: 'pending', 
+    totalPrice: 0, 
+    createdAt: { toDate: () => new Date() } 
+  } as unknown as Reservation;
+
+  const reservationParam = params?.reservation;
+  const { reservation: initialReservation } = params || { reservation: dummyReservation };
+  
+  const [reservation, setReservation] = useState<Reservation>(initialReservation);
 
   const [renterProfile, setRenterProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -57,6 +76,14 @@ export default function ReservationDetails() {
   const [showDenyModal, setShowDenyModal] = useState(false);
   const [denialReason, setDenialReason] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+
+  // ✅ FIX: Función helper para detectar si el check-in está completo
+  const isCheckInCompleted = useCallback(() => {
+    const hasCompletedFlag = reservation.checkIn?.completed === true;
+    const isInProgress = reservation.status === 'in-progress';
+    
+    return hasCompletedFlag || isInProgress;
+  }, [reservation]);
   
   // Denial reason templates
   const denialTemplates = [
@@ -68,6 +95,7 @@ export default function ReservationDetails() {
   ];
 
   const loadRenterProfile = useCallback(async () => {
+    if (!reservation.userId) return;
     try {
       const userDoc = await getDoc(doc(db, 'users', reservation.userId));
       if (userDoc.exists()) {
@@ -84,6 +112,44 @@ export default function ReservationDetails() {
   const getCoordinates = () => {
     return reservation.pickupCoordinates || reservation.pickupCoords || reservation.deliveryCoords || null;
   };
+
+  // Suscribirse a cambios en la reserva en tiempo real
+  useFocusEffect(
+    useCallback(() => {
+      const reservationId = initialReservation?.id;
+      if (!reservationId) return;
+      
+      // Refetch fresh data when screen gains focus (important after check-in)
+      const fetchFreshReservation = async () => {
+        try {
+          const reservationSnap = await getDoc(doc(db, 'reservations', reservationId));
+          if (reservationSnap.exists()) {
+            const freshData = { id: reservationSnap.id, ...reservationSnap.data() } as Reservation;
+            setReservation(freshData);
+          }
+        } catch (error) {
+          console.error('[ReservationDetails] Error fetching fresh reservation:', error);
+        }
+      };
+      
+      fetchFreshReservation();
+      
+      // Also maintain real-time listener
+      const reservationRef = doc(db, 'reservations', reservationId);
+      
+      const unsubscribe = onSnapshot(reservationRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const updatedReservation = { id: docSnap.id, ...data } as Reservation;
+          setReservation(updatedReservation);
+        }
+      }, (error) => {
+        console.error('[ReservationDetails] Error listening to reservation:', error);
+      });
+
+      return () => unsubscribe();
+    }, [initialReservation?.id])
+  );
 
   useEffect(() => {
     loadRenterProfile();
@@ -157,15 +223,15 @@ export default function ReservationDetails() {
   };
 
   const getStatusBadge = () => {
-    const statusConfig = {
+    const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
       pending: { label: 'Pendiente', color: '#F59E0B', bg: '#FEF3C7' },
       confirmed: { label: 'Confirmada', color: '#10B981', bg: '#D1FAE5' },
-      active: { label: 'En Curso', color: '#3B82F6', bg: '#DBEAFE' },
+      'in-progress': { label: 'En Curso', color: '#3B82F6', bg: '#DBEAFE' },
       completed: { label: 'Completada', color: '#6B7280', bg: '#F3F4F6' },
       cancelled: { label: 'Cancelada', color: '#EF4444', bg: '#FEE2E2' },
       denied: { label: 'Rechazada', color: '#DC2626', bg: '#FEE2E2' },
     };
-    const config = statusConfig[reservation.status as keyof typeof statusConfig];
+    const config = statusConfig[reservation.status] || statusConfig.pending;
     return (
       <View style={[styles.statusBadge, { backgroundColor: config.bg }]}>
         <Text style={[styles.statusText, { color: config.color }]}>{config.label}</Text>
@@ -191,6 +257,108 @@ export default function ReservationDetails() {
     );
   };
 
+  const getTimeRemaining = useCallback(() => {
+    const startDate = reservation.startDate?.toDate();
+    const endDate = reservation.endDate?.toDate();
+    const now = new Date();
+
+    if (reservation.status === 'completed') {
+        return {
+            type: 'completed',
+            message: 'Viaje completado',
+            icon: 'checkmark-circle' as const,
+            color: '#10B981',
+            bg: '#ECFDF5'
+        };
+    }
+
+    const hoursUntilStart = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntilEnd = (endDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    if (hoursUntilStart > 0) {
+        const days = Math.floor(hoursUntilStart / 24);
+        const hours = Math.floor(hoursUntilStart % 24);
+        return {
+            type: 'upcoming',
+            message: days > 0 ? `Faltan ${days}d ${hours}h` : `Faltan ${hours} horas`,
+            icon: 'time' as const,
+            color: '#F59E0B',
+            bg: '#FFFBEB'
+        };
+    }
+
+    if (hoursUntilEnd > 0) {
+        const days = Math.floor(hoursUntilEnd / 24);
+        const hours = Math.floor(hoursUntilEnd % 24);
+        return {
+            type: 'active',
+            message: days > 0 ? `${days}d ${hours}h restantes` : `${hours} horas restantes`,
+            icon: 'car-sport' as const,
+            color: '#0B729D',
+            bg: '#F0F9FF'
+        };
+    }
+
+    return {
+        type: 'ended',
+        message: 'Viaje finalizado',
+        icon: 'flag' as const,
+        color: '#6B7280',
+        bg: '#F3F4F6'
+    };
+  }, [reservation]);
+
+  const handleCallRenter = () => {
+    if (renterProfile?.telefono) {
+        Linking.openURL(`tel:${renterProfile.telefono}`);
+    } else {
+        Alert.alert('No disponible', 'El número de teléfono no está disponible.');
+    }
+  };
+
+  const handleChat = async () => {
+    if (!renterProfile) return;
+    try {
+        const chatId = await createChatIfNotExists(
+            reservation.id, 
+            [reservation.arrendadorId, reservation.userId],
+            {
+                marca: reservation.vehicleSnapshot?.marca || '',
+                modelo: reservation.vehicleSnapshot?.modelo || '',
+                imagen: reservation.vehicleSnapshot?.imagen || ''
+            },
+            {
+                [reservation.arrendadorId]: 'Yo',
+                [reservation.userId]: renterProfile.nombre
+            }
+        );
+        navigation.navigate('ChatRoom', {
+            reservationId: reservation.id,
+            participants: [reservation.arrendadorId, reservation.userId],
+            vehicleInfo: {
+                marca: reservation.vehicleSnapshot?.marca || '',
+                modelo: reservation.vehicleSnapshot?.modelo || '',
+                imagen: reservation.vehicleSnapshot?.imagen || ''
+            }
+        });
+    } catch (error) {
+        console.error('Error opening chat:', error);
+        Alert.alert('Error', 'No se pudo abrir el chat');
+    }
+  };
+
+  const timeRemainingInfo = getTimeRemaining();
+
+
+  if (!reservationParam) {
+    return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+           <Text>Error: Datos de reserva faltantes.</Text>
+           <TouchableOpacity onPress={() => navigation.goBack()}><Text>Volver</Text></TouchableOpacity>
+        </View>
+    );
+  }
+
   if (loadingProfile) {
     return (
       <View style={styles.loadingContainer}>
@@ -214,6 +382,25 @@ export default function ReservationDetails() {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            {/* Status Header - New Design */}
+            <View style={[styles.statusHeader, { backgroundColor: timeRemainingInfo.bg }]}>
+                <View style={[styles.statusIconContainer, { backgroundColor: 'rgba(255,255,255,0.6)' }]}>
+                    <Ionicons name={timeRemainingInfo.icon} size={24} color={timeRemainingInfo.color} />
+                </View>
+                <View style={styles.statusContent}>
+                    <Text style={[styles.statusTitle, { color: timeRemainingInfo.color }]}>
+                        {reservation.status === 'pending' ? 'Solicitud Pendiente' : 
+                         reservation.status === 'confirmed' ? 'Reserva Confirmada' : 
+                         reservation.status === 'in-progress' ? 'Viaje en Curso' : 
+                         reservation.status === 'completed' ? 'Viaje Finalizado' : 
+                         reservation.status === 'cancelled' ? 'Cancelada' : 'Rechazada'}
+                    </Text>
+                    <Text style={[styles.statusSubtitle, { color: timeRemainingInfo.color, opacity: 0.8 }]}>
+                        {timeRemainingInfo.message}
+                    </Text>
+                </View>
+            </View>
+
         {/* Vehículo Card */}
         <View style={styles.vehicleSection}>
           <View style={styles.vehicleImageContainer}>
@@ -222,22 +409,90 @@ export default function ReservationDetails() {
               style={styles.vehicleImage}
               contentFit="cover"
             />
-            <View style={styles.vehicleOverlay}>
-              {getStatusBadge()}
-            </View>
-            <View style={styles.vehicleInfoCard}>
-              <View style={styles.vehicleMainInfo}>
-                <Text style={styles.vehicleBrandText}>{reservation.vehicleSnapshot?.marca}</Text>
-                <Text style={styles.vehicleModelText}>{reservation.vehicleSnapshot?.modelo}</Text>
-                <Text style={styles.vehicleYearText}>{reservation.vehicleSnapshot?.anio}</Text>
-              </View>
-              <View style={styles.reservationIdBox}>
-                <Ionicons name="document-text-outline" size={14} color="#6B7280" />
-                <Text style={styles.reservationIdText}>ID: {reservation.id.slice(0, 8).toUpperCase()}</Text>
-              </View>
+            
+            <View style={styles.vehicleInfoOverlay}>
+                <View>
+                    <Text style={styles.vehicleBrandTextOverlay}>{reservation.vehicleSnapshot?.marca}</Text>
+                    <Text style={styles.vehicleModelTextOverlay}>{reservation.vehicleSnapshot?.modelo} {reservation.vehicleSnapshot?.anio}</Text>
+                </View>
+                <View style={styles.reservationIdBoxOverlay}>
+                    <Text style={styles.reservationIdTextOverlay}>ID: {reservation.id.slice(0, 8).toUpperCase()}</Text>
+                </View>
             </View>
           </View>
         </View>
+
+        {/* Quick Actions Bar */}
+        {(reservation.status === 'confirmed' || reservation.status === 'in-progress') && (
+            <View style={styles.quickActionsBar}>
+                <TouchableOpacity style={styles.quickActionButton} onPress={handleChat}>
+                    <View style={[styles.quickActionIcon, { backgroundColor: '#E0F2FE' }]}>
+                        <Ionicons name="chatbubbles" size={24} color="#0B729D" />
+                    </View>
+                    <Text style={styles.quickActionLabel}>Chat</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.quickActionButton} onPress={handleCallRenter}>
+                    <View style={[styles.quickActionIcon, { backgroundColor: '#DCFCE7' }]}>
+                        <Ionicons name="call" size={24} color="#10B981" />
+                    </View>
+                    <Text style={styles.quickActionLabel}>Llamar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.quickActionButton} onPress={() => {}}>
+                     <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
+                        <Ionicons name="help-buoy" size={24} color="#D97706" />
+                    </View>
+                    <Text style={styles.quickActionLabel}>Ayuda</Text>
+                </TouchableOpacity>
+            </View>
+        )}
+
+        {/* Active Trip Actions - Mirroring Renter UI for consistency */}
+        {reservation.status === 'in-progress' && (() => {
+            const endDate = reservation.endDate?.toDate();
+            const now = new Date();
+            const hoursRemaining = endDate ? (endDate.getTime() - now.getTime()) / (1000 * 60 * 60) : 0;
+            const daysRemaining = Math.floor(hoursRemaining / 24);
+            const hoursRemainingMod = Math.floor(hoursRemaining % 24);
+            
+            return (
+                <View style={styles.activeTripCard}>
+                    <View style={styles.activeTripHeader}>
+                        <View style={styles.activeTripIconCircle}>
+                            <Ionicons name="car-sport" size={24} color="#10B981" />
+                        </View>
+                        <View style={styles.activeTripHeaderText}>
+                            <Text style={styles.activeTripTitle}>¡Viaje en curso!</Text>
+                            <Text style={styles.activeTripSubtitle}>
+                                {daysRemaining > 0 ? `${daysRemaining}d ${hoursRemainingMod}h restantes` : `${Math.floor(hoursRemaining)}h restantes`}
+                            </Text>
+                        </View>
+                    </View>
+                    
+                    <View style={styles.activeTripActions}>
+                        <TouchableOpacity 
+                            style={styles.activeTripActionButton}
+                            onPress={() => navigation.navigate('CheckInComplete', { 
+                                reservation, 
+                                checkInId: reservation.checkIn?.id 
+                            })}
+                        >
+                            <Ionicons name="document-text" size={20} color="#059669" />
+                            <Text style={styles.activeTripActionText}>Ver Check-in</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity 
+                            style={styles.activeTripActionButton}
+                            onPress={() => navigation.navigate('CheckOutStart', { reservation })}
+                        >
+                            <Ionicons name="log-out" size={20} color="#059669" />
+                            <Text style={styles.activeTripActionText}>Finalizar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            );
+        })()}
 
         {/* Datos del Arrendatario */}
         <View style={styles.section}>
@@ -496,7 +751,12 @@ export default function ReservationDetails() {
         {/* Timeline Visual - show for confirmed and later statuses */}
         {reservation.status !== 'pending' && reservation.status !== 'denied' && reservation.status !== 'cancelled' && (
           <View style={styles.section}>
-            <TripTimeline currentStatus={reservation.status} isRenter={false} />
+            <TripTimeline 
+              currentStatus={reservation.status} 
+              isRenter={false}
+              checkInCompleted={reservation.checkIn?.completed || reservation.status === 'in-progress' || reservation.status === 'completed'}
+              checkOutCompleted={reservation.checkOut?.completed || reservation.status === 'completed'}
+            />
           </View>
         )}
 
@@ -556,6 +816,7 @@ export default function ReservationDetails() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
+      {/* Action Buttons */}
       {/* Action Buttons (solo si está pendiente) */}
       {reservation.status === 'pending' && (
         <View style={styles.actionBar}>
@@ -585,8 +846,8 @@ export default function ReservationDetails() {
         </View>
       )}
 
-      {/* Action Buttons para reservas confirmadas */}
-      {reservation.status === 'confirmed' && (() => {
+      {/* Action Buttons para reservas confirmadas o activas */}
+      {(reservation.status === 'confirmed' || reservation.status === 'in-progress') && (() => {
         const startDate = reservation.startDate?.toDate();
         const endDate = reservation.endDate?.toDate();
         const now = new Date();
@@ -596,18 +857,27 @@ export default function ReservationDetails() {
         const hoursUntilStart = msUntilStart / (1000 * 60 * 60);
         const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
         
-        // Check-in disponible si:
-        // - Faltan menos de 24h Y más de -2h (ventana de tolerancia de 26h), O
-        // - El viaje ya empezó pero no ha terminado
         const canCheckIn = (
             (hoursUntilStart <= 24 && hoursUntilStart > -2) ||
             (hoursUntilStart <= 0 && hoursUntilEnd > 0)
         );
         
+        // ✅ FIX: Si el check-in ya se completó (ambos firmaron), mostrar panel de viaje activo
+        if (isCheckInCompleted()) {
+            return null; // Ahora usamos el activeTripCard en el scroll principal
+        }
+
+        // Si NO se ha completado, mostrar botón de inicio normal
         let buttonText = 'Preparar Check-in';
         let statusBanner = null;
+        let onPressAction = () => navigation.navigate('CheckInPreparation', { reservation, isArrendador: true });
         
-        if (!canCheckIn) {
+        // ✅ FIX: Verificar si hay check-in iniciado pero no completado
+        if (reservation.checkIn && !isCheckInCompleted()) {
+            buttonText = 'Continuar Check-in';
+            onPressAction = () => navigation.navigate('CheckInStart', { reservation, isArrendador: true });
+        } else if (!canCheckIn) {
+             // ... logic remains ...
             if (hoursUntilStart > 24) {
                 const days = Math.ceil(hoursUntilStart / 24);
                 buttonText = `Disponible en ${days} día${days > 1 ? 's' : ''}`;
@@ -617,9 +887,10 @@ export default function ReservationDetails() {
                 buttonText = 'Ventana expirada';
             }
         } else if (hoursUntilStart > 0 && hoursUntilStart <= 24) {
-            const hours = Math.floor(hoursUntilStart);
-            const minutes = Math.floor((hoursUntilStart % 1) * 60);
-            statusBanner = (
+             // ... logic remains ...
+             const hours = Math.floor(hoursUntilStart);
+             const minutes = Math.floor((hoursUntilStart % 1) * 60);
+             statusBanner = (
                 <View style={styles.checkInBanner}>
                     <Ionicons name="time-outline" size={18} color="#F59E0B" />
                     <Text style={styles.checkInBannerText}>
@@ -628,7 +899,8 @@ export default function ReservationDetails() {
                 </View>
             );
         } else if (hoursUntilStart <= 0 && hoursUntilEnd > 0) {
-            statusBanner = (
+             // ... logic remains ...
+             statusBanner = (
                 <View style={[styles.checkInBanner, { backgroundColor: '#DCFCE7' }]}>
                     <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                     <Text style={[styles.checkInBannerText, { color: '#166534' }]}>
@@ -642,18 +914,53 @@ export default function ReservationDetails() {
           <>
             {statusBanner}
             <View style={styles.actionBar}>
-              <TouchableOpacity 
-                style={[styles.checkInButton, !canCheckIn && styles.buttonDisabled]}
-                onPress={() => navigation.navigate('CheckInPreparation', { reservation, isArrendador: true })}
-                disabled={!canCheckIn}
-              >
-                <Ionicons name="key" size={20} color="#fff" />
-                <Text style={styles.checkInButtonText}>{buttonText}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.checkInButton, !canCheckIn && styles.buttonDisabled]}
+                  onPress={onPressAction}
+                  disabled={!canCheckIn}
+                >
+                  <Ionicons name="key" size={20} color="#fff" />
+                  <Text style={styles.checkInButtonText}>{buttonText}</Text>
+                </TouchableOpacity>
             </View>
           </>
         );
       })()}
+
+      {/* In-Progress Status - Trip active */}
+      {reservation.status === 'in-progress' && null /* We use the inline card now */}
+
+      {/* Completed Status */}
+      {reservation.status === 'completed' && (
+        <View style={styles.actionBar}>
+          <View style={[styles.checkInBanner, { backgroundColor: '#DCFCE7', marginBottom: 12 }]}>
+            <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+            <Text style={[styles.checkInBannerText, { color: '#166534' }]}>
+              ✅ Viaje completado exitosamente
+            </Text>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.rateRenterButton}
+            onPress={() => navigation.navigate('RateRenter', { reservation })}
+          >
+            <Ionicons name="star" size={20} color="#F59E0B" />
+            <Text style={styles.rateRenterButtonText}>Calificar Arrendatario</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Cancelled/Denied Status */}
+      {(reservation.status === 'cancelled' || reservation.status === 'denied') && (
+        <View style={styles.actionBar}>
+          <View style={[styles.checkInBanner, { backgroundColor: '#FEE2E2' }]}>
+            <Ionicons name="close-circle" size={18} color="#DC2626" />
+            <Text style={[styles.checkInBannerText, { color: '#991B1B' }]}>
+              {reservation.status === 'cancelled' ? 'Reserva cancelada' : 'Reserva rechazada'}
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* Modal de Rechazo */}
       <Modal
@@ -671,10 +978,8 @@ export default function ReservationDetails() {
             style={styles.modalOverlay}
             onPress={() => setShowDenyModal(false)}
           >
-            <TouchableOpacity 
-              activeOpacity={1} 
+            <View
               style={styles.modalContent}
-              onPress={(e) => e.stopPropagation()}
             >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Rechazar Reserva</Text>
@@ -769,7 +1074,8 @@ export default function ReservationDetails() {
                   )}
                 </TouchableOpacity>
               </View>
-            </TouchableOpacity>
+         
+            </View>
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
@@ -827,23 +1133,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  vehicleImage: {
-    width: '100%',
-    height: 200,
-    backgroundColor: '#F3F4F6',
-  },
-  vehicleOverlay: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-  },
-  vehicleInfoCard: {
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  vehicleMainInfo: {
-    marginBottom: 12,
-  },
+
   vehicleBrandText: {
     fontSize: 12,
     fontWeight: '600',
@@ -881,26 +1171,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  statusBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
+
   scrollView: {
     flex: 1,
   },
   section: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     marginBottom: 12,
   },
   vehicleSection: {
@@ -913,7 +1189,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
-    marginHorizontal: 16,
+    marginHorizontal: 20,
     marginTop: 16,
   },
   vehicleImageContainer: {
@@ -966,6 +1242,169 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    gap: 16,
+  },
+  statusIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusContent: {
+    flex: 1,
+  },
+  statusTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statusSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  vehicleInfoOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingTop: 40, 
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',  // Gradient effect simulation
+  },
+  vehicleBrandTextOverlay: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  vehicleModelTextOverlay: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  reservationIdBoxOverlay: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  reservationIdTextOverlay: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  quickActionsBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  quickActionButton: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  quickActionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quickActionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  // Active Trip Styles (Mirrored from Renter)
+  activeTripCard: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#86EFAC',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  activeTripHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  activeTripIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTripHeaderText: {
+    flex: 1,
+  },
+  activeTripTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#065F46',
+    marginBottom: 2,
+  },
+  activeTripSubtitle: {
+    fontSize: 14,
+    color: '#047857',
+    fontWeight: '500',
+  },
+  activeTripActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  activeTripActionButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  activeTripActionText: {
+    color: '#059669',
+    fontWeight: '700',
+    fontSize: 12,
+    marginTop: 4,
   },
   renterCard: {
     backgroundColor: '#fff',
@@ -1163,22 +1602,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
   },
-  messageContainer: {
-    backgroundColor: '#F9FAFB',
-    padding: 12,
-    borderRadius: 8,
-  },
-  messageLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 6,
-  },
-  messageText: {
-    fontSize: 14,
-    color: '#111827',
-    lineHeight: 20,
-  },
+
   detailsCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -1407,6 +1831,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#92400E',
     flex: 1,
+  },
+  rateRenterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+  },
+  rateRenterButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#D97706',
   },
   actionBar: {
     position: 'absolute',

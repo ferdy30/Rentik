@@ -1,7 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
 // import * as AppleAuthentication from 'expo-apple-authentication';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 
 export interface SocialAuthButtonsProps {
   onGoogle: () => void | Promise<void>;
@@ -29,10 +28,11 @@ const SocialAuthButtons: React.FC<SocialAuthButtonsProps> = ({
       )}
 
       <View style={{ gap: 10 }}>
-        <TouchableOpacity style={styles.googleButton} onPress={onGoogle}>
+        {/* Google Sign-In deshabilitado temporalmente */}
+        {/* <TouchableOpacity style={styles.googleButton} onPress={onGoogle}>
           <Ionicons name="logo-google" size={18} color="#032B3C" style={{ marginRight: 8 }} />
           <Text style={styles.googleButtonText}>Continuar con Google</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         {/* Apple Sign-In deshabilitado temporalmente (requiere Apple Developer Program $99/año) */}
         {/* {Platform.OS === 'ios' && !!onApple && (

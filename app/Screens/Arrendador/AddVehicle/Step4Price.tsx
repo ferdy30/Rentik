@@ -20,7 +20,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useAuth } from '../../../../context/Auth';
+import { useAuth } from '../../../context/Auth';
 import LocationPicker from '../../../components/LocationPicker';
 import { StepIndicator } from '../../../components/StepIndicator';
 import { VehiclePreview } from '../../../components/VehiclePreview';

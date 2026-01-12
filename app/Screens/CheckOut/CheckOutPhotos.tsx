@@ -15,10 +15,10 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { Firebaseauth, storage } from '../../../FirebaseConfig';
+import { typography } from '../../constants/typography';
+import { Firebaseauth, storage } from '../../FirebaseConfig';
 import { saveCheckOutPhotos } from '../../services/checkOut';
 import { Reservation } from '../../services/reservations';
-import { typography } from '../../constants/typography';
 
 interface PhotoSlot {
     key: keyof PhotosType;
@@ -124,7 +124,7 @@ export default function CheckOutPhotos() {
     const retakePhoto = (slot: PhotoSlot) => {
         Alert.alert(
             'Retomar foto',
-            `�Quieres retomar la foto de ${slot.label.toLowerCase()}?`,
+            `¿Quieres retomar la foto de ${slot.label.toLowerCase()}?`,
             [
                 { text: 'Cancelar', style: 'cancel' },
                 { text: 'Retomar', onPress: () => takePhoto(slot) }
@@ -138,7 +138,7 @@ export default function CheckOutPhotos() {
         if (missingPhotos.length > 0) {
             Alert.alert(
                 'Fotos incompletas',
-                `Faltan ${missingPhotos.length} foto(s): ${missingPhotos.map(s => s.label).join(', ')}. �Deseas continuar de todos modos?`,
+                `Faltan ${missingPhotos.length} foto(s): ${missingPhotos.map(s => s.label).join(', ')}. ¿Deseas continuar de todos modos?`,
                 [
                     { text: 'Cancelar', style: 'cancel' },
                     { 
@@ -269,14 +269,14 @@ export default function CheckOutPhotos() {
                 </View>
 
                 <View style={styles.tipsCard}>
-                    <Text style={styles.tipsTitle}>?? Importante</Text>
+                    <Text style={styles.tipsTitle}>📸 Importante</Text>
                     <View style={styles.tipRow}>
-                        <Text style={styles.tipBullet}>�</Text>
-                        <Text style={styles.tipText}>Aseg�rate de que el od�metro sea legible</Text>
+                        <Text style={styles.tipBullet}>•</Text>
+                        <Text style={styles.tipText}>Asegúrate de que el odómetro sea legible</Text>
                     </View>
                     <View style={styles.tipRow}>
-                        <Text style={styles.tipBullet}>�</Text>
-                        <Text style={styles.tipText}>Fotograf�a cualquier da�o nuevo si existe</Text>
+                        <Text style={styles.tipBullet}>•</Text>
+                        <Text style={styles.tipText}>Fotografía cualquier daño nuevo si existe</Text>
                     </View>
                 </View>
             </ScrollView>

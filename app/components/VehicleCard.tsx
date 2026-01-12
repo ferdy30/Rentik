@@ -22,6 +22,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
   const [imageIndex, setImageIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
+  // Optimization: Use useRef for Animated values to persist across re-renders without recreation
   const scaleAnim = useRef(new Animated.Value(1)).current;
   
   const images = useMemo(
@@ -83,6 +84,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
               style={[styles.image, { width: cardWidth || '100%' }]}
               contentFit="cover"
               transition={500}
+              cachePolicy="memory-disk"
               onLoad={() => setImageLoaded(true)}
             />
           ))}
@@ -492,4 +494,12 @@ const styles = StyleSheet.create({
   },
 });
 
-export default VehicleCard;
+// Memoize component to prevent unnecessary re-renders
+export default React.memo(VehicleCard, (prevProps, nextProps) => {
+  return (
+    prevProps.vehicle.id === nextProps.vehicle.id &&
+    prevProps.isFavorite === nextProps.isFavorite &&
+    prevProps.vehicle.disponible === nextProps.vehicle.disponible &&
+    prevProps.vehicle.precioPorDia === nextProps.vehicle.precioPorDia
+  );
+});

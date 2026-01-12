@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
-import { useToast } from '../../context/ToastContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { useToast } from '../context/ToastContext';
 
 interface FavoriteButtonProps {
   vehicleId: string;

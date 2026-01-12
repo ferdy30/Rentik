@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '../../../context/Auth';
+import { useAuth } from '../../context/Auth';
 import { getOwnerReservations } from '../../services/reservations';
 import { getAllVehicles } from '../../services/vehicles';
 

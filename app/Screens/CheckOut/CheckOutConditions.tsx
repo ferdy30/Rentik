@@ -19,9 +19,9 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { storage } from '../../../FirebaseConfig';
-import { addNewDamageReport, saveCheckOutConditions } from '../../services/checkOut';
 import { typography } from '../../constants/typography';
+import { storage } from '../../FirebaseConfig';
+import { addNewDamageReport, saveCheckOutConditions } from '../../services/checkOut';
 import { Reservation } from '../../services/reservations';
 
 export default function CheckOutConditions() {
@@ -120,7 +120,7 @@ export default function CheckOutConditions() {
         if (!odometer.trim()) {
             Alert.alert(
                 'Faltan datos',
-                '�Deseas continuar sin ingresar el kilometraje?',
+                '¿Deseas continuar sin ingresar el kilometraje?',
                 [
                     { text: 'Cancelar', style: 'cancel' },
                     { 

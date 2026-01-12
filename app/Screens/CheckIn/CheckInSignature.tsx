@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SignatureScreen from 'react-native-signature-canvas';
-import { useAuth } from '../../../context/Auth';
+import { useAuth } from '../../context/Auth';
 import { CheckInReport, saveCheckInSignatures, subscribeToCheckIn, updateCheckInStatus } from '../../services/checkIn';
 import { Reservation } from '../../services/reservations';
 
@@ -41,30 +41,40 @@ export default function CheckInSignature() {
         setSaving(true);
         try {
             const isRenter = user.uid === checkIn.renterId;
+            const userType = isRenter ? 'renter' : 'owner';
+            
+            console.log(`[CheckInSignature] 📝 Saving signature for ${userType}`);
+            console.log('[CheckInSignature] Current signatures:', checkIn.signatures);
 
             const newSignatures = {
                 ...checkIn.signatures,
-                [isRenter ? 'renter' : 'owner']: signature
+                [userType]: signature
             };
 
+            console.log('[CheckInSignature] New signatures:', newSignatures);
             await saveCheckInSignatures(checkInId, newSignatures);
+            console.log('[CheckInSignature] ✅ Signature saved successfully');
 
-            // If both signed (or just the current user if remote flow), complete check-in
-            // For now, let's assume if the current user signs, they are done with their part.
-            // But the check-in status should only be 'completed' if both have signed OR if it's a self-check-in flow.
-            // Let's just save signature and move to complete screen.
-            
-            // If this is the start of the trip (status pending/in-progress), we might want to mark it as 'in-progress' (active trip)
-            // if it's not already.
-            
-            if (checkIn.status === 'pending') {
-                await updateCheckInStatus(checkInId, 'in-progress');
+            // Check if both parties have signed (Logic updated)
+            const bothSigned = newSignatures.renter && newSignatures.owner;
+            console.log('[CheckInSignature] Both signed?', bothSigned);
+
+            if (bothSigned) {
+                console.log('[CheckInSignature] 🎉 BOTH PARTIES SIGNED!');
+                console.log('[CheckInSignature] Calling updateCheckInStatus with checkInId:', checkInId);
+                // Mark check-in as completed (this now also updates reservation.status to 'in-progress')
+                await updateCheckInStatus(checkInId, 'completed');
+                console.log('[CheckInSignature] ✅ updateCheckInStatus completed successfully');
+                console.log('[CheckInSignature] Check-in completed and trip started');
+            } else {
+                console.log('[CheckInSignature] ⏳ Waiting for other party to sign');
             }
 
             // Navegar al resumen de Check-in primero (pantalla de confirmación)
-            navigation.navigate('CheckInComplete', { reservation, checkInId });
+            console.log('[CheckInSignature] Navigating to CheckInComplete');
+            navigation.replace('CheckInComplete', { reservation, checkInId });
         } catch (error) {
-            console.error('Error saving signature:', error);
+            console.error('[CheckInSignature] ❌ Error saving signature:', error);
             Alert.alert('Error', 'No se pudo guardar la firma.');
         } finally {
             setSaving(false);
@@ -88,7 +98,7 @@ export default function CheckInSignature() {
     }
 
     const isRenter = user?.uid === checkIn?.renterId;
-    const roleName = isRenter ? 'Arrendatario' : 'Arrendador';
+    const roleName = isRenter ? 'Viajero' : 'Anfitrión';
     const alreadySigned = isRenter ? checkIn?.signatures?.renter : checkIn?.signatures?.owner;
 
     if (alreadySigned) {
@@ -100,7 +110,7 @@ export default function CheckInSignature() {
                     <Text style={styles.successText}>Ya has firmado este check-in.</Text>
                     <TouchableOpacity 
                         style={styles.continueButton}
-                        onPress={() => navigation.navigate('CheckInComplete', { reservation, checkInId })}
+                        onPress={() => navigation.replace('CheckInComplete', { reservation, checkInId })}
                     >
                         <Text style={styles.continueButtonText}>Ver Resumen</Text>
                     </TouchableOpacity>
@@ -114,16 +124,14 @@ export default function CheckInSignature() {
             <StatusBar barStyle="dark-content" />
             
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#111827" />
-                </TouchableOpacity>
+                <View style={{ width: 40 }} />
                 <Text style={styles.headerTitle}>Firma de Conformidad</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             <View style={styles.content}>
                 <Text style={styles.instructions}>
-                    Por favor firma a continuación para confirmar que has revisado el estado del vehículo y aceptas las condiciones reportadas.
+                    Por favor firma a continuaci�n para confirmar que has revisado el estado del veh�culo y aceptas las condiciones reportadas.
                 </Text>
                 
                 <View style={styles.signatureBox}>
@@ -136,7 +144,7 @@ export default function CheckInSignature() {
                             .m-signature-pad--footer { display: none; margin: 0px; }
                             body,html { width: 100%; height: 100%; }
                         `}
-                        backgroundColor="#F9FAFB"
+                        backgroundColor="#F5F5F5"
                         penColor="#000000"
                     />
                 </View>
@@ -182,17 +190,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: '#FAFAFA',
     },
     backButton: {
         padding: 8,
         borderRadius: 12,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#FAFAFA',
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#111827',
+        color: '#333333',
     },
     content: {
         flex: 1,
@@ -207,20 +215,20 @@ const styles = StyleSheet.create({
     signatureBox: {
         flex: 1,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#E0E0E0',
         borderRadius: 12,
         overflow: 'hidden',
         marginBottom: 12,
     },
     signerLabel: {
         textAlign: 'center',
-        color: '#6B7280',
+        color: '#757575',
         fontSize: 14,
     },
     footer: {
         padding: 20,
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
+        borderTopColor: '#FAFAFA',
         flexDirection: 'row',
         gap: 12,
     },
@@ -228,12 +236,12 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 16,
         borderRadius: 12,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#FAFAFA',
         alignItems: 'center',
     },
     clearButtonText: {
-        color: '#374151',
-        fontWeight: '600',
+        color: '#424242',
+        fontWeight: '700',
         fontSize: 16,
     },
     confirmButton: {
@@ -245,7 +253,7 @@ const styles = StyleSheet.create({
     },
     confirmButtonText: {
         color: '#fff',
-        fontWeight: '600',
+        fontWeight: '700',
         fontSize: 16,
     },
     buttonDisabled: {
@@ -260,13 +268,13 @@ const styles = StyleSheet.create({
     successTitle: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#111827',
+        color: '#333333',
         marginTop: 16,
         marginBottom: 8,
     },
     successText: {
         fontSize: 16,
-        color: '#6B7280',
+        color: '#757575',
         textAlign: 'center',
         marginBottom: 32,
     },
@@ -279,6 +287,6 @@ const styles = StyleSheet.create({
     continueButtonText: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
     },
 });

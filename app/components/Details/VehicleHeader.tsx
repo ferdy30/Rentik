@@ -11,27 +11,34 @@ interface VehicleHeaderProps {
 }
 
 export default function VehicleHeader({ marca, modelo, anio, rating, reviewCount }: VehicleHeaderProps) {
-  const isTopRated = rating >= 4.8;
+  // Valores seguros para evitar undefined/null
+  const safeMarca = marca || 'Marca';
+  const safeModelo = modelo || 'Modelo';
+  const safeAnio = anio || new Date().getFullYear();
+  const safeRating = typeof rating === 'number' ? rating : 0;
+  const safeReviewCount = typeof reviewCount === 'number' ? reviewCount : 0;
+  
+  const isTopRated = safeRating >= 4.8;
   
   return (
     <View>
-      {isTopRated && (
+      {isTopRated ? (
         <View style={styles.topRatedBadge}>
           <Ionicons name="trophy" size={16} color="#F59E0B" />
           <Text style={styles.topRatedText}>Top Rated</Text>
         </View>
-      )}
+      ) : null}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.brand}>{marca}</Text>
-          <Text style={styles.model}>{modelo} {anio}</Text>
+          <Text style={styles.brand}>{safeMarca}</Text>
+          <Text style={styles.model}>{safeModelo} {safeAnio}</Text>
         </View>
         <View style={styles.ratingBox}>
           <View style={styles.ratingBadge}>
             <Ionicons name="star" size={16} color="#F59E0B" />
-            <Text style={styles.ratingScore}>{rating.toFixed(1)}</Text>
+            <Text style={styles.ratingScore}>{safeRating.toFixed(1)}</Text>
           </View>
-          <Text style={styles.tripsCount}>{reviewCount} viajes</Text>
+          <Text style={styles.tripsCount}>{safeReviewCount} viajes</Text>
         </View>
       </View>
     </View>

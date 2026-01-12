@@ -1,5 +1,5 @@
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../FirebaseConfig';
+import { db } from '../FirebaseConfig';
 
 /**
  * Update participant's live location during check-in process

@@ -15,7 +15,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { Firebaseauth, storage } from '../../../FirebaseConfig';
+import { Firebaseauth, storage } from '../../FirebaseConfig';
 import { saveCheckInPhotos } from '../../services/checkIn';
 import { Reservation } from '../../services/reservations';
 

@@ -1,0 +1,446 @@
+/**
+ * EJEMPLO DE INTEGRACIÓN - CheckInPhotos con todas las mejoras
+ * 
+ * Este archivo muestra cómo integrar todos los componentes nuevos
+ * en una pantalla de check-in existente.
+ */
+
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import React, { useEffect, useState } from 'react';
+import {
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+
+// ✅ Importar componentes nuevos
+import CheckInProgressIndicator from '../../components/CheckInProgressIndicator';
+import EmergencyMode, { EmergencyButton } from '../../components/EmergencyMode';
+import InteractiveGuide from '../../components/InteractiveGuide';
+import PhotoPreviewModal from '../../components/PhotoPreviewModal';
+import PreviousDamagesDisplay from '../../components/PreviousDamagesDisplay';
+
+
+// ✅ Importar servicios actualizados
+import {
+    logCheckInError,
+    saveCheckInPhotos
+} from '../../services/checkIn';
+import { getCurrentLocation } from '../../services/location';
+
+interface Photo {
+  uri: string;
+  label: string;
+  timestamp?: Date;
+}
+
+export default function CheckInPhotosExample() {
+  // Estados existentes
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // ✅ NUEVO: Estados para componentes nuevos
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [showGuide, setShowGuide] = useState(false);
+  const [showEmergency, setShowEmergency] = useState(false);
+
+  // Datos de ejemplo
+  const checkInId = 'example-checkin-id';
+  const vehicleId = 'example-vehicle-id';
+  const currentStep = 1; // Paso actual (0-6)
+
+  useEffect(() => {
+    // Mostrar guía la primera vez
+    const hasSeenGuide = false; // Obtener de AsyncStorage
+    if (!hasSeenGuide) {
+      setShowGuide(true);
+    }
+  }, []);
+
+  const handleTakePhoto = async (photoType: string, label: string) => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso requerido', 'Necesitamos acceso a la cámara');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsEditing: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const newPhoto: Photo = {
+          uri: result.assets[0].uri,
+          label,
+          timestamp: new Date(),
+        };
+
+        setPhotos([...photos, newPhoto]);
+
+        // ✅ NUEVO: Guardar inmediatamente con error tracking
+        try {
+          await saveCheckInPhotos(checkInId, {
+            [photoType]: result.assets[0].uri,
+          });
+        } catch (error) {
+          // ✅ NUEVO: Registrar error
+          await logCheckInError(
+            checkInId,
+            'CheckInPhotos',
+            `Error al guardar foto ${label}`,
+            'UPLOAD_ERROR'
+          );
+          
+          Alert.alert(
+            'Error al guardar',
+            'La foto se guardó localmente pero no se pudo subir. Reintentaremos automáticamente.'
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      
+      // ✅ NUEVO: Error tracking
+      await logCheckInError(
+        checkInId,
+        'CheckInPhotos',
+        'Error al capturar foto',
+        'CAMERA_ERROR'
+      );
+    }
+  };
+
+  const handleViewPhoto = (index: number) => {
+    setPreviewIndex(index);
+    setShowPreview(true);
+  };
+
+  const handleDeletePhoto = (index: number) => {
+    Alert.alert(
+      'Eliminar foto',
+      '¿Estás seguro de que deseas eliminar esta foto?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            const newPhotos = photos.filter((_, i) => i !== index);
+            setPhotos(newPhotos);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleNext = async () => {
+    // Validar que se hayan tomado todas las fotos requeridas
+    if (photos.length < 5) {
+      Alert.alert(
+        'Fotos incompletas',
+        'Por favor toma todas las fotos requeridas antes de continuar'
+      );
+      return;
+    }
+
+    // ✅ NUEVO: Verificar ubicación antes de continuar
+    const { location, error } = await getCurrentLocation();
+    if (error) {
+      Alert.alert(
+        'Error de ubicación',
+        'No pudimos verificar tu ubicación. ¿Deseas continuar de todas formas?',
+        [
+          { text: 'Reintentar', onPress: handleNext },
+          { text: 'Continuar', onPress: () => navigateNext() },
+        ]
+      );
+      return;
+    }
+
+    navigateNext();
+  };
+
+  const navigateNext = () => {
+    // Navegar al siguiente paso
+    console.log('Navigating to next step...');
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* ✅ NUEVO: Indicador de progreso */}
+      <CheckInProgressIndicator currentStep={currentStep} />
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Fotografías del Vehículo</Text>
+          <TouchableOpacity onPress={() => setShowGuide(true)}>
+            <Ionicons name="help-circle-outline" size={24} color="#0B729D" />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.subtitle}>
+          Documenta el estado actual del vehículo con fotos claras
+        </Text>
+
+        {/* ✅ NUEVO: Mostrar daños previos */}
+        <PreviousDamagesDisplay
+          vehicleId={vehicleId}
+          currentCheckInId={checkInId}
+          onViewPhoto={(photo) => {
+            // Mostrar foto en modal de preview
+            Alert.alert('Daño previo', 'Esta foto es de un check-in anterior');
+          }}
+        />
+
+        {/* Fotos requeridas */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Fotos Obligatorias (5)</Text>
+          
+          {[
+            { type: 'front', label: 'Frente' },
+            { type: 'left', label: 'Lateral Izquierdo' },
+            { type: 'back', label: 'Trasera' },
+            { type: 'right', label: 'Lateral Derecho' },
+            { type: 'dashboard', label: 'Tablero' },
+          ].map((item, index) => {
+            const photoExists = photos.find((p) => p.label === item.label);
+
+            return (
+              <TouchableOpacity
+                key={item.type}
+                style={styles.photoCard}
+                onPress={() => {
+                  if (photoExists) {
+                    handleViewPhoto(photos.findIndex((p) => p.label === item.label));
+                  } else {
+                    handleTakePhoto(item.type, item.label);
+                  }
+                }}
+              >
+                {photoExists ? (
+                  <>
+                    <Image source={{ uri: photoExists.uri }} style={styles.photoThumbnail} />
+                    <View style={styles.photoInfo}>
+                      <Text style={styles.photoLabel}>{item.label}</Text>
+                      <Text style={styles.photoStatus}>✓ Capturada</Text>
+                    </View>
+                    <Ionicons name="eye" size={24} color="#0B729D" />
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.photoPlaceholder}>
+                      <Ionicons name="camera" size={32} color="#9CA3AF" />
+                    </View>
+                    <View style={styles.photoInfo}>
+                      <Text style={styles.photoLabel}>{item.label}</Text>
+                      <Text style={styles.photoRequired}>Requerida</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={24} color="#D1D5DB" />
+                  </>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Fotos adicionales */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Fotos Adicionales (Opcional)</Text>
+          <Text style={styles.sectionSubtitle}>
+            Captura daños específicos o detalles importantes
+          </Text>
+          
+          <TouchableOpacity
+            style={styles.addPhotoButton}
+            onPress={() => handleTakePhoto('additional', `Adicional ${photos.length + 1}`)}
+          >
+            <Ionicons name="add-circle-outline" size={24} color="#0B729D" />
+            <Text style={styles.addPhotoText}>Agregar Foto</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Footer con botón de continuar */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[
+            styles.nextButton,
+            photos.length < 5 && styles.nextButtonDisabled,
+          ]}
+          onPress={handleNext}
+          disabled={photos.length < 5}
+        >
+          <Text style={styles.nextButtonText}>Continuar</Text>
+          <Ionicons name="arrow-forward" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* ✅ NUEVO: Modal de vista previa de fotos */}
+      <PhotoPreviewModal
+        visible={showPreview}
+        photos={photos}
+        initialIndex={previewIndex}
+        onClose={() => setShowPreview(false)}
+        onDelete={handleDeletePhoto}
+      />
+
+      {/* ✅ NUEVO: Guía interactiva */}
+      <InteractiveGuide
+        visible={showGuide}
+        onClose={() => setShowGuide(false)}
+        currentStep="photos"
+        onComplete={() => {
+          // Guardar en AsyncStorage que ya vio la guía
+          console.log('Guide completed');
+        }}
+      />
+
+      {/* ✅ NUEVO: Botón de emergencia */}
+      <EmergencyButton onPress={() => setShowEmergency(true)} />
+
+      {/* ✅ NUEVO: Modal de emergencia */}
+      <EmergencyMode
+        visible={showEmergency}
+        onClose={() => setShowEmergency(false)}
+        ownerPhone="+503 7777-7777"
+        ownerName="Juan Pérez"
+        vehiclePlate="P123456"
+        insurancePhone="+503 2222-2222"
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 20,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  photoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  photoThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  photoPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  photoLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  photoStatus: {
+    fontSize: 14,
+    color: '#10B981',
+    fontWeight: '500',
+  },
+  photoRequired: {
+    fontSize: 14,
+    color: '#F59E0B',
+    fontWeight: '500',
+  },
+  addPhotoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#0B729D',
+    borderStyle: 'dashed',
+  },
+  addPhotoText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0B729D',
+    marginLeft: 8,
+  },
+  footer: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  nextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0B729D',
+    paddingVertical: 16,
+    borderRadius: 8,
+  },
+  nextButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  nextButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginRight: 8,
+  },
+});

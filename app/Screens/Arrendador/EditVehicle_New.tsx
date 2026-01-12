@@ -2,21 +2,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { useAuth } from '../../../context/Auth';
 import EditInfoTab from '../../components/EditVehicle/EditInfoTab';
 import EditPhotosTab from '../../components/EditVehicle/EditPhotosTab';
 import EditPriceTab from '../../components/EditVehicle/EditPriceTab';
 import EditRulesTab from '../../components/EditVehicle/EditRulesTab';
+import { useAuth } from '../../context/Auth';
 import { getVehicleReservations } from '../../services/reservations';
 import { normalizeVehicleData, updateVehicle, updateVehiclePhotos } from '../../services/vehicles';
 import type { Vehicle } from '../../types/vehicle';
@@ -38,6 +39,10 @@ export default function EditVehicle() {
   const [activeTab, setActiveTab] = useState<Tab>('info');
   const [hasActiveReservations, setHasActiveReservations] = useState(false);
   const [checkingReservations, setCheckingReservations] = useState(true);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [successTab, setSuccessTab] = useState<Tab>('info');
+  const scaleAnim = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
     checkForActiveReservations();
@@ -58,10 +63,59 @@ export default function EditVehicle() {
     }
   };
 
+  const showSuccess = (message: string, tab: Tab) => {
+    setSuccessMessage(message);
+    setSuccessTab(tab);
+    setShowSuccessModal(true);
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7,
+    }).start();
+  };
+
+  const hideSuccessModal = () => {
+    Animated.timing(scaleAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowSuccessModal(false);
+    });
+  };
+
+  const getNextSteps = (tab: Tab) => {
+    switch (tab) {
+      case 'info':
+        return [
+          'Actualiza las fotos de tu vehículo para atraer más clientes',
+          'Revisa el precio y la ubicación en la siguiente pestaña',
+        ];
+      case 'photos':
+        return [
+          'Establece un precio competitivo para tu vehículo',
+          'Configura las reglas y políticas de renta',
+        ];
+      case 'price':
+        return [
+          'Define las reglas de uso del vehículo',
+          'Tu vehículo estará listo para recibir reservas',
+        ];
+      case 'rules':
+        return [
+          'Tu vehículo está completamente configurado',
+          'Los clientes ya pueden hacer reservas',
+        ];
+      default:
+        return [];
+    }
+  };
+
   const handleSaveInfo = async (data: Partial<Vehicle>) => {
     try {
       await updateVehicle(vehicle.id, data);
-      Alert.alert('Éxito', 'Información actualizada correctamente');
+      showSuccess('Información actualizada correctamente', 'info');
     } catch (error: any) {
       throw new Error(error.message || 'Error al actualizar');
     }
@@ -71,7 +125,7 @@ export default function EditVehicle() {
     try {
       if (!user?.uid) throw new Error('Usuario no autenticado');
       await updateVehiclePhotos(vehicle.id, photos, deletedPhotos, user.uid);
-      Alert.alert('Éxito', 'Fotos actualizadas correctamente');
+      showSuccess('Fotos actualizadas correctamente', 'photos');
     } catch (error: any) {
       throw new Error(error.message || 'Error al actualizar fotos');
     }
@@ -80,7 +134,7 @@ export default function EditVehicle() {
   const handleSavePrice = async (data: Partial<Vehicle>) => {
     try {
       await updateVehicle(vehicle.id, data);
-      Alert.alert('Éxito', 'Precio y ubicación actualizados');
+      showSuccess('Precio y ubicación actualizados', 'price');
     } catch (error: any) {
       throw new Error(error.message || 'Error al actualizar');
     }
@@ -89,7 +143,7 @@ export default function EditVehicle() {
   const handleSaveRules = async (data: Partial<Vehicle>) => {
     try {
       await updateVehicle(vehicle.id, data);
-      Alert.alert('Éxito', 'Reglas actualizadas correctamente');
+      showSuccess('Reglas actualizadas correctamente', 'rules');
     } catch (error: any) {
       throw new Error(error.message || 'Error al actualizar');
     }
@@ -215,6 +269,71 @@ export default function EditVehicle() {
         {renderTabContent()}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={hideSuccessModal}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View 
+            style={[
+              styles.modalContent,
+              {
+                transform: [{ scale: scaleAnim }],
+              },
+            ]}
+          >
+            {/* Success Icon */}
+            <View style={styles.successIconContainer}>
+              <View style={styles.successIconCircle}>
+                <Ionicons name="checkmark" size={40} color="#fff" />
+              </View>
+              <View style={styles.successIconRing} />
+            </View>
+
+            {/* Title */}
+            <Text style={styles.modalTitle}>¡Cambios Guardados!</Text>
+            <Text style={styles.modalMessage}>{successMessage}</Text>
+
+            {/* Next Steps */}
+            <View style={styles.nextStepsContainer}>
+              <Text style={styles.nextStepsTitle}>Siguientes pasos:</Text>
+              {getNextSteps(successTab).map((step, index) => (
+                <View key={index} style={styles.nextStepItem}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>{index + 1}</Text>
+                  </View>
+                  <Text style={styles.nextStepText}>{step}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.continueButton}
+                onPress={hideSuccessModal}
+              >
+                <Text style={styles.continueButtonText}>Continuar Editando</Text>
+                <Ionicons name="arrow-forward" size={18} color="#fff" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.doneButton}
+                onPress={() => {
+                  hideSuccessModal();
+                  navigation.goBack();
+                }}
+              >
+                <Text style={styles.doneButtonText}>Finalizar</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -312,5 +431,137 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  successIconContainer: {
+    position: 'relative',
+    marginBottom: 24,
+  },
+  successIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  successIconRing: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#D1FAE5',
+    top: -10,
+    left: -10,
+    zIndex: 1,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: '#6B7280',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  nextStepsContainer: {
+    width: '100%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+  },
+  nextStepsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  nextStepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    gap: 12,
+  },
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#0B729D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  stepNumberText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  nextStepText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
+  },
+  modalActions: {
+    width: '100%',
+    gap: 12,
+  },
+  continueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0B729D',
+    paddingVertical: 16,
+    borderRadius: 12,
+    shadowColor: '#0B729D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  continueButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  doneButton: {
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  doneButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
   },
 });

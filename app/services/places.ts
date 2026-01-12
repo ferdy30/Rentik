@@ -5,7 +5,7 @@
  */
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { Firebaseapp } from '../../FirebaseConfig';
+import { Firebaseapp } from '../FirebaseConfig';
 import { getUserFriendlyError, logError } from '../utils/errorHandler';
 
 const functions = getFunctions(Firebaseapp);

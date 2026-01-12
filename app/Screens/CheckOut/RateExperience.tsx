@@ -17,9 +17,8 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { db } from '../../../FirebaseConfig';
-import { useAuth } from '../../../context/Auth';
-import { typography } from '../../constants/typography';
+import { db } from '../../FirebaseConfig';
+import { useAuth } from '../../context/Auth';
 
 export default function RateExperience() {
     const navigation = useNavigation<any>();
@@ -73,21 +72,25 @@ export default function RateExperience() {
                 vehicleId,
                 ownerId,
                 authorId: user?.uid,
+                authorName: userData?.nombre || 'Usuario',
                 rating,
-                comment,
+                comment: comment.trim() || '',
                 createdAt: serverTimestamp(),
-                type: 'vehicle_review'
+                type: 'vehicle_review',
+                visible: true
             };
 
-            await addDoc(collection(db, 'reviews'), reviewData);
+            const reviewRef = await addDoc(collection(db, 'reviews'), reviewData);
 
-            // 2. Update Vehicle Average Rating (Client-side aggregation for now)
-            // Ideally this should be a Cloud Function to avoid concurrency issues
+            // 2. Update Vehicle Average Rating using transaction
             const vehicleRef = doc(db, 'vehicles', vehicleId);
             
             await runTransaction(db, async (transaction) => {
                 const vehicleDoc = await transaction.get(vehicleRef);
-                if (!vehicleDoc.exists()) return;
+                if (!vehicleDoc.exists()) {
+                    console.error('Vehicle not found');
+                    return;
+                }
 
                 const data = vehicleDoc.data();
                 const currentRating = data.rating || 0;
@@ -97,8 +100,9 @@ export default function RateExperience() {
                 const newRating = ((currentRating * currentCount) + rating) / newCount;
 
                 transaction.update(vehicleRef, {
-                    rating: newRating,
-                    reviewCount: newCount
+                    rating: Number(newRating.toFixed(1)),
+                    reviewCount: newCount,
+                    updatedAt: serverTimestamp()
                 });
             });
 
@@ -111,9 +115,23 @@ export default function RateExperience() {
                 }]
             );
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error submitting review:', error);
-            Alert.alert('Error', 'No se pudo guardar tu calificación. Intenta de nuevo.');
+            
+            let errorMessage = 'No se pudo guardar tu calificación. Intenta de nuevo.';
+            
+            if (error.code === 'permission-denied') {
+                errorMessage = 'No tienes permiso para enviar esta calificación. Por favor contacta con soporte.';
+            } else if (error.code === 'unavailable') {
+                errorMessage = 'Sin conexión a internet. Verifica tu conexión e intenta de nuevo.';
+            } else if (error.code === 'not-found') {
+                errorMessage = 'El vehículo no fue encontrado. La calificación no se guardó.';
+            }
+            
+            Alert.alert('Error', errorMessage, [
+                { text: 'Intentar de nuevo', style: 'default' },
+                { text: 'Saltar', style: 'cancel', onPress: handleFinish }
+            ]);
         } finally {
             setSubmitting(false);
         }
@@ -206,96 +224,114 @@ export default function RateExperience() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#F9FAFB',
     },
     content: {
         flexGrow: 1,
         padding: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     header: {
         alignItems: 'center',
-        marginBottom: 32,
+        marginTop: 40,
+        marginBottom: 40,
     },
     title: {
-        fontSize: 24,
-        fontFamily: typography.fonts.bold,
+        fontSize: 28,
+        fontWeight: '800',
         color: '#111827',
-        marginBottom: 8,
+        marginBottom: 12,
         textAlign: 'center',
+        letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: 16,
         color: '#6B7280',
         textAlign: 'center',
         lineHeight: 24,
+        paddingHorizontal: 20,
     },
     starsContainer: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 12,
         marginBottom: 16,
+        justifyContent: 'center',
+        padding: 20,
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
     starButton: {
         padding: 4,
     },
     ratingLabel: {
-        fontSize: 18,
-        fontFamily: typography.fonts.semiBold,
+        fontSize: 20,
+        fontWeight: '700',
         color: '#F59E0B',
         marginBottom: 40,
-        height: 24,
+        textAlign: 'center',
+        height: 28,
     },
     inputContainer: {
         width: '100%',
         marginBottom: 32,
     },
     inputLabel: {
-        fontSize: 14,
-        fontFamily: typography.fonts.medium,
+        fontSize: 15,
+        fontWeight: '600',
         color: '#374151',
-        marginBottom: 8,
+        marginBottom: 12,
     },
     input: {
         borderWidth: 1,
         borderColor: '#E5E7EB',
-        borderRadius: 12,
-        padding: 12,
-        height: 120,
-        fontSize: 16,
+        borderRadius: 16,
+        padding: 16,
+        height: 140,
+        fontSize: 15,
         color: '#111827',
-        backgroundColor: '#F9FAFB',
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.03,
+        shadowRadius: 2,
+        elevation: 1,
     },
     footer: {
         width: '100%',
-        gap: 16,
+        gap: 12,
+        paddingTop: 20,
     },
     submitButton: {
         backgroundColor: '#0B729D',
-        paddingVertical: 16,
-        borderRadius: 12,
+        paddingVertical: 18,
+        borderRadius: 16,
         alignItems: 'center',
         shadowColor: '#0B729D',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 4,
     },
     disabledButton: {
-        opacity: 0.7,
+        opacity: 0.6,
     },
     submitButtonText: {
         color: '#fff',
-        fontSize: 16,
-        fontFamily: typography.fonts.bold,
+        fontSize: 17,
+        fontWeight: '700',
+        letterSpacing: 0.3,
     },
     skipButton: {
-        paddingVertical: 12,
+        paddingVertical: 14,
         alignItems: 'center',
     },
     skipButtonText: {
-        color: '#6B7280',
-        fontSize: 16,
-        fontFamily: typography.fonts.medium,
+        color: '#9CA3AF',
+        fontSize: 15,
+        fontWeight: '600',
     },
 });

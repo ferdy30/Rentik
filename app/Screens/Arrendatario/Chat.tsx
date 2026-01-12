@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useAuth } from '../../../context/Auth';
+import { useAuth } from '../../context/Auth';
 import { Chat, loadOlderChats, subscribeToUserChats } from '../../services/chat';
 
 export default function ChatScreen() {

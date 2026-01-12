@@ -1,39 +1,20 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useAuth } from '../../context/Auth';
+import { useAuth } from '../context/Auth';
 import TripDetails from '../Screens/Arrendatario/TripDetails';
-import BookingStep1Dates from '../Screens/Booking/BookingStep1Dates';
-import BookingStep2Location from '../Screens/Booking/BookingStep2Location';
-import BookingStep3Time from '../Screens/Booking/BookingStep3Time';
-import BookingStep4Confirmation from '../Screens/Booking/BookingStep4Confirmation';
 import ChatRoom from '../Screens/ChatRoom';
-import CheckInComplete from '../Screens/CheckIn/CheckInComplete';
-import CheckInConditions from '../Screens/CheckIn/CheckInConditions';
-import CheckInDamageReport from '../Screens/CheckIn/CheckInDamageReport';
-import CheckInKeys from '../Screens/CheckIn/CheckInKeys';
-import CheckInPhotos from '../Screens/CheckIn/CheckInPhotos';
-import CheckInPreparation from '../Screens/CheckIn/CheckInPreparation';
-import CheckInProcessExplanation from '../Screens/CheckIn/CheckInProcessExplanation';
-import CheckInSignature from '../Screens/CheckIn/CheckInSignature';
-import CheckInStart from '../Screens/CheckIn/CheckInStart';
-import CheckOutComplete from '../Screens/CheckOut/CheckOutComplete';
-import CheckOutConditions from '../Screens/CheckOut/CheckOutConditions';
-import CheckOutPhotos from '../Screens/CheckOut/CheckOutPhotos';
-import CheckOutReview from '../Screens/CheckOut/CheckOutReview';
-import CheckOutStart from '../Screens/CheckOut/CheckOutStart';
-import RateExperience from '../Screens/CheckOut/RateExperience';
 import Details from '../Screens/Details';
 import HomeArrendatario from '../Screens/HomeArrendatario';
 import Login from '../Screens/Login';
 import PaymentSetup from '../Screens/Registro/PaymentSetupStripe';
-import RegistroAddress from '../Screens/Registro/RegistroAddress';
-import RegistroStep1 from '../Screens/Registro/RegistroStep1';
-import RegistroStep2 from '../Screens/Registro/RegistroStep2';
-import RegistroStep3 from '../Screens/Registro/RegistroStep3';
 import Splash from '../Screens/Splash';
 import { RootStackParamList } from '../types/navigation';
 import ArrendadorStack from './ArrendadorStack';
 import { getInitialRouteByRoleAndProfile, isArrendador } from './role';
+import { AuthGroup, RegistrationGroup } from './stacks/AuthGroup';
+import { BookingGroup } from './stacks/BookingGroup';
+import { CheckInGroup } from './stacks/CheckInGroup';
+import { CheckOutGroup } from './stacks/CheckOutGroup';
 
 
 
@@ -42,13 +23,6 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export default function AppNavigation() {
   // Obtenemos el usuario y sus datos del contexto de Auth
   const { user, userData, loading } = useAuth();
-
-  console.log('[NAV] Auth state:', {
-    hasUser: !!user,
-    uid: user?.uid,
-    userData: userData ? { role: userData.role, profileComplete: userData.profileComplete } : null,
-    loading
-  });
 
   // Mientras carga O si hay usuario pero sin datos aún (evita flash de Login)
   if (loading || (user && !userData)) {
@@ -72,13 +46,6 @@ export default function AppNavigation() {
         : (shouldCompletePayment ? 'PaymentSetup' : getInitialRouteByRoleAndProfile(userData?.role, profileComplete))) 
     : 'Splash';
 
-  console.log('[NAV] Routing decision:', {
-    roleKnown,
-    isIncompleteProfile,
-    shouldCompletePayment,
-    initialRouteName
-  });
-
   // Key único para forzar remount del stack cuando cambia el estado de autenticación crítico
   const navigationKey = user
     ? `authenticated-${userData?.role}-${userData?.profileComplete}-${userData?.stripe?.detailsSubmitted}`
@@ -98,14 +65,7 @@ export default function AppNavigation() {
         {user ? (
           isIncompleteProfile ? (
             // Usuario autenticado pero con perfil incompleto: permitir completar registro (pasos 1-3)
-            <Stack.Group>
-              <Stack.Screen name="RegistroStep1" component={RegistroStep1} />
-              <Stack.Screen name="RegistroStep2" component={RegistroStep2} />
-              <Stack.Screen name="RegistroAddress" component={RegistroAddress} />
-              <Stack.Screen name="RegistroStep3" component={RegistroStep3} />
-              {/* Fallback */}
-              <Stack.Screen name="Login" component={Login} />
-            </Stack.Group>
+            RegistrationGroup(Stack)
           ) : !roleKnown ? (
             // Mientras aún no sabemos el rol (doc no creado o sincronizando), mantenemos Splash
             <Stack.Group>
@@ -127,87 +87,20 @@ export default function AppNavigation() {
             <Stack.Screen name="ChatRoom" component={ChatRoom} />
             
             {/* Check-in Flow */}
-            <Stack.Screen name="CheckInPreparation" component={CheckInPreparation} />
-            <Stack.Screen name="CheckInProcessExplanation" component={CheckInProcessExplanation} />
-            <Stack.Screen name="CheckInStart" component={CheckInStart} />
-            <Stack.Screen 
-              name="CheckInPhotos" 
-              component={CheckInPhotos} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="CheckInConditions" 
-              component={CheckInConditions} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="CheckInDamageReport" 
-              component={CheckInDamageReport} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="CheckInKeys" 
-              component={CheckInKeys} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="CheckInSignature" 
-              component={CheckInSignature} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="CheckInComplete" 
-              component={CheckInComplete} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
+            {CheckInGroup(Stack)}
             
             {/* Check-out Flow */}
-            <Stack.Screen name="CheckOutStart" component={CheckOutStart} />
-            <Stack.Screen 
-              name="CheckOutPhotos" 
-              component={CheckOutPhotos} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="CheckOutConditions" 
-              component={CheckOutConditions} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="CheckOutReview" 
-              component={CheckOutReview} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="RateExperience" 
-              component={RateExperience} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="CheckOutComplete" 
-              component={CheckOutComplete} 
-              options={{ headerShown: false, gestureEnabled: false }}
-            />
+            {CheckOutGroup(Stack)}
             
-            {/* Flujo de Booking (Común o específico de arrendatario, pero accesible) */}
-            <Stack.Screen name="BookingStep1Dates" component={BookingStep1Dates} />
-            <Stack.Screen name="BookingStep2Location" component={BookingStep2Location} />
-            <Stack.Screen name="BookingStep3Time" component={BookingStep3Time} />
-            <Stack.Screen name="BookingStep4Confirmation" component={BookingStep4Confirmation} />
+            {/* Flujo de Booking */}
+            {BookingGroup(Stack)}
+
             {/* Fallback */}
             <Stack.Screen name="Login" component={Login} />
           </Stack.Group>
         ) : (
           // Stack para usuarios no autenticados (auth flow)
-          <Stack.Group>
-            <Stack.Screen name="Splash" component={Splash} />
-            <Stack.Screen name="Login" component={Login} />
-            {/* Flujo de registro simplificado: info personal, fotos licencia (ambas), rol + términos */}
-            <Stack.Screen name="RegistroStep1" component={RegistroStep1} />
-            <Stack.Screen name="RegistroStep2" component={RegistroStep2} />
-            <Stack.Screen name="RegistroAddress" component={RegistroAddress} />
-            <Stack.Screen name="RegistroStep3" component={RegistroStep3} />
-          </Stack.Group>
+          AuthGroup(Stack)
         )}
       </Stack.Navigator>
     </NavigationContainer>

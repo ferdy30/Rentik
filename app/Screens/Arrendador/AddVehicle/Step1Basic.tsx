@@ -20,7 +20,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { db, functions } from '../../../../FirebaseConfig';
+import { db, functions } from '../../../FirebaseConfig';
 import { StepIndicator } from '../../../components/StepIndicator';
 import type { ArrendadorStackParamList } from '../../../navigation/ArrendadorStack';
 import { decodeVin, mapMakeToMarca } from '../../../services/vin';

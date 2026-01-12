@@ -15,8 +15,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useAuth } from '../../../context/Auth';
-import { db } from '../../../FirebaseConfig';
+import { useAuth } from '../../context/Auth';
+import { db } from '../../FirebaseConfig';
 import ReservationCard from '../../components/ReservationCard';
 import { createChatIfNotExists } from '../../services/chat';
 import { archiveReservation, deleteReservation, getOwnerReservations, Reservation, updateReservationStatus } from '../../services/reservations';

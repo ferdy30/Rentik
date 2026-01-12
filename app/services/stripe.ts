@@ -7,7 +7,7 @@
 
 import Constants from 'expo-constants';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { Firebaseapp } from '../../FirebaseConfig';
+import { Firebaseapp } from '../FirebaseConfig';
 
 export const STRIPE_PUBLISHABLE_KEY = 
   (Constants.expoConfig?.extra as any)?.stripePublishableKey || 

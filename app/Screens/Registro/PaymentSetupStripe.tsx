@@ -20,8 +20,8 @@ import {
     View,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { useAuth } from '../../../context/Auth';
-import { db } from '../../../FirebaseConfig';
+import { useAuth } from '../../context/Auth';
+import { db } from '../../FirebaseConfig';
 import { colors } from '../../constants/colors';
 
 type OnboardingState = 'initial' | 'creating' | 'onboarding' | 'verifying' | 'complete';

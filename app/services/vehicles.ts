@@ -1,7 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Platform } from 'react-native';
-import { db, storage } from '../../FirebaseConfig';
+import { db, storage } from '../FirebaseConfig';
 import { Vehicle } from '../types/vehicle';
 
 // Re-exportar para compatibilidad
@@ -86,7 +86,7 @@ export const normalizeVehicleData = (id: string, data: any): Vehicle => {
     reviewCount: typeof data.reviewCount === 'number' ? data.reviewCount : 0,
     trips: typeof data.trips === 'number' ? data.trips : 0,
     status: data.status || 'active',
-    disponible: data.disponible ?? true,
+    disponible: typeof data.disponible === 'boolean' ? data.disponible : (data.disponible === 'true' ? true : (data.disponible === 'false' ? false : true)),
   };
 };
 
@@ -258,12 +258,50 @@ export const getVehiclesByOwner = async (userId: string): Promise<Vehicle[]> => 
  */
 export const getAllVehicles = async (limitCount: number = 20): Promise<Vehicle[]> => {
   try {
-    const q = query(
-      collection(db, 'vehicles'), 
-      where('status', '==', 'active')
-    );
+    // Obtener TODOS los vehículos sin filtrar por status
+    const q = query(collection(db, 'vehicles'));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => normalizeVehicleData(doc.id, doc.data()));
+    
+    // Normalizar y filtrar vehículos
+    const vehicles = querySnapshot.docs
+      .map(doc => normalizeVehicleData(doc.id, doc.data()))
+      .filter(vehicle => {
+        // Mostrar vehículos que tengan status 'active' o 'available', o que tengan disponible=true
+        return vehicle.status === 'active' || 
+               vehicle.status === 'available' || 
+               vehicle.disponible === true;
+      });
+
+    // Verificar disponibilidad en tiempo real basada en reservas activas
+    const vehiclesWithRealAvailability = await Promise.all(
+      vehicles.map(async (vehicle) => {
+        try {
+          // Buscar reservas activas para este vehículo
+          const reservationsRef = collection(db, 'reservations');
+          const activeReservationsQuery = query(
+            reservationsRef,
+            where('vehicleId', '==', vehicle.id),
+            where('status', 'in', ['confirmed', 'in-progress'])
+          );
+          const reservationsSnapshot = await getDocs(activeReservationsQuery);
+          
+          // El vehículo está disponible si NO tiene reservas activas
+          const hasActiveReservations = !reservationsSnapshot.empty;
+          
+          return {
+            ...vehicle,
+            disponible: !hasActiveReservations,
+            // Mantener el status original pero actualizar disponible
+          };
+        } catch (error) {
+          console.error(`Error checking availability for vehicle ${vehicle.id}:`, error);
+          // En caso de error, mantener el estado original
+          return vehicle;
+        }
+      })
+    );
+
+    return vehiclesWithRealAvailability;
   } catch (error) {
     console.error('Error fetching all vehicles:', error);
     throw error;

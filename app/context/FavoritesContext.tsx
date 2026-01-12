@@ -1,5 +1,5 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { useAuth } from '../../context/Auth';
+import { useAuth } from '../context/Auth';
 import {
     subscribeToUserFavorites,
     toggleFavorite as toggleFavoriteService,

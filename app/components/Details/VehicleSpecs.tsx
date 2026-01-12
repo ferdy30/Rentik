@@ -10,6 +10,12 @@ interface VehicleSpecsProps {
 }
 
 export default function VehicleSpecs({ transmision, combustible, pasajeros, puertas }: VehicleSpecsProps) {
+  // Valores por defecto para evitar undefined/null
+  const safeTransmision = transmision || 'Automático';
+  const safeCombustible = combustible || 'Gasolina';
+  const safePasajeros = pasajeros || 5;
+  const safePuertas = puertas || 4;
+  
   return (
     <View style={styles.specsGrid}>
       <View style={styles.specCard}>
@@ -17,28 +23,28 @@ export default function VehicleSpecs({ transmision, combustible, pasajeros, puer
           <Ionicons name="speedometer-outline" size={20} color="#2563EB" />
         </View>
         <Text style={styles.specLabel}>Transmisión</Text>
-        <Text style={styles.specValue}>{transmision}</Text>
+        <Text style={styles.specValue}>{safeTransmision}</Text>
       </View>
       <View style={styles.specCard}>
         <View style={[styles.iconCircle, { backgroundColor: '#FEF3C7' }]}>
           <Ionicons name="water-outline" size={20} color="#F59E0B" />
         </View>
         <Text style={styles.specLabel}>Combustible</Text>
-        <Text style={styles.specValue}>{combustible}</Text>
+        <Text style={styles.specValue}>{safeCombustible}</Text>
       </View>
       <View style={styles.specCard}>
         <View style={[styles.iconCircle, { backgroundColor: '#D1FAE5' }]}>
           <Ionicons name="people-outline" size={20} color="#10B981" />
         </View>
         <Text style={styles.specLabel}>Pasajeros</Text>
-        <Text style={styles.specValue}>{pasajeros}</Text>
+        <Text style={styles.specValue}>{safePasajeros}</Text>
       </View>
       <View style={styles.specCard}>
         <View style={[styles.iconCircle, { backgroundColor: '#FCE7F3' }]}>
           <Ionicons name="car-sport-outline" size={20} color="#EC4899" />
         </View>
         <Text style={styles.specLabel}>Puertas</Text>
-        <Text style={styles.specValue}>{puertas}</Text>
+        <Text style={styles.specValue}>{safePuertas}</Text>
       </View>
     </View>
   );

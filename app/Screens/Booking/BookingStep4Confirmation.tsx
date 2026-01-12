@@ -15,7 +15,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useAuth } from '../../../context/Auth';
+import { useAuth } from '../../context/Auth';
 import { checkAvailability, createReservation, getVehicleReservations } from '../../services/reservations';
 
 export default function BookingStep4Confirmation() {
@@ -59,13 +59,15 @@ export default function BookingStep4Confirmation() {
         const deliveryFee = isDelivery ? deliveryCost : 0;
 
         const subtotal = rentalCost + extrasTotal + deliveryFee;
-        const serviceFee = subtotal * 0.10; // 10% fee
-        const total = subtotal + serviceFee;
+        // Rentik commission: 20% split (10% to customer benefit, 10% from owner)
+        // Customer pays 10% more, owner receives 10% less
+        const rentikCommission = subtotal * 0.10;
+        const total = subtotal + rentikCommission;
 
-        return { days, rentalCost, extrasTotal, deliveryFee, serviceFee, total };
+        return { days, rentalCost, extrasTotal, deliveryFee, rentikCommission, total };
     };
 
-    const { days, rentalCost, extrasTotal, deliveryFee, serviceFee, total } = calculateTotal();
+    const { days, rentalCost, extrasTotal, deliveryFee, rentikCommission, total } = calculateTotal();
 
     const handleConfirm = async () => {
         if (!user) {
@@ -137,8 +139,9 @@ export default function BookingStep4Confirmation() {
                     pricePerDay: vehicle.precio,
                     deliveryFee,
                     extrasTotal,
-                    serviceFee,
+                    rentikCommission,
                     subtotal: rentalCost + extrasTotal + deliveryFee,
+                    ownerEarnings: (rentalCost + extrasTotal + deliveryFee) - (rentalCost * 0.10),
                     total
                 }
             };
@@ -475,10 +478,10 @@ export default function BookingStep4Confirmation() {
                         
                         <View style={styles.priceRow}>
                             <View style={styles.priceRowLeft}>
-                                <Text style={styles.priceLabel}>Servicio Rentik</Text>
-                                <Text style={styles.priceSubtext}>10% del subtotal</Text>
+                                <Text style={styles.priceLabel}>Comisión Rentik (20% split)</Text>
+                                <Text style={styles.priceSubtext}>10% para cliente, 10% del dueño</Text>
                             </View>
-                            <Text style={styles.priceValue}>${serviceFee.toFixed(2)}</Text>
+                            <Text style={styles.priceValue}>${rentikCommission.toFixed(2)}</Text>
                         </View>
 
                         <View style={styles.divider} />

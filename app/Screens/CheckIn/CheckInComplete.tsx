@@ -14,7 +14,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../../../context/Auth';
+import { useAuth } from '../../context/Auth';
 import { CheckInReport, subscribeToCheckIn } from '../../services/checkIn';
 import { Reservation } from '../../services/reservations';
 

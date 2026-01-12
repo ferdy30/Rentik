@@ -18,7 +18,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Firebaseauth, storage } from '../../../FirebaseConfig';
+import { Firebaseauth, storage } from '../../FirebaseConfig';
 import { addDamageReport, CheckInReport, subscribeToCheckIn } from '../../services/checkIn';
 import { Reservation } from '../../services/reservations';
 
@@ -50,7 +50,7 @@ export default function CheckInDamageReport() {
     const handleTakeDamagePhoto = async () => {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permiso denegado', 'Necesitamos acceso a la cámara para reportar daños.');
+            Alert.alert('Permiso denegado', 'Necesitamos acceso a la c�mara para reportar da�os.');
             return;
         }
 
@@ -86,11 +86,11 @@ export default function CheckInDamageReport() {
 
     const handleSaveDamage = async () => {
         if (!damagePhoto) {
-            Alert.alert('Foto requerida', 'Por favor toma una foto del daño.');
+            Alert.alert('Foto requerida', 'Por favor toma una foto del da�o.');
             return;
         }
         if (!damageNotes.trim()) {
-            Alert.alert('Descripción requerida', 'Por favor describe el daño.');
+            Alert.alert('Descripci�n requerida', 'Por favor describe el da�o.');
             return;
         }
 
@@ -111,10 +111,10 @@ export default function CheckInDamageReport() {
             
             setModalVisible(false);
             resetForm();
-            Alert.alert('Éxito', 'Daño reportado correctamente');
+            Alert.alert('�xito', 'Da�o reportado correctamente');
         } catch (error) {
             console.error('Error saving damage:', error);
-            Alert.alert('Error', 'No se pudo guardar el reporte de daño.');
+            Alert.alert('Error', 'No se pudo guardar el reporte de da�o.');
         } finally {
             setSubmitting(false);
         }
@@ -129,7 +129,7 @@ export default function CheckInDamageReport() {
     };
 
     const handleContinue = () => {
-        navigation.navigate('CheckInKeys', { reservation, checkInId });
+        navigation.replace('CheckInKeys', { reservation, checkInId });
     };
 
     const renderDamageItem = ({ item }: { item: CheckInReport['damages'][0] }) => (
@@ -151,7 +151,7 @@ export default function CheckInDamageReport() {
                     </View>
                 </View>
                 <Text style={styles.damageType}>
-                    {item.type === 'scratch' ? 'Rayón' :
+                    {item.type === 'scratch' ? 'Ray�n' :
                      item.type === 'dent' ? 'Abolladura' :
                      item.type === 'stain' ? 'Mancha' :
                      item.type === 'crack' ? 'Grieta' : 'Otro'}
@@ -175,18 +175,21 @@ export default function CheckInDamageReport() {
             <StatusBar barStyle="dark-content" />
             
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#111827" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Reporte de Daños</Text>
                 <View style={{ width: 40 }} />
+                <View style={{ flex: 1, marginLeft: 16 }}>
+                    <Text style={styles.headerTitle}>Reporte de Daños</Text>
+                    <Text style={styles.headerSubtitle}>Paso 4 de 5</Text>
+                </View>
+                <View style={styles.progressCircle}>
+                    <Text style={styles.progressText}>4/5</Text>
+                </View>
             </View>
 
             <View style={styles.content}>
                 <View style={styles.infoBox}>
                     <Ionicons name="information-circle-outline" size={24} color="#0B729D" />
                     <Text style={styles.infoText}>
-                        Reporta cualquier daño existente en el vehículo. Si no hay daños nuevos, puedes continuar.
+                        Reporta cualquier da�o existente en el veh�culo. Si no hay da�os nuevos, puedes continuar.
                     </Text>
                 </View>
 
@@ -198,8 +201,8 @@ export default function CheckInDamageReport() {
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
                             <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" />
-                            <Text style={styles.emptyText}>Sin daños reportados</Text>
-                            <Text style={styles.emptySubtext}>El vehículo parece estar en perfectas condiciones</Text>
+                            <Text style={styles.emptyText}>Sin da�os reportados</Text>
+                            <Text style={styles.emptySubtext}>El veh�culo parece estar en perfectas condiciones</Text>
                         </View>
                     }
                 />
@@ -209,11 +212,32 @@ export default function CheckInDamageReport() {
                     onPress={() => setModalVisible(true)}
                 >
                     <Ionicons name="add" size={24} color="#fff" />
-                    <Text style={styles.addButtonText}>Reportar Daño</Text>
+                    <Text style={styles.addButtonText}>Reportar Da�o</Text>
                 </TouchableOpacity>
             </View>
 
             <View style={styles.footer}>
+                <TouchableOpacity 
+                    style={{ marginBottom: 12, alignItems: 'center', padding: 8 }}
+                    onPress={() => {
+                        Alert.alert(
+                            'Modo Desarrollo',
+                            'Saltando reporte de da�os...',
+                            [
+                                { text: 'Cancelar', style: 'cancel' },
+                                {
+                                    text: 'Saltar',
+                                    onPress: () => handleContinue()
+                                }
+                            ]
+                        );
+                    }}
+                >
+                    <Text style={{ color: '#757575', textDecorationLine: 'underline', fontSize: 14 }}>
+                        [DEV] Saltar da�os
+                    </Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
                     <Text style={styles.continueButtonText}>Continuar a Llaves</Text>
                     <Ionicons name="arrow-forward" size={20} color="#fff" />
@@ -231,14 +255,14 @@ export default function CheckInDamageReport() {
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalTitle}>Nuevo Reporte</Text>
                         <TouchableOpacity onPress={() => setModalVisible(false)}>
-                            <Ionicons name="close" size={24} color="#111827" />
+                            <Ionicons name="close" size={24} color="#333333" />
                         </TouchableOpacity>
                     </View>
 
                     <ScrollView style={styles.modalContent}>
-                        <Text style={styles.label}>Ubicación</Text>
+                        <Text style={styles.label}>Ubicaci�n</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsContainer}>
-                            {['Frente', 'Atrás', 'Izquierda', 'Derecha', 'Techo', 'Interior', 'Llantas'].map((loc) => (
+                            {['Frente', 'Atr�s', 'Izquierda', 'Derecha', 'Techo', 'Interior', 'Llantas'].map((loc) => (
                                 <TouchableOpacity
                                     key={loc}
                                     style={[styles.chip, damageLocation === loc && styles.chipSelected]}
@@ -251,10 +275,10 @@ export default function CheckInDamageReport() {
                             ))}
                         </ScrollView>
 
-                        <Text style={styles.label}>Tipo de Daño</Text>
+                        <Text style={styles.label}>Tipo de Da�o</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsContainer}>
                             {[
-                                { id: 'scratch', label: 'Rayón' },
+                                { id: 'scratch', label: 'Ray�n' },
                                 { id: 'dent', label: 'Abolladura' },
                                 { id: 'stain', label: 'Mancha' },
                                 { id: 'crack', label: 'Grieta' },
@@ -297,13 +321,13 @@ export default function CheckInDamageReport() {
                             ))}
                         </View>
 
-                        <Text style={styles.label}>Foto del Daño</Text>
+                        <Text style={styles.label}>Foto del Da�o</Text>
                         <TouchableOpacity style={styles.photoButton} onPress={handleTakeDamagePhoto}>
                             {damagePhoto ? (
                                 <Image source={{ uri: damagePhoto }} style={styles.previewImage} />
                             ) : (
                                 <View style={styles.photoPlaceholder}>
-                                    <Ionicons name="camera" size={32} color="#9CA3AF" />
+                                    <Ionicons name="camera" size={32} color="#BDBDBD" />
                                     <Text style={styles.photoPlaceholderText}>Tomar Foto</Text>
                                 </View>
                             )}
@@ -312,7 +336,7 @@ export default function CheckInDamageReport() {
                         <Text style={styles.label}>Notas</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="Describe el daño..."
+                            placeholder="Describe el da�o..."
                             multiline
                             numberOfLines={3}
                             value={damageNotes}
@@ -353,7 +377,7 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         marginTop: 10,
-        color: '#6B7280',
+        color: '#757575',
     },
     header: {
         flexDirection: 'row',
@@ -362,17 +386,35 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: '#FAFAFA',
     },
     backButton: {
         padding: 8,
         borderRadius: 12,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#FAFAFA',
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#111827',
+        color: '#333333',
+    },
+    headerSubtitle: {
+        fontSize: 12,
+        color: '#757575',
+        marginTop: 2,
+    },
+    progressCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#E0F2FE',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    progressText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#0B729D',
     },
     content: {
         flex: 1,
@@ -402,12 +444,12 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#374151',
+        color: '#424242',
         marginTop: 12,
     },
     emptySubtext: {
         fontSize: 14,
-        color: '#6B7280',
+        color: '#757575',
         marginTop: 4,
     },
     damageCard: {
@@ -417,7 +459,7 @@ const styles = StyleSheet.create({
         padding: 12,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#E0E0E0',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
@@ -428,7 +470,7 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 8,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#FAFAFA',
     },
     damageInfo: {
         flex: 1,
@@ -443,7 +485,7 @@ const styles = StyleSheet.create({
     damageLocation: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#111827',
+        color: '#333333',
     },
     severityBadge: {
         paddingHorizontal: 8,
@@ -456,7 +498,7 @@ const styles = StyleSheet.create({
     severityText: {
         fontSize: 12,
         fontWeight: '500',
-        color: '#374151',
+        color: '#424242',
     },
     damageType: {
         fontSize: 14,
@@ -465,7 +507,7 @@ const styles = StyleSheet.create({
     },
     damageNotes: {
         fontSize: 13,
-        color: '#6B7280',
+        color: '#757575',
         fontStyle: 'italic',
     },
     addButton: {
@@ -487,7 +529,7 @@ const styles = StyleSheet.create({
     footer: {
         padding: 20,
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
+        borderTopColor: '#FAFAFA',
         backgroundColor: '#fff',
     },
     continueButton: {
@@ -515,12 +557,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 20,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: '#FAFAFA',
     },
     modalTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#111827',
+        color: '#333333',
     },
     modalContent: {
         flex: 1,
@@ -529,7 +571,7 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#374151',
+        color: '#424242',
         marginBottom: 8,
         marginTop: 16,
     },
@@ -541,7 +583,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#FAFAFA',
         marginRight: 8,
         borderWidth: 1,
         borderColor: 'transparent',
@@ -567,20 +609,20 @@ const styles = StyleSheet.create({
         padding: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#E0E0E0',
         alignItems: 'center',
     },
     severityButtonText: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#374151',
+        color: '#424242',
     },
     photoButton: {
         height: 200,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: '#F5F5F5',
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: '#E5E7EB',
+        borderColor: '#E0E0E0',
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
@@ -591,7 +633,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     photoPlaceholderText: {
-        color: '#9CA3AF',
+        color: '#BDBDBD',
         fontSize: 14,
     },
     previewImage: {
@@ -599,19 +641,19 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     input: {
-        backgroundColor: '#F9FAFB',
+        backgroundColor: '#F5F5F5',
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#E0E0E0',
         borderRadius: 12,
         padding: 12,
         fontSize: 16,
-        color: '#111827',
+        color: '#333333',
         textAlignVertical: 'top',
     },
     modalFooter: {
         padding: 20,
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
+        borderTopColor: '#FAFAFA',
     },
     saveButton: {
         backgroundColor: '#0B729D',
