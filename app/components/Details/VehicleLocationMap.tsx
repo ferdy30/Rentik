@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Dimensions, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { LazyMapView as MapView, LazyMarker as Marker, PROVIDER_GOOGLE } from '../LazyMap';
 
 const { width } = Dimensions.get('window');
 

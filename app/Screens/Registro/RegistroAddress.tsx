@@ -14,11 +14,12 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
+import { LazyMapView as MapView, LazyMarker as Marker, type Region } from '../../components/LazyMap';
 import { colors } from '../../constants/colors';
+import { typography } from '../constants/typography';
 import { fetchPlaceDetailsById, fetchPlacesAutocomplete } from '../../services/places';
 
-// Paso adicional: Dirección (con mapa + Google Places via Cloud Functions)
+// Paso adicional: Direcci�n (con mapa + Google Places via Cloud Functions)
 export default function RegistroAddress({ route, navigation }: any) {
   const prevData = route.params || {};
 
@@ -56,7 +57,7 @@ export default function RegistroAddress({ route, navigation }: any) {
     } catch (e) {
       console.warn('[PLACES] autocomplete error', e);
       setPredictions([]);
-      Alert.alert('Error', 'No se pudo buscar la dirección. Verifica tu conexión.');
+      Alert.alert('Error', 'No se pudo buscar la direcci�n. Verifica tu conexi�n.');
     } finally {
       setLoading(false);
     }
@@ -69,17 +70,17 @@ export default function RegistroAddress({ route, navigation }: any) {
       const result = await fetchPlaceDetailsById(placeId);
       
       if (!result || !result.geometry?.location) {
-        Alert.alert('Dirección', 'No pudimos obtener los detalles de la dirección.');
+        Alert.alert('Direcci�n', 'No pudimos obtener los detalles de la direcci�n.');
         return null;
       }
       
       const { lat, lng } = result.geometry.location;
       
-      // Actualizar región y marcador con animación
+      // Actualizar regi�n y marcador con animaci�n
       const newRegion = {
         latitude: lat,
         longitude: lng,
-        latitudeDelta: 0.01, // Zoom más cercano al seleccionar
+        latitudeDelta: 0.01, // Zoom m�s cercano al seleccionar
         longitudeDelta: 0.01,
       };
       setRegion(newRegion);
@@ -107,7 +108,7 @@ export default function RegistroAddress({ route, navigation }: any) {
       setLoading(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'No se puede acceder a tu ubicación sin permisos.');
+        Alert.alert('Permiso denegado', 'No se puede acceder a tu ubicaci�n sin permisos.');
         return;
       }
 
@@ -127,11 +128,11 @@ export default function RegistroAddress({ route, navigation }: any) {
         mapRef.current.animateToRegion(newRegion, 500);
       }
 
-      // Opcional: hacer geocoding inverso para obtener la dirección
-      setQuery('Mi ubicación actual');
+      // Opcional: hacer geocoding inverso para obtener la direcci�n
+      setQuery('Mi ubicaci�n actual');
     } catch (error) {
       console.warn('[LOCATION] error', error);
-      Alert.alert('Error', 'No se pudo obtener tu ubicación.');
+      Alert.alert('Error', 'No se pudo obtener tu ubicaci�n.');
     } finally {
       setLoading(false);
     }
@@ -155,7 +156,7 @@ export default function RegistroAddress({ route, navigation }: any) {
     setPredictions([]);
     const coords = await fetchPlaceDetails(p.place_id);
     
-    // Animar el mapa a la nueva ubicación con las coordenadas correctas
+    // Animar el mapa a la nueva ubicaci�n con las coordenadas correctas
     if (coords && mapRef.current) {
       setTimeout(() => {
         mapRef.current?.animateToRegion(
@@ -207,11 +208,11 @@ export default function RegistroAddress({ route, navigation }: any) {
             </View>
             <Text style={styles.stepText}>Paso 2 de 3</Text>
             <Ionicons name="location-outline" size={48} color={colors.primary} style={{ marginVertical: 8 }} />
-            <Text style={styles.title}>Tu Dirección</Text>
+            <Text style={styles.title}>Tu Direcci�n</Text>
             <Text style={styles.subtitle}>Para validar tu identidad</Text>
           </View>
 
-          {/* Botón destacado: Usar ubicación actual */}
+          {/* Bot�n destacado: Usar ubicaci�n actual */}
           <TouchableOpacity 
             style={styles.currentLocationBtn} 
             onPress={handleGetCurrentLocation}
@@ -221,13 +222,13 @@ export default function RegistroAddress({ route, navigation }: any) {
               <Ionicons name="navigate" size={24} color={colors.primary} />
             </View>
             <View style={{flex: 1}}>
-              <Text style={styles.currentLocationText}>Usar mi ubicación actual</Text>
-              <Text style={styles.currentLocationSubtext}>Detectar automáticamente</Text>
+              <Text style={styles.currentLocationText}>Usar mi ubicaci�n actual</Text>
+              <Text style={styles.currentLocationSubtext}>Detectar autom�ticamente</Text>
             </View>
             {loading ? (
               <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+              <Ionicons name="chevron-forward" size={20} color="#BDBDBD" />
             )}
           </TouchableOpacity>
 
@@ -240,13 +241,13 @@ export default function RegistroAddress({ route, navigation }: any) {
 
           {/* Buscador */}
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Buscar dirección</Text>
+            <Text style={styles.cardLabel}>Buscar direcci�n</Text>
             <View style={styles.searchRow}>
-              <Ionicons name="search" size={20} color="#9CA3AF" />
+              <Ionicons name="search" size={20} color="#BDBDBD" />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Ej: Col. Escalón, San Salvador"
-                placeholderTextColor="#9CA3AF"
+                placeholder="Ej: Col. Escal�n, San Salvador"
+                placeholderTextColor="#BDBDBD"
                 value={query}
                 onChangeText={(t) => {
                   setQuery(t);
@@ -255,7 +256,7 @@ export default function RegistroAddress({ route, navigation }: any) {
               />
               {query.length > 0 && (
                 <TouchableOpacity onPress={() => { setQuery(''); setPredictions([]); }}>
-                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                  <Ionicons name="close-circle" size={18} color="#BDBDBD" />
                 </TouchableOpacity>
               )}
             </View>
@@ -280,7 +281,7 @@ export default function RegistroAddress({ route, navigation }: any) {
           {/* Mapa */}
           <View style={styles.mapCard}> 
             <View style={styles.mapHeader}>
-              <Text style={styles.mapTitle}>Confirmar ubicación</Text>
+              <Text style={styles.mapTitle}>Confirmar ubicaci�n</Text>
               <Text style={styles.mapSubtitle}>Arrastra el pin si es necesario</Text>
             </View>
             <View style={styles.mapContainer}>
@@ -299,13 +300,13 @@ export default function RegistroAddress({ route, navigation }: any) {
                   }}
                 />
               </MapView>
-              {/* Overlay de dirección seleccionada */}
+              {/* Overlay de direcci�n seleccionada */}
               <View style={styles.addressOverlay}>
                 <Ionicons name="location" size={16} color={colors.primary} />
                 <Text style={styles.addressOverlayText} numberOfLines={1}>
                   {selectedPlace 
                     ? selectedPlace.formattedAddress
-                    : 'Ubicación seleccionada en el mapa'
+                    : 'Ubicaci�n seleccionada en el mapa'
                   }
                 </Text>
               </View>
@@ -314,7 +315,7 @@ export default function RegistroAddress({ route, navigation }: any) {
 
           {/* Confirmar */}
           <TouchableOpacity style={styles.primaryBtn} onPress={handleConfirm}>
-            <Text style={styles.primaryText}>Confirmar Dirección</Text>
+            <Text style={styles.primaryText}>Confirmar Direcci�n</Text>
             <Ionicons name="arrow-forward" size={20} color="#fff" />
           </TouchableOpacity>
         </ScrollView>
@@ -332,26 +333,26 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: 32 },
   backButton: { position: 'absolute', left: 0, top: 0, padding: 8, zIndex: 10 },
   progressContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20, marginTop: 10 },
-  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5E7EB' },
+  progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E0E0E0' },
   progressDotActive: { backgroundColor: colors.primary, transform: [{ scale: 1.2 }] },
   progressDotDone: { backgroundColor: colors.primary },
-  progressLine: { width: 30, height: 2, backgroundColor: '#E5E7EB', marginHorizontal: 4 },
+  progressLine: { width: 30, height: 2, backgroundColor: '#E0E0E0', marginHorizontal: 4 },
   progressLineDone: { backgroundColor: colors.primary },
   
-  stepText: { color: colors.primary, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-  title: { fontSize: 28, fontWeight: '700', color: '#111827', textAlign: 'center' },
-  subtitle: { fontSize: 16, color: '#6B7280', marginTop: 4, textAlign: 'center' },
+  stepText: { color: colors.primary, fontSize: 13, fontFamily: typography.fonts.bold, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  title: { fontSize: 28, fontFamily: typography.fonts.bold, color: '#333333', textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#757575', marginTop: 4, textAlign: 'center' },
 
   // Current Location Button
   currentLocationBtn: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: '#F9FAFB', 
+    backgroundColor: '#F5F5F5', 
     padding: 16, 
     borderRadius: 16, 
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#E5E7EB'
+    borderColor: '#E0E0E0'
   },
   iconContainer: {
     width: 40,
@@ -363,12 +364,12 @@ const styles = StyleSheet.create({
     marginRight: 12
   },
   currentLocationText: { 
-    color: '#111827', 
+    color: '#333333', 
     fontSize: 16, 
-    fontWeight: '600',
+    fontFamily: typography.fonts.semiBold,
   },
   currentLocationSubtext: {
-    color: '#6B7280',
+    color: '#757575',
     fontSize: 12,
     marginTop: 2
   },
@@ -382,13 +383,13 @@ const styles = StyleSheet.create({
   dividerLine: { 
     flex: 1, 
     height: 1, 
-    backgroundColor: '#E5E7EB' 
+    backgroundColor: '#E0E0E0' 
   },
   dividerText: { 
-    color: '#9CA3AF', 
+    color: '#BDBDBD', 
     fontSize: 12, 
     marginHorizontal: 12,
-    fontWeight: '500',
+    fontFamily: typography.fonts.medium,
     textTransform: 'uppercase'
   },
 
@@ -401,28 +402,28 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    fontFamily: typography.fonts.semiBold,
+    color: '#424242',
     marginBottom: 8
   },
   searchRow: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FAFAFA',
     borderRadius: 12, 
     paddingHorizontal: 12, 
     height: 48
   },
   searchInput: { 
     flex: 1, 
-    color: '#111827',
+    color: '#333333',
     fontSize: 15,
     marginLeft: 8
   },
   predictionsContainer: {
     marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: '#FAFAFA',
     paddingTop: 4
   },
   predictionItem: { 
@@ -430,7 +431,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     paddingVertical: 12, 
     borderBottomWidth: 1, 
-    borderBottomColor: '#F9FAFB' 
+    borderBottomColor: '#F5F5F5' 
   },
   predictionIcon: {
     width: 28,
@@ -454,21 +455,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E0E0E0',
   },
   mapHeader: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6'
+    borderBottomColor: '#FAFAFA'
   },
   mapTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#111827'
+    fontFamily: typography.fonts.bold,
+    color: '#333333'
   },
   mapSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
+    color: '#757575',
     marginTop: 2
   },
   mapContainer: {
@@ -499,8 +500,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 13,
-    color: '#374151',
-    fontWeight: '500'
+    color: '#424242',
+    fontFamily: typography.fonts.medium
   },
 
   // Primary Button
@@ -521,7 +522,7 @@ const styles = StyleSheet.create({
   primaryText: { 
     color: '#fff', 
     fontSize: 16, 
-    fontWeight: '700',
+    fontFamily: typography.fonts.bold,
     marginRight: 8
   },
 });

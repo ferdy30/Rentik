@@ -3,6 +3,7 @@ import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage
 import { Platform } from 'react-native';
 import { db, storage } from '../FirebaseConfig';
 import { Vehicle } from '../types/vehicle';
+import { Cache, CACHE_KEYS } from '../utils/cache';
 
 // Re-exportar para compatibilidad
 export type VehicleData = Vehicle;
@@ -232,6 +233,10 @@ export const addVehicle = async (
     });
 
     const docRef = await addDoc(collection(db, 'vehicles'), newVehicle);
+    
+    // Invalidar caché al agregar vehículo nuevo
+    await Cache.invalidateVehicleCache();
+    
     return docRef.id;
   } catch (error) {
     console.error('Error adding vehicle:', error);
@@ -254,10 +259,19 @@ export const getVehiclesByOwner = async (userId: string): Promise<Vehicle[]> => 
 };
 
 /**
- * Obtiene todos los vehículos disponibles
+ * Obtiene todos los vehículos disponibles (con caché)
  */
-export const getAllVehicles = async (limitCount: number = 20): Promise<Vehicle[]> => {
+export const getAllVehicles = async (limitCount: number = 20, useCache: boolean = true): Promise<Vehicle[]> => {
   try {
+    // Intentar obtener del caché primero
+    if (useCache) {
+      const cachedVehicles = await Cache.get<Vehicle[]>(CACHE_KEYS.ALL_VEHICLES);
+      if (cachedVehicles) {
+        console.log('✅ Vehículos cargados desde caché');
+        return cachedVehicles;
+      }
+    }
+
     // Obtener TODOS los vehículos sin filtrar por status
     const q = query(collection(db, 'vehicles'));
     const querySnapshot = await getDocs(q);
@@ -301,6 +315,12 @@ export const getAllVehicles = async (limitCount: number = 20): Promise<Vehicle[]
       })
     );
 
+    // Guardar en caché por 5 minutos
+    if (useCache) {
+      await Cache.set(CACHE_KEYS.ALL_VEHICLES, vehiclesWithRealAvailability);
+      console.log('💾 Vehículos guardados en caché');
+    }
+
     return vehiclesWithRealAvailability;
   } catch (error) {
     console.error('Error fetching all vehicles:', error);
@@ -314,6 +334,8 @@ export const getAllVehicles = async (limitCount: number = 20): Promise<Vehicle[]
 export const deleteVehicle = async (vehicleId: string) => {
   try {
     await deleteDoc(doc(db, 'vehicles', vehicleId));
+    // Invalidar caché
+    await Cache.invalidateVehicleCache();
   } catch (error) {
     console.error('Error deleting vehicle:', error);
     throw error;
@@ -327,6 +349,8 @@ export const updateVehicle = async (vehicleId: string, data: Partial<Vehicle>) =
   try {
     const vehicleRef = doc(db, 'vehicles', vehicleId);
     await updateDoc(vehicleRef, data);
+    // Invalidar caché
+    await Cache.invalidateVehicleCache();
   } catch (error) {
     console.error('Error updating vehicle:', error);
     throw error;

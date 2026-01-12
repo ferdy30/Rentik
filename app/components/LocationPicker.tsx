@@ -11,7 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
+import { LazyMapView as MapView, LazyMarker as Marker, type Region } from './LazyMap';
 import { fetchPlaceDetailsById, fetchPlacesAutocomplete } from '../services/places';
 
 interface LocationData {

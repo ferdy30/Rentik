@@ -16,7 +16,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { LazyMapView as MapView, LazyMarker as Marker, PROVIDER_GOOGLE, type Region } from '../../components/LazyMap';
 import { fetchPlaceDetailsById, fetchPlacesAutocomplete } from '../../services/places';
 import { getDeliveryDetails } from '../../utils/distance';
 

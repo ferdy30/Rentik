@@ -14,7 +14,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { LazyMapView as MapView, LazyCircle as Circle, LazyMarker as Marker, PROVIDER_GOOGLE } from '../../components/LazyMap';
 import { db } from '../../FirebaseConfig';
 import { typography } from '../../constants/typography';
 import { useAuth } from '../../context/Auth';

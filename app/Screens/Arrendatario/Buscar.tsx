@@ -19,7 +19,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { LazyMapView as MapView, LazyCallout as Callout, LazyMarker as Marker, PROVIDER_GOOGLE } from '../../components/LazyMap';
 import EmptyState from '../../components/EmptyState';
 import FilterModal, { type FilterOptions } from '../../components/FilterModal';
 import VehicleCard from '../../components/VehicleCard';
