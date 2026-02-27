@@ -45,6 +45,14 @@ FirebaseConfig.js
 # App config with API keys
 app.json
 
+# Google services files (contienen claves privadas)
+google-services.json
+GoogleService-Info.plist
+google-play-service-account.json
+
+# Keystores de firma
+*.keystore
+
 # Firebase
 .firebase/
 firebase-debug.log
