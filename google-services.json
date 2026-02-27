@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1066128652427",
+    "project_id": "rentik-d401e",
+    "storage_bucket": "rentik-d401e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1066128652427:android:0a4135ebc3daed8667fc8e",
+        "android_client_info": {
+          "package_name": "com.rentik.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1066128652427-f11an60vdf1b6qfqd8nhh8tc5hrse6of.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2dYgSDLOLR-Fr-F1zhVElavdsOHKCUGw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1066128652427-062r6r2jj7gjiiq5ko3l12np1f5n4r42.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
