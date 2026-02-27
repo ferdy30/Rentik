@@ -1,0 +1,107 @@
+{
+  "expo": {
+    "name": "Rentik",
+    "slug": "rentik",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/RentikLogo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/RentikLogo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#032B3C"
+    },
+    "scheme": "rentik",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rentik.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Rentik necesita acceso a tus fotos para que puedas subir imágenes de tu vehículo.",
+        "NSCameraUsageDescription": "Rentik necesita acceso a tu cámara para que puedas tomar fotos de tu vehículo.",
+        "NSPhotoLibraryAddUsageDescription": "Rentik necesita permiso para guardar fotos en tu galería.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {
+            "firebasestorage.googleapis.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionRequiresForwardSecrecy": true,
+              "NSIncludesSubdomains": true
+            },
+            "firebasestorage.app": {
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionRequiresForwardSecrecy": true,
+              "NSIncludesSubdomains": true
+            }
+          }
+        }
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyA7iRMnvdgPPmohLZhHvyZAlsZcEaUPJr4"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/RentikLogo.png",
+        "backgroundColor": "#032B3C"
+      },
+      "package": "com.rentik.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyA7iRMnvdgPPmohLZhHvyZAlsZcEaUPJr4"
+        }
+      },
+      "softwareKeyboardLayoutMode": "pan",
+      "allowBackup": false,
+      "largeHeap": true,
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/RentikLogo.png",
+          "color": "#032B3C",
+          "defaultChannel": "default",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Rentik necesita tu ubicación para mostrarte vehículos cercanos y completar tu perfil."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Rentik necesita acceso a tus fotos para que puedas subir imágenes de tu vehículo.",
+          "cameraPermission": "Rentik necesita acceso a tu cámara para que puedas tomar fotos de tu vehículo."
+        }
+      ]
+    ],
+    "extra": {
+      "googleWebClientId": "1066128652427-062r6r2jj7gjiiq5ko3l12np1f5n4r42.apps.googleusercontent.com",
+      "googleIosClientId": "YOUR_GOOGLE_IOS_CLIENT_ID",
+      "googleAndroidClientId": "1066128652427-062r6r2jj7gjiiq5ko3l12np1f5n4r42.apps.googleusercontent.com",
+      "stripePublishableKey": "pk_test_51SMxQI7BubzK4SOW5YNfXihD5uqodWx6f4Os0iuDLEAC9YG0GOWZ3mU6fK8RCETk7jeN3zZTfac5CuwPFXUpMfbh00ZH4CDpCj",
+      "googleMapsApiKey": "AIzaSyA7iRMnvdgPPmohLZhHvyZAlsZcEaUPJr4",
+      "eas": {
+        "projectId": "46fb68ff-f869-45b0-9faf-df5707225054"
+      }
+    }
+  }
+}
