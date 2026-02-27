@@ -39,8 +39,8 @@ Thumbs.db
 .env.development
 .env.test
 
-# Firebase config with sensitive keys
-FirebaseConfig.js
+# Firebase config - seguro commitear, los valores son config de cliente pública
+# FirebaseConfig.js
 
 # App config with API keys
 app.json
@@ -49,9 +49,6 @@ app.json
 # google-services.json  ← seguro commitear (config de cliente, no server key)
 GoogleService-Info.plist
 google-play-service-account.json
-
-# Keystores de firma
-*.keystore
 
 # Firebase
 .firebase/
