@@ -1,39 +1,29 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useCallback } from "react";
 import {
-    Alert,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
-} from 'react-native';
-import { useAuth } from '../../context/Auth';
-import { Firebaseauth } from '../../FirebaseConfig';
+  Alert,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useAuth } from "../../context/Auth";
+import { Firebaseauth } from "../../FirebaseConfig";
 
-export default function PerfilScreen() {
-  const { user, userData } = useAuth();
-  const navigation = useNavigation<any>();
+interface MenuOptionProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+  onPress?: () => void;
+  color?: string;
+}
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Estás seguro que deseas cerrar sesión?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Cerrar sesión', 
-          style: 'destructive',
-          onPress: () => Firebaseauth.signOut()
-        }
-      ]
-    );
-  };
-
-  const MenuOption = ({ icon, title, subtitle, onPress, color = '#0B729D' }: any) => (
+const MenuOption = React.memo(
+  ({ icon, title, subtitle, onPress, color = "#0B729D" }: MenuOptionProps) => (
     <TouchableOpacity style={styles.menuOption} onPress={onPress}>
       <View style={[styles.iconContainer, { backgroundColor: `${color}15` }]}>
         <Ionicons name={icon} size={22} color={color} />
@@ -44,16 +34,48 @@ export default function PerfilScreen() {
       </View>
       <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
     </TouchableOpacity>
+  ),
+);
+
+export default function PerfilScreen() {
+  const { user, userData } = useAuth();
+  const navigation = useNavigation<any>();
+
+  const handleSignOut = useCallback(() => {
+    Alert.alert("Cerrar sesión", "¿Estás seguro que deseas cerrar sesión?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Cerrar sesión",
+        style: "destructive",
+        onPress: () => Firebaseauth.signOut(),
+      },
+    ]);
+  }, []);
+
+  const handleNavigateToAutos = useCallback(
+    () => navigation.navigate("MisAutos"),
+    [navigation],
+  );
+  const handleNavigateToIngresos = useCallback(
+    () => navigation.navigate("Ingresos"),
+    [navigation],
+  );
+  const handleNavigateToReservas = useCallback(
+    () => navigation.navigate("Reservas"),
+    [navigation],
   );
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
         {/* Header Gradient */}
         <LinearGradient
-          colors={['#0B729D', '#0A4A5C']}
+          colors={["#0B729D", "#0A4A5C"]}
           style={styles.headerGradient}
         >
           <View style={styles.headerContent}>
@@ -68,7 +90,7 @@ export default function PerfilScreen() {
           <View style={styles.userCard}>
             <View style={styles.avatarContainer}>
               <Text style={styles.avatarText}>
-                {userData?.nombre?.[0] || user?.email?.[0] || 'A'}
+                {userData?.nombre?.[0] || user?.email?.[0] || "A"}
               </Text>
             </View>
             <View style={styles.userInfo}>
@@ -106,37 +128,37 @@ export default function PerfilScreen() {
           {/* Business Section */}
           <Text style={styles.sectionTitle}>Mi Negocio</Text>
           <View style={styles.sectionContainer}>
-            <MenuOption 
-              icon="car-sport-outline" 
-              title="Mis Vehículos" 
+            <MenuOption
+              icon="car-sport-outline"
+              title="Mis Vehículos"
               subtitle="Administrar flota"
-              onPress={() => navigation.navigate('MisAutos')}
+              onPress={handleNavigateToAutos}
             />
-            <MenuOption 
-              icon="cash-outline" 
-              title="Ingresos" 
+            <MenuOption
+              icon="cash-outline"
+              title="Ingresos"
               subtitle="Reportes y ganancias"
-              onPress={() => navigation.navigate('Ingresos')}
+              onPress={handleNavigateToIngresos}
             />
-            <MenuOption 
-              icon="calendar-outline" 
-              title="Calendario" 
+            <MenuOption
+              icon="calendar-outline"
+              title="Calendario"
               subtitle="Disponibilidad y reservas"
-              onPress={() => navigation.navigate('Reservas')}
+              onPress={handleNavigateToReservas}
             />
           </View>
 
           {/* Account Section */}
           <Text style={styles.sectionTitle}>Cuenta</Text>
           <View style={styles.sectionContainer}>
-            <MenuOption 
-              icon="person-outline" 
-              title="Información Personal" 
+            <MenuOption
+              icon="person-outline"
+              title="Información Personal"
               subtitle="Datos de contacto"
             />
-            <MenuOption 
-              icon="card-outline" 
-              title="Datos Bancarios" 
+            <MenuOption
+              icon="card-outline"
+              title="Datos Bancarios"
               subtitle="Para recibir pagos"
             />
           </View>
@@ -144,9 +166,9 @@ export default function PerfilScreen() {
           {/* Support Section */}
           <Text style={styles.sectionTitle}>Soporte</Text>
           <View style={styles.sectionContainer}>
-            <MenuOption 
-              icon="help-circle-outline" 
-              title="Centro de Ayuda" 
+            <MenuOption
+              icon="help-circle-outline"
+              title="Centro de Ayuda"
               color="#F59E0B"
             />
           </View>
@@ -165,7 +187,7 @@ export default function PerfilScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
   },
   headerGradient: {
     paddingTop: 60,
@@ -175,51 +197,51 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 30,
   },
   headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 24,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
   },
   verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(16, 185, 129, 0.2)",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
     gap: 4,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
+    borderColor: "rgba(16, 185, 129, 0.4)",
   },
   verifiedText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 24,
   },
   avatarContainer: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: "rgba(255,255,255,0.3)",
   },
   avatarText: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#0B729D',
+    fontWeight: "bold",
+    color: "#0B729D",
   },
   userInfo: {
     marginLeft: 16,
@@ -227,87 +249,87 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    color: "rgba(255,255,255,0.8)",
     marginBottom: 8,
   },
   roleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     gap: 4,
   },
   roleText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#0B729D',
+    fontWeight: "600",
+    color: "#0B729D",
   },
   statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    flexDirection: "row",
+    backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 16,
     padding: 16,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   statItem: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
   },
   statNumber: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
   },
   statLabel: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    color: "rgba(255,255,255,0.8)",
     marginTop: 4,
   },
   statDivider: {
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   contentContainer: {
     padding: 20,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: "bold",
+    color: "#111827",
     marginBottom: 12,
     marginTop: 8,
   },
   sectionContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 8,
     marginBottom: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
   menuOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
   },
   iconContainer: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   menuTextContainer: {
@@ -315,19 +337,19 @@ const styles = StyleSheet.create({
   },
   menuTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: "600",
+    color: "#1F2937",
   },
   menuSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
+    color: "#6B7280",
     marginTop: 2,
   },
   logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FEF2F2',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEF2F2",
     padding: 16,
     borderRadius: 16,
     gap: 8,
@@ -335,7 +357,7 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#EF4444',
+    fontWeight: "600",
+    color: "#EF4444",
   },
 });

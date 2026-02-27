@@ -43,7 +43,13 @@ service cloud.firestore {
     match /vehicles/{vehicleId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.arrendadorId;
-      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.arrendadorId;
+      // Owner can update anything; anyone authenticated can update only rating/reviewCount
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.arrendadorId ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['rating', 'reviewCount', 'updatedAt'])
+      );
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.arrendadorId;
     }
 
     // Reservations collection
@@ -97,6 +103,8 @@ service cloud.firestore {
         resource.data.renterId == request.auth.uid || 
         resource.data.ownerId == request.auth.uid
       );
+      // Allow list so getDocs queries work for duplicate detection
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && (
         request.resource.data.renterId == request.auth.uid || 
         request.resource.data.ownerId == request.auth.uid
@@ -109,7 +117,7 @@ service cloud.firestore {
     
     // Reviews collection
     match /reviews/{reviewId} {
-      allow read: if true; // Reviews are public
+      allow read, list: if true; // Reviews are public
       allow create: if isAuthenticated() && 
                       request.resource.data.authorId == request.auth.uid;
       allow update: if isAuthenticated() && 

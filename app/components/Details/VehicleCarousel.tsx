@@ -1,9 +1,16 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import React, { useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import React, { useState } from "react";
+import {
+    Dimensions,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import FirebaseImage from "../FirebaseImage";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface VehicleCarouselProps {
   images: string[];
@@ -14,7 +21,14 @@ interface VehicleCarouselProps {
   isFavorite?: boolean;
 }
 
-export default function VehicleCarousel({ images, onBackPress, onSharePress, onImagePress, onFavoritePress, isFavorite }: VehicleCarouselProps) {
+export default function VehicleCarousel({
+  images,
+  onBackPress,
+  onSharePress,
+  onImagePress,
+  onFavoritePress,
+  isFavorite,
+}: VehicleCarouselProps) {
   const [imageIndex, setImageIndex] = useState(0);
 
   const handleScroll = (event: any) => {
@@ -34,26 +48,18 @@ export default function VehicleCarousel({ images, onBackPress, onSharePress, onI
         scrollEventThrottle={16}
       >
         {images.map((img: string, index: number) => (
-          <TouchableOpacity 
-            key={index} 
-            activeOpacity={0.9} 
+          <TouchableOpacity
+            key={index}
+            activeOpacity={0.9}
             onPress={() => onImagePress && onImagePress(index)}
           >
-            <Image 
-              source={{ uri: img }} 
-              style={styles.image}
-              contentFit="cover"
-              transition={500}
-            />
+            <FirebaseImage uri={img} style={styles.image} resizeMode="cover" />
           </TouchableOpacity>
         ))}
       </ScrollView>
-      
+
       {/* Back Button */}
-      <TouchableOpacity 
-        style={styles.backButton} 
-        onPress={onBackPress}
-      >
+      <TouchableOpacity style={styles.backButton} onPress={onBackPress}>
         <Ionicons name="arrow-back" size={24} color="#1F2937" />
       </TouchableOpacity>
 
@@ -64,11 +70,14 @@ export default function VehicleCarousel({ images, onBackPress, onSharePress, onI
 
       {/* Favorite Button */}
       {onFavoritePress && (
-        <TouchableOpacity style={styles.favoriteButton} onPress={onFavoritePress}>
-          <Ionicons 
-            name={isFavorite ? "heart" : "heart-outline"} 
-            size={24} 
-            color={isFavorite ? "#EF4444" : "#1F2937"} 
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={onFavoritePress}
+        >
+          <Ionicons
+            name={isFavorite ? "heart" : "heart-outline"}
+            size={24}
+            color={isFavorite ? "#EF4444" : "#1F2937"}
           />
         </TouchableOpacity>
       )}
@@ -76,7 +85,9 @@ export default function VehicleCarousel({ images, onBackPress, onSharePress, onI
       {/* Dots Indicator with Counter */}
       <View style={styles.dotsContainer}>
         <Ionicons name="image-outline" size={14} color="#fff" />
-        <Text style={styles.imageCounter}>{imageIndex + 1}/{images.length}</Text>
+        <Text style={styles.imageCounter}>
+          {imageIndex + 1}/{images.length}
+        </Text>
       </View>
     </View>
   );
@@ -85,87 +96,87 @@ export default function VehicleCarousel({ images, onBackPress, onSharePress, onI
 const styles = StyleSheet.create({
   imageContainer: {
     height: 380,
-    width: '100%',
-    position: 'relative',
-    backgroundColor: '#000',
+    width: "100%",
+    position: "relative",
+    backgroundColor: "#000",
   },
   image: {
     width: SCREEN_WIDTH,
     height: 380,
   },
   backButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     left: 20,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
   shareButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     right: 20,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
   favoriteButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     right: 74,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
   dotsContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 24,
     right: 24,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: "rgba(0,0,0,0.75)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   imageCounter: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: "rgba(255,255,255,0.5)",
   },
   dotActive: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     width: 20,
   },
 });

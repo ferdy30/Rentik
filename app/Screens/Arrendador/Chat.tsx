@@ -1,17 +1,37 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
-} from 'react-native';
-import { useAuth } from '../../context/Auth';
-import { Chat, loadOlderChats, subscribeToUserChats } from '../../services/chat';
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../../context/Auth";
+import {
+  Chat,
+  loadOlderChats,
+  subscribeToUserChats,
+} from "../../services/chat";
+
+const formatChatTime = (timestamp: any): string => {
+  if (!timestamp) return "";
+  const date = timestamp.toDate();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  if (msgDay.getTime() === today.getTime()) {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  if (msgDay.getTime() === yesterday.getTime()) return "Ayer";
+  return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+};
 
 export default function ChatScreen() {
   const navigation = useNavigation<any>();
@@ -22,13 +42,14 @@ export default function ChatScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [lastVisible, setLastVisible] = useState<any>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     if (!user) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     const unsubscribe = subscribeToUserChats(
       user.uid,
       15, // Load 15 chats initially
@@ -39,87 +60,112 @@ export default function ChatScreen() {
         setLoading(false);
       },
       (error) => {
-        console.error('Error loading chats:', error);
+        console.error("Error loading chats:", error);
         setLoading(false);
-        setError('Error al cargar los chats');
-      }
+        setError("Error al cargar los chats");
+      },
     );
-    
-    return () => unsubscribe();
-  }, [user]);
 
-  const loadMoreChats = async () => {
+    return () => unsubscribe();
+  }, [user, retryKey]);
+
+  const loadMoreChats = useCallback(async () => {
     if (loadingMore || !hasMore || !lastVisible || !user) return;
 
     setLoadingMore(true);
     try {
       const olderChats = await loadOlderChats(user.uid, lastVisible, 15);
-      
+
       if (olderChats.length > 0) {
-        setChats(prev => [...prev, ...olderChats]);
+        setChats((prev) => [...prev, ...olderChats]);
         setLastVisible(olderChats[olderChats.length - 1]);
         setHasMore(olderChats.length === 15);
       } else {
         setHasMore(false);
       }
     } catch (error) {
-      console.error('Error loading more chats:', error);
+      console.error("Error loading more chats:", error);
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [loadingMore, hasMore, lastVisible, user]);
 
-  const renderItem = ({ item }: { item: Chat }) => {
-    const otherUserId = item.participants.find(p => p !== user?.uid);
-    const otherUserName = otherUserId && item.participantNames?.[otherUserId] ? item.participantNames[otherUserId] : 'Cliente';
-    const vehicleName = item.vehicleInfo ? `${item.vehicleInfo.marca} ${item.vehicleInfo.modelo}` : 'Reserva';
-    const displayName = `${otherUserName} - ${vehicleName}`;
-    const unreadCount = user?.uid ? (item.unreadCount?.[user.uid] || 0) : 0;
+  const renderItem = useCallback(
+    ({ item }: { item: Chat }) => {
+      const otherUserId = item.participants.find((p) => p !== user?.uid);
+      const otherUserName =
+        otherUserId && item.participantNames?.[otherUserId]
+          ? item.participantNames[otherUserId]
+          : "Cliente";
+      const vehicleName = item.vehicleInfo
+        ? `${item.vehicleInfo.marca} ${item.vehicleInfo.modelo}`
+        : "Reserva";
+      const displayName = `${otherUserName} - ${vehicleName}`;
+      const unreadCount = user?.uid ? item.unreadCount?.[user.uid] || 0 : 0;
 
-    return (
-      <TouchableOpacity 
-        style={styles.chatItem}
-        onPress={() => navigation.navigate('ChatRoom', {
-          reservationId: item.reservationId,
-          participants: item.participants,
-          vehicleInfo: item.vehicleInfo
-        })}
-      >
-        <View style={styles.avatarContainer}>
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Text style={styles.avatarInitials}>{otherUserName.charAt(0).toUpperCase()}</Text>
-          </View>
-          {unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+      return (
+        <TouchableOpacity
+          style={styles.chatItem}
+          onPress={() =>
+            navigation.navigate("ChatRoom", {
+              reservationId: item.reservationId,
+              participants: item.participants,
+              vehicleInfo: item.vehicleInfo,
+            })
+          }
+        >
+          <View style={styles.avatarContainer}>
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarInitials}>
+                {otherUserName.charAt(0).toUpperCase()}
+              </Text>
             </View>
-          )}
-        </View>
-        
-        <View style={styles.chatContent}>
-          <View style={styles.chatHeader}>
-            <Text style={[styles.name, unreadCount > 0 && styles.nameUnread]} numberOfLines={1}>{displayName}</Text>
-            <Text style={styles.time}>
-              {item.lastMessageTimestamp?.toDate().toLocaleDateString()}
-            </Text>
+            {unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadText}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </Text>
+              </View>
+            )}
           </View>
-          <View style={styles.messageContainer}>
-            <Text style={[styles.lastMessage, unreadCount > 0 && styles.lastMessageUnread]} numberOfLines={1}>
-              {item.lastMessage || 'Inicia la conversación...'}
-            </Text>
+
+          <View style={styles.chatContent}>
+            <View style={styles.chatHeader}>
+              <Text
+                style={[styles.name, unreadCount > 0 && styles.nameUnread]}
+                numberOfLines={1}
+              >
+                {displayName}
+              </Text>
+              <Text style={styles.time}>
+                {formatChatTime(item.lastMessageTimestamp)}
+              </Text>
+            </View>
+            <View style={styles.messageContainer}>
+              <Text
+                style={[
+                  styles.lastMessage,
+                  unreadCount > 0 && styles.lastMessageUnread,
+                ]}
+                numberOfLines={1}
+              >
+                {item.lastMessage || "Inicia la conversación..."}
+              </Text>
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+        </TouchableOpacity>
+      );
+    },
+    [user, navigation],
+  );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mensajes</Text>
       </View>
-      
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0B729D" />
@@ -129,6 +175,12 @@ export default function ChatScreen() {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color="#EF4444" />
           <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => setRetryKey((k) => k + 1)}
+          >
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
         </View>
       ) : chats.length === 0 ? (
         <View style={styles.emptyState}>
@@ -139,11 +191,15 @@ export default function ChatScreen() {
         <FlatList
           data={chats}
           renderItem={renderItem}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           onEndReached={loadMoreChats}
-          onEndReachedThreshold={0.5}
+          onEndReachedThreshold={0.4}
+          removeClippedSubviews={Platform.OS === "android"}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={12}
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.loadingMoreContainer}>
@@ -154,165 +210,179 @@ export default function ChatScreen() {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: Platform.OS === "ios" ? 8 : 16,
     paddingBottom: 16,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: "#F3F4F6",
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: "800",
+    color: "#111827",
   },
   listContent: {
     paddingBottom: 20,
   },
   chatItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   avatarContainer: {
-    position: 'relative',
+    position: "relative",
     marginRight: 16,
   },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: "#F3F4F6",
   },
   avatarPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E0F2FE',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E0F2FE",
   },
   avatarInitials: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#0B729D',
+    fontWeight: "700",
+    color: "#0B729D",
   },
   chatContent: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   chatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 4,
   },
   name: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
+    flex: 1,
+    marginRight: 8,
   },
   time: {
     fontSize: 12,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   messageContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   lastMessage: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
     flex: 1,
     marginRight: 8,
   },
   separator: {
     height: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: "#F3F4F6",
     marginLeft: 92,
   },
   emptyState: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   unreadBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: -2,
     right: -2,
-    backgroundColor: '#EF4444',
+    backgroundColor: "#EF4444",
     borderRadius: 10,
     minWidth: 20,
     height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: "#fff",
   },
   unreadText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   nameUnread: {
-    fontWeight: '800',
+    fontWeight: "800",
   },
   lastMessageUnread: {
-    color: '#111827',
-    fontWeight: '600',
+    color: "#111827",
+    fontWeight: "600",
   },
   vehicleLabel: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     marginTop: 2,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   errorText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#EF4444',
-    textAlign: 'center',
+    color: "#EF4444",
+    textAlign: "center",
   },
   loadingMoreContainer: {
     paddingVertical: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 8,
   },
   loadingMoreText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: "#0B729D",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
   },
 });

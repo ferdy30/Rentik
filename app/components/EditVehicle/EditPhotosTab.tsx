@@ -1,11 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
+import React, { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Modal,
     Platform,
     ScrollView,
@@ -13,8 +13,8 @@ import {
     Text,
     TouchableOpacity,
     View,
-} from 'react-native';
-import type { Vehicle } from '../../types/vehicle';
+} from "react-native";
+import type { Vehicle } from "../../types/vehicle";
 
 interface EditPhotosTabProps {
   vehicle: Vehicle;
@@ -25,7 +25,9 @@ const MAX_PHOTOS = 15;
 const REQUIRED_PHOTOS = 5;
 
 export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
-  const [photos, setPhotos] = useState<string[]>(vehicle.imagenes || [vehicle.imagen] || []);
+  const [photos, setPhotos] = useState<string[]>(
+    vehicle.imagenes || [vehicle.imagen] || [],
+  );
   const [deletedPhotos, setDeletedPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
@@ -35,11 +37,11 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
       const manipResult = await ImageManipulator.manipulateAsync(
         uri,
         [{ resize: { width: 1200 } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
       );
       return manipResult.uri;
     } catch (error) {
-      console.error('Error compressing image:', error);
+      console.error("Error compressing image:", error);
       return uri;
     }
   };
@@ -47,7 +49,10 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
   const pickImage = async (fromCamera: boolean = false) => {
     try {
       if (photos.length >= MAX_PHOTOS) {
-        Alert.alert('Límite Alcanzado', `Puedes subir máximo ${MAX_PHOTOS} fotos`);
+        Alert.alert(
+          "Límite Alcanzado",
+          `Puedes subir máximo ${MAX_PHOTOS} fotos`,
+        );
         return;
       }
 
@@ -55,7 +60,7 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
       if (fromCamera) {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) {
-          Alert.alert('Permiso Requerido', 'Necesitamos acceso a la cámara');
+          Alert.alert("Permiso Requerido", "Necesitamos acceso a la cámara");
           return;
         }
         result = await ImagePicker.launchCameraAsync({
@@ -65,9 +70,10 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
           aspect: [4, 3],
         });
       } else {
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        const permission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permission.granted) {
-          Alert.alert('Permiso Requerido', 'Necesitamos acceso a tu galería');
+          Alert.alert("Permiso Requerido", "Necesitamos acceso a tu galería");
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
@@ -79,52 +85,55 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
 
       if (!result.canceled) {
         const newPhotos = await Promise.all(
-          result.assets.map(asset => compressImage(asset.uri))
+          result.assets.map((asset) => compressImage(asset.uri)),
         );
-        setPhotos(prev => [...prev, ...newPhotos].slice(0, MAX_PHOTOS));
+        setPhotos((prev) => [...prev, ...newPhotos].slice(0, MAX_PHOTOS));
       }
     } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "No se pudo seleccionar la imagen");
     }
   };
 
   const removePhoto = (index: number) => {
     Alert.alert(
-      'Eliminar Foto',
-      '¿Estás seguro de que quieres eliminar esta foto?',
+      "Eliminar Foto",
+      "¿Estás seguro de que quieres eliminar esta foto?",
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Eliminar',
-          style: 'destructive',
+          text: "Eliminar",
+          style: "destructive",
           onPress: () => {
             const photoToDelete = photos[index];
             // Si la foto ya existe en Firebase (empieza con https://), la marcamos para eliminar
-            if (photoToDelete.startsWith('https://')) {
-              setDeletedPhotos(prev => [...prev, photoToDelete]);
+            if (photoToDelete.startsWith("https://")) {
+              setDeletedPhotos((prev) => [...prev, photoToDelete]);
             }
-            setPhotos(prev => prev.filter((_, i) => i !== index));
+            setPhotos((prev) => prev.filter((_, i) => i !== index));
           },
         },
-      ]
+      ],
     );
   };
 
-  const movePhoto = (index: number, direction: 'up' | 'down') => {
+  const movePhoto = (index: number, direction: "up" | "down") => {
     const newPhotos = [...photos];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    const newIndex = direction === "up" ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= photos.length) return;
-    
-    [newPhotos[index], newPhotos[newIndex]] = [newPhotos[newIndex], newPhotos[index]];
+
+    [newPhotos[index], newPhotos[newIndex]] = [
+      newPhotos[newIndex],
+      newPhotos[index],
+    ];
     setPhotos(newPhotos);
   };
 
   const handleSave = async () => {
     if (photos.length < REQUIRED_PHOTOS) {
       Alert.alert(
-        'Fotos Insuficientes',
-        `Necesitas al menos ${REQUIRED_PHOTOS} fotos para el vehículo.`
+        "Fotos Insuficientes",
+        `Necesitas al menos ${REQUIRED_PHOTOS} fotos para el vehículo.`,
       );
       return;
     }
@@ -133,9 +142,12 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
     try {
       await onSave(photos, deletedPhotos);
       setDeletedPhotos([]); // Limpiar después de guardar exitosamente
-      Alert.alert('Éxito', 'Fotos actualizadas correctamente');
+      Alert.alert("Éxito", "Fotos actualizadas correctamente");
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudieron actualizar las fotos');
+      Alert.alert(
+        "Error",
+        error.message || "No se pudieron actualizar las fotos",
+      );
     } finally {
       setSaving(false);
     }
@@ -148,7 +160,8 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
         <View style={styles.infoBanner}>
           <Ionicons name="information-circle" size={20} color="#0B729D" />
           <Text style={styles.infoText}>
-            Mínimo {REQUIRED_PHOTOS} fotos, máximo {MAX_PHOTOS}. La primera foto será la portada.
+            Mínimo {REQUIRED_PHOTOS} fotos, máximo {MAX_PHOTOS}. La primera foto
+            será la portada.
           </Text>
         </View>
 
@@ -196,28 +209,32 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
                   <Text style={styles.coverBadgeText}>Portada</Text>
                 </View>
               )}
-              
+
               <TouchableOpacity
                 style={styles.photoContainer}
                 onPress={() => setSelectedPhoto(photo)}
               >
-                <Image source={{ uri: photo }} style={styles.photo} contentFit="cover" />
+                <Image
+                  source={{ uri: photo }}
+                  style={styles.photo}
+                  resizeMode="cover"
+                />
               </TouchableOpacity>
 
               <View style={styles.photoActions}>
                 {index > 0 && (
                   <TouchableOpacity
                     style={styles.actionButton}
-                    onPress={() => movePhoto(index, 'up')}
+                    onPress={() => movePhoto(index, "up")}
                   >
                     <Ionicons name="arrow-up" size={16} color="#6B7280" />
                   </TouchableOpacity>
                 )}
-                
+
                 {index < photos.length - 1 && (
                   <TouchableOpacity
                     style={styles.actionButton}
-                    onPress={() => movePhoto(index, 'down')}
+                    onPress={() => movePhoto(index, "down")}
                   >
                     <Ionicons name="arrow-down" size={16} color="#6B7280" />
                   </TouchableOpacity>
@@ -251,7 +268,8 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
         <TouchableOpacity
           style={[
             styles.saveButton,
-            (saving || photos.length < REQUIRED_PHOTOS) && styles.saveButtonDisabled,
+            (saving || photos.length < REQUIRED_PHOTOS) &&
+              styles.saveButtonDisabled,
           ]}
           onPress={handleSave}
           disabled={saving || photos.length < REQUIRED_PHOTOS}
@@ -287,7 +305,7 @@ export default function EditPhotosTab({ vehicle, onSave }: EditPhotosTabProps) {
             <Image
               source={{ uri: selectedPhoto }}
               style={styles.modalImage}
-              contentFit="contain"
+              resizeMode="contain"
             />
           )}
         </View>
@@ -301,191 +319,191 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     padding: 16,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: "#EFF6FF",
     borderRadius: 12,
     marginBottom: 16,
   },
   infoText: {
     flex: 1,
     fontSize: 13,
-    color: '#1E40AF',
+    color: "#1E40AF",
     lineHeight: 18,
   },
   counterContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 16,
   },
   counterText: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
   },
   validBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: "#D1FAE5",
     borderRadius: 12,
   },
   validText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#10B981',
+    fontWeight: "700",
+    color: "#10B981",
   },
   addButtonsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 24,
   },
   addButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 16,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: "#EFF6FF",
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#BAE6FD',
-    borderStyle: 'dashed',
+    borderColor: "#BAE6FD",
+    borderStyle: "dashed",
   },
   addButtonText: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#0B729D',
+    fontWeight: "700",
+    color: "#0B729D",
   },
   photosGrid: {
     gap: 16,
   },
   photoCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
   coverBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 20,
     left: 20,
     zIndex: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#F59E0B',
+    backgroundColor: "#F59E0B",
     borderRadius: 8,
   },
   coverBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: "700",
+    color: "#fff",
   },
   photoContainer: {
-    width: '100%',
+    width: "100%",
     height: 200,
     borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
+    overflow: "hidden",
+    backgroundColor: "#F3F4F6",
   },
   photo: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   photoActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginTop: 12,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   actionButton: {
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   deleteButton: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: "#FEE2E2",
   },
   addMoreCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 40,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
+    borderColor: "#E5E7EB",
+    borderStyle: "dashed",
     marginVertical: 16,
   },
   addMoreText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontWeight: "600",
+    color: "#6B7280",
     marginTop: 12,
   },
   addMoreSubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     marginTop: 4,
   },
   saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 16,
     borderRadius: 16,
-    backgroundColor: '#0B729D',
+    backgroundColor: "#0B729D",
     marginTop: 16,
-    shadowColor: '#0B729D',
+    shadowColor: "#0B729D",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   saveButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: "#9CA3AF",
     shadowOpacity: 0,
     elevation: 0,
   },
   saveButtonText: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: "700",
+    color: "#fff",
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalClose: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? 40 : 50,
+    position: "absolute",
+    top: Platform.OS === "android" ? 40 : 50,
     right: 20,
     zIndex: 10,
     padding: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: "rgba(0,0,0,0.6)",
     borderRadius: 25,
   },
   modalImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
 });

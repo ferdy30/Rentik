@@ -1,9 +1,10 @@
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { db, Firebaseauth } from '../FirebaseConfig';
+import { onAuthStateChanged, User } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { db, Firebaseauth } from "../FirebaseConfig";
+import { registerForPushNotificationsAsync } from "../services/notifications";
 
-export type AppRole = 'arrendador' | 'arrendatario' | string | null | undefined;
+export type AppRole = "arrendador" | "arrendatario" | string | null | undefined;
 
 export interface UserData {
   role?: AppRole;
@@ -17,7 +18,11 @@ interface AuthContextValue {
   loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextValue>({ user: null, userData: null, loading: true });
+const AuthContext = createContext<AuthContextValue>({
+  user: null,
+  userData: null,
+  loading: true,
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -38,9 +43,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(u);
 
         if (u) {
+          // Registrar token de notificaciones push (silencioso, no bloquea)
+          registerForPushNotificationsAsync(u.uid).catch(() => null);
           // Usar onSnapshot para escuchar cambios en tiempo real en el documento del usuario
           unsubscribeSnapshot = onSnapshot(
-            doc(db, 'users', u.uid),
+            doc(db, "users", u.uid),
             (userDoc) => {
               if (userDoc.exists()) {
                 setUserData(userDoc.data() as UserData);
@@ -50,10 +57,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setLoading(false);
             },
             (error) => {
-              console.error('Error fetching user data:', error);
+              console.error("Error fetching user data:", error);
               setUserData(null);
               setLoading(false);
-            }
+            },
           );
         } else {
           // Cerrar cualquier listener activo al cerrar sesión
@@ -65,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         }
       } catch (error) {
-        console.error('Error in auth state change:', error);
+        console.error("Error in auth state change:", error);
         setLoading(false);
       }
     });
@@ -78,11 +85,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const value = React.useMemo<AuthContextValue>(() => ({ 
-    user, 
-    userData, 
-    loading 
-  }), [user, userData, loading]);
+  const value = React.useMemo<AuthContextValue>(
+    () => ({
+      user,
+      userData,
+      loading,
+    }),
+    [user, userData, loading],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

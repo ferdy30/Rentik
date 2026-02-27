@@ -1,7 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import React, { useState } from "react";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface Review {
   id: string;
@@ -40,7 +39,13 @@ export default function VehicleReviews({
         {[1, 2, 3, 4, 5].map((star) => (
           <Ionicons
             key={star}
-            name={star <= rating ? 'star' : star - 0.5 <= rating ? 'star-half' : 'star-outline'}
+            name={
+              star <= rating
+                ? "star"
+                : star - 0.5 <= rating
+                  ? "star-half"
+                  : "star-outline"
+            }
             size={14}
             color="#FBBF24"
           />
@@ -53,9 +58,11 @@ export default function VehicleReviews({
     <View style={styles.ratingBarContainer}>
       <Text style={styles.ratingLabel}>{label}</Text>
       <View style={styles.barBackground}>
-        <View style={[styles.barFill, { width: `${(value / 5) * 100}%` }]} />
+        <View
+          style={[styles.barFill, { width: `${((value ?? 0) / 5) * 100}%` }]}
+        />
       </View>
-      <Text style={styles.ratingValue}>{value.toFixed(1)}</Text>
+      <Text style={styles.ratingValue}>{(value ?? 0).toFixed(1)}</Text>
     </View>
   );
 
@@ -82,10 +89,10 @@ export default function VehicleReviews({
       {/* Overall Rating */}
       <View style={styles.overallContainer}>
         <View style={styles.ratingCircle}>
-          <Text style={styles.ratingNumber}>{averageRating.toFixed(1)}</Text>
-          <View style={styles.starsRow}>
-            {renderStars(averageRating)}
-          </View>
+          <Text style={styles.ratingNumber}>
+            {(averageRating ?? 0).toFixed(1)}
+          </Text>
+          <View style={styles.starsRow}>{renderStars(averageRating)}</View>
         </View>
         <Text style={styles.totalReviews}>{totalReviews} reseñas</Text>
       </View>
@@ -93,10 +100,10 @@ export default function VehicleReviews({
       {/* Rating Breakdown */}
       {ratingBreakdown && (
         <View style={styles.breakdownContainer}>
-          {renderRatingBar('Limpieza', ratingBreakdown.cleanliness)}
-          {renderRatingBar('Comunicación', ratingBreakdown.communication)}
-          {renderRatingBar('Precisión', ratingBreakdown.accuracy)}
-          {renderRatingBar('Relación calidad-precio', ratingBreakdown.value)}
+          {renderRatingBar("Limpieza", ratingBreakdown.cleanliness)}
+          {renderRatingBar("Comunicación", ratingBreakdown.communication)}
+          {renderRatingBar("Precisión", ratingBreakdown.accuracy)}
+          {renderRatingBar("Relación calidad-precio", ratingBreakdown.value)}
         </View>
       )}
 
@@ -107,7 +114,10 @@ export default function VehicleReviews({
             <View style={styles.reviewHeader}>
               <View style={styles.userInfo}>
                 {review.userPhoto ? (
-                  <Image source={{ uri: review.userPhoto }} style={styles.userPhoto} />
+                  <Image
+                    source={{ uri: review.userPhoto }}
+                    style={styles.userPhoto}
+                  />
                 ) : (
                   <View style={styles.userPhotoPlaceholder}>
                     <Ionicons name="person" size={20} color="#9CA3AF" />
@@ -135,10 +145,12 @@ export default function VehicleReviews({
           onPress={() => setShowAll(!showAll)}
         >
           <Text style={styles.showMoreText}>
-            {showAll ? 'Ver menos' : `Ver todas las reseñas (${reviews.length})`}
+            {showAll
+              ? "Ver menos"
+              : `Ver todas las reseñas (${reviews.length})`}
           </Text>
           <Ionicons
-            name={showAll ? 'chevron-up' : 'chevron-down'}
+            name={showAll ? "chevron-up" : "chevron-down"}
             size={20}
             color="#0B729D"
           />
@@ -153,100 +165,100 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
   },
   overallContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 20,
     marginBottom: 24,
     padding: 20,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: "#FFFBEB",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#FEF3C7',
+    borderColor: "#FEF3C7",
   },
   ratingCircle: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: 8,
   },
   ratingNumber: {
     fontSize: 36,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: "800",
+    color: "#111827",
   },
   starsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 2,
   },
   totalReviews: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontWeight: "600",
+    color: "#6B7280",
   },
   breakdownContainer: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
     gap: 12,
   },
   ratingBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   ratingLabel: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '600',
-    color: '#4B5563',
+    fontWeight: "600",
+    color: "#4B5563",
   },
   barBackground: {
     flex: 2,
     height: 8,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: "#E5E7EB",
     borderRadius: 4,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   barFill: {
-    height: '100%',
-    backgroundColor: '#FBBF24',
+    height: "100%",
+    backgroundColor: "#FBBF24",
     borderRadius: 4,
   },
   ratingValue: {
     width: 32,
-    textAlign: 'right',
+    textAlign: "right",
     fontSize: 13,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
   },
   reviewsList: {
     gap: 16,
   },
   reviewCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: "#E5E7EB",
   },
   reviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
   userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     flex: 1,
   },
@@ -259,75 +271,75 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   userDetails: {
     flex: 1,
   },
   userName: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
     marginBottom: 2,
   },
   tripDuration: {
     fontSize: 13,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   reviewMeta: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     gap: 4,
   },
   reviewDate: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     marginTop: 4,
   },
   reviewComment: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#374151',
+    color: "#374151",
   },
   showMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 14,
     marginTop: 16,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: "#F0F9FF",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#BAE6FD',
+    borderColor: "#BAE6FD",
   },
   showMoreText: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#0B729D',
+    fontWeight: "700",
+    color: "#0B729D",
   },
   emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 40,
     paddingHorizontal: 24,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
+    borderColor: "#E5E7EB",
+    borderStyle: "dashed",
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#374151',
+    fontWeight: "700",
+    color: "#374151",
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
+    color: "#6B7280",
+    textAlign: "center",
   },
 });

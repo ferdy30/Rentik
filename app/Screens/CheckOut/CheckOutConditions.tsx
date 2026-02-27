@@ -23,6 +23,7 @@ import { typography } from '../../constants/typography';
 import { storage } from '../../FirebaseConfig';
 import { addNewDamageReport, saveCheckOutConditions } from '../../services/checkOut';
 import { Reservation } from '../../services/reservations';
+import { logger } from '../../utils/logger';
 
 export default function CheckOutConditions() {
     const navigation = useNavigation<any>();
@@ -46,7 +47,7 @@ export default function CheckOutConditions() {
     const handleTakeDamagePhoto = async () => {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permiso denegado', 'Necesitamos acceso a la c�mara.');
+            Alert.alert('Permiso denegado', 'Necesitamos acceso a la cámara.');
             return;
         }
 
@@ -73,11 +74,11 @@ export default function CheckOutConditions() {
 
     const handleSaveDamage = async () => {
         if (!damagePhoto) {
-            Alert.alert('Foto requerida', 'Por favor toma una foto del da�o.');
+            Alert.alert('Foto requerida', 'Por favor toma una foto del daño.');
             return;
         }
         if (!damageNotes.trim()) {
-            Alert.alert('Descripci�n requerida', 'Por favor describe el da�o.');
+            Alert.alert('Descripción requerida', 'Por favor describe el daño.');
             return;
         }
 
@@ -99,9 +100,9 @@ export default function CheckOutConditions() {
             
             setModalVisible(false);
             resetDamageForm();
-            Alert.alert('�xito', 'Da�o reportado correctamente');
-        } catch (error) {
-            console.error('Error saving damage:', error);
+            Alert.alert('¡Éxito!', 'Daño reportado correctamente');
+        } catch (error: any) {
+            logger.error('Error saving damage report', { error: error.message });
             Alert.alert('Error', 'No se pudo guardar el reporte.');
         } finally {
             setSubmittingDamage(false);
@@ -146,9 +147,9 @@ export default function CheckOutConditions() {
             });
 
             navigation.navigate('CheckOutReview', { reservationId: reservation.id, checkOutId });
-        } catch (error) {
-            console.error('Error saving conditions:', error);
-            Alert.alert('Error', 'No se pudo guardar la informaci�n.');
+        } catch (error: any) {
+            logger.error('Error saving checkout conditions', { error: error.message });
+            Alert.alert('Error', 'No se pudo guardar la información.');
         } finally {
             setSaving(false);
         }
@@ -167,7 +168,7 @@ export default function CheckOutConditions() {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#333333" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Estado del Veh�culo</Text>
+                <Text style={styles.headerTitle}>Estado del Vehículo</Text>
                 <TouchableOpacity 
                     onPress={skipToNextScreen} 
                     style={{ backgroundColor: '#EF4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginLeft: 8 }}
@@ -226,7 +227,7 @@ export default function CheckOutConditions() {
                     {/* Damages Section */}
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Nuevos Da�os</Text>
+                            <Text style={styles.sectionTitle}>Nuevos Daños</Text>
                             <TouchableOpacity 
                                 style={styles.addDamageButton}
                                 onPress={() => setModalVisible(true)}
@@ -239,8 +240,8 @@ export default function CheckOutConditions() {
                         {damages.length === 0 ? (
                             <View style={styles.emptyState}>
                                 <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" />
-                                <Text style={styles.emptyText}>Sin nuevos da�os reportados</Text>
-                                <Text style={styles.emptySubtext}>Si todo est� bien, puedes continuar.</Text>
+                                <Text style={styles.emptyText}>Sin nuevos daños reportados</Text>
+                                <Text style={styles.emptySubtext}>Si todo está bien, puedes continuar.</Text>
                             </View>
                         ) : (
                             damages.map((d, index) => (
@@ -301,16 +302,16 @@ export default function CheckOutConditions() {
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Reportar Nuevo Da�o</Text>
+                        <Text style={styles.modalTitle}>Reportar Nuevo Daño</Text>
                         <TouchableOpacity onPress={() => setModalVisible(false)}>
                             <Ionicons name="close" size={24} color="#333333" />
                         </TouchableOpacity>
                     </View>
 
                     <ScrollView style={styles.modalContent}>
-                        <Text style={styles.label}>Ubicaci�n</Text>
+                        <Text style={styles.label}>Ubicación</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsContainer}>
-                            {['Frente', 'Atr�s', 'Izquierda', 'Derecha', 'Techo', 'Interior', 'Llantas'].map((loc) => (
+                            {['Frente', 'Atrás', 'Izquierda', 'Derecha', 'Techo', 'Interior', 'Llantas'].map((loc) => (
                                 <TouchableOpacity
                                     key={loc}
                                     style={[styles.chip, damageLocation === loc && styles.chipSelected]}
@@ -326,7 +327,7 @@ export default function CheckOutConditions() {
                         <Text style={styles.label}>Tipo</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsContainer}>
                             {[
-                                { id: 'scratch', label: 'Ray�n' },
+                                { id: 'scratch', label: 'Rayón' },
                                 { id: 'dent', label: 'Abolladura' },
                                 { id: 'stain', label: 'Mancha' },
                                 { id: 'crack', label: 'Grieta' },
@@ -384,7 +385,7 @@ export default function CheckOutConditions() {
                         <Text style={styles.label}>Notas</Text>
                         <TextInput
                             style={styles.textArea}
-                            placeholder="Describe el da�o..."
+                            placeholder="Describe el daño..."
                             multiline
                             numberOfLines={3}
                             value={damageNotes}

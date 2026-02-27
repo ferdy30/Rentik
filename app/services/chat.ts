@@ -5,6 +5,7 @@ import {
     DocumentSnapshot,
     getDoc,
     getDocs,
+    increment,
     limit,
     onSnapshot,
     orderBy,
@@ -15,9 +16,10 @@ import {
     startAfter,
     Timestamp,
     updateDoc,
-    where
-} from 'firebase/firestore';
-import { db } from '../FirebaseConfig';
+    where,
+    writeBatch,
+} from "firebase/firestore";
+import { db } from "../FirebaseConfig";
 
 export interface Message {
   id: string;
@@ -50,110 +52,152 @@ export interface Chat {
 // Use reservation ID directly as chat ID for unique chat per reservation
 export const getChatId = (reservationId: string) => reservationId;
 
-export const createChatIfNotExists = async (reservationId: string, participants: string[], vehicleInfo: any, participantNames: { [userId: string]: string }) => {
+export const createChatIfNotExists = async (
+  reservationId: string,
+  participants: string[],
+  vehicleInfo: any,
+  participantNames: { [userId: string]: string },
+) => {
   const chatId = getChatId(reservationId);
-  const chatRef = doc(db, 'chats', chatId);
-  
+  const chatRef = doc(db, "chats", chatId);
+
   try {
     // First try to read the chat - if it exists, return early
     const chatSnap = await getDoc(chatRef);
 
     if (chatSnap.exists()) {
-      console.log('Chat already exists:', chatId);
+      console.log("Chat already exists:", chatId);
       return chatId;
     }
 
     // Chat doesn't exist, create it
-    console.log('Creating new chat:', chatId, 'with participants:', participants);
-    
+    console.log(
+      "Creating new chat:",
+      chatId,
+      "with participants:",
+      participants,
+    );
+
     const unreadCount: { [userId: string]: number } = {};
-    participants.forEach(p => unreadCount[p] = 0);
-    
+    participants.forEach((p) => (unreadCount[p] = 0));
+
     const chatData = {
       id: chatId,
       reservationId,
       participants,
       participantNames,
-      lastMessage: '',
+      lastMessage: "",
       lastMessageTimestamp: serverTimestamp(),
-      lastMessageSenderId: '',
+      lastMessageSenderId: "",
       updatedAt: serverTimestamp(),
       unreadCount,
-      vehicleInfo
+      vehicleInfo,
     };
 
     await setDoc(chatRef, chatData);
-    console.log('Chat created successfully:', chatId);
-    
+    console.log("Chat created successfully:", chatId);
+
     return chatId;
   } catch (error: any) {
-    console.error('Error in createChatIfNotExists:', error);
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
-    console.error('Attempted participants:', participants);
-    
-    if (error.code === 'permission-denied') {
-      throw new Error('No tienes permiso para crear este chat. Verifica que eres parte de la reserva.');
-    } else if (error.code === 'unavailable') {
-      throw new Error('Sin conexión. Verifica tu internet');
+    console.error("Error in createChatIfNotExists:", error);
+    console.error("Error code:", error.code);
+    console.error("Error message:", error.message);
+    console.error("Attempted participants:", participants);
+
+    if (error.code === "permission-denied") {
+      throw new Error(
+        "No tienes permiso para crear este chat. Verifica que eres parte de la reserva.",
+      );
+    } else if (error.code === "unavailable") {
+      throw new Error("Sin conexión. Verifica tu internet");
     } else {
-      throw new Error('No se pudo crear el chat. Intenta de nuevo');
+      throw new Error("No se pudo crear el chat. Intenta de nuevo");
     }
   }
 };
 
-export const sendMessage = async (chatId: string, text: string, senderId: string, image?: string) => {
+/**
+ * Send a message and update chat metadata atomically.
+ * Pass `recipientId` to avoid an extra Firestore read on every send.
+ */
+export const sendMessage = async (
+  chatId: string,
+  text: string,
+  senderId: string,
+  image?: string,
+  recipientId?: string,
+) => {
   try {
-    // 1. Add message to subcollection
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
-    await addDoc(messagesRef, {
-      text,
-      image: image || null,
-      senderId,
-      createdAt: serverTimestamp(),
-      read: false
-    });
+    const chatRef = doc(db, "chats", chatId);
+    const messageRef = doc(collection(db, "chats", chatId, "messages"));
 
-    // 2. Get chat to find other participant
-    const chatRef = doc(db, 'chats', chatId);
-    const chatSnap = await getDoc(chatRef);
-    
-    if (chatSnap.exists()) {
-      const chatData = chatSnap.data();
-      const otherParticipant = chatData.participants.find((p: string) => p !== senderId);
-      
-      // 3. Update chat document with last message and increment unread count for other user
-      const updateData: any = {
-        lastMessage: image ? '📷 Imagen' : text,
-        lastMessageTimestamp: serverTimestamp(),
-        lastMessageSenderId: senderId,
-        updatedAt: serverTimestamp()
-      };
-      
-      if (otherParticipant) {
-        updateData[`unreadCount.${otherParticipant}`] = (chatData.unreadCount?.[otherParticipant] || 0) + 1;
+    const chatUpdate: Record<string, any> = {
+      lastMessage: image ? "📷 Imagen" : text,
+      lastMessageTimestamp: serverTimestamp(),
+      lastMessageSenderId: senderId,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (recipientId) {
+      // Atomic increment — no extra read needed
+      chatUpdate[`unreadCount.${recipientId}`] = increment(1);
+
+      // Batch: write message + update chat in one round-trip
+      const batch = writeBatch(db);
+      batch.set(messageRef, {
+        text,
+        image: image || null,
+        senderId,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+      batch.update(chatRef, chatUpdate);
+      await batch.commit();
+    } else {
+      // Fallback: read chat to discover the other participant
+      await addDoc(collection(db, "chats", chatId, "messages"), {
+        text,
+        image: image || null,
+        senderId,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+      const chatSnap = await getDoc(chatRef);
+      if (chatSnap.exists()) {
+        const chatData = chatSnap.data();
+        const otherParticipant = chatData.participants.find(
+          (p: string) => p !== senderId,
+        );
+        if (otherParticipant) {
+          chatUpdate[`unreadCount.${otherParticipant}`] = increment(1);
+        }
+        await updateDoc(chatRef, chatUpdate);
       }
-      
-      await updateDoc(chatRef, updateData);
     }
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error("Error sending message:", error);
     throw error;
   }
 };
 
-export const subscribeToMessages = (chatId: string, callback: (messages: Message[]) => void) => {
+export const subscribeToMessages = (
+  chatId: string,
+  callback: (messages: Message[]) => void,
+) => {
   const q = query(
-    collection(db, 'chats', chatId, 'messages'),
-    orderBy('createdAt', 'desc'),
-    limit(50)
+    collection(db, "chats", chatId, "messages"),
+    orderBy("createdAt", "desc"),
+    limit(50),
   );
 
   return onSnapshot(q, (snapshot) => {
-    const messages = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Message));
+    const messages = snapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as Message,
+    );
     callback(messages);
   });
 };
@@ -162,24 +206,29 @@ export const subscribeToMessages = (chatId: string, callback: (messages: Message
 export const subscribeToRecentMessages = (
   chatId: string,
   limitCount: number,
-  callback: (messages: Message[], lastDoc: QueryDocumentSnapshot | null) => void
+  callback: (
+    messages: Message[],
+    lastDoc: QueryDocumentSnapshot | null,
+  ) => void,
 ) => {
   const q = query(
-    collection(db, 'chats', chatId, 'messages'),
-    orderBy('createdAt', 'desc'),
-    limit(limitCount)
+    collection(db, "chats", chatId, "messages"),
+    orderBy("createdAt", "desc"),
+    limit(limitCount),
   );
 
   return onSnapshot(q, (snapshot) => {
-    const messages = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Message));
-    
-    const lastDoc = snapshot.docs.length > 0 
-      ? snapshot.docs[snapshot.docs.length - 1] 
-      : null;
-    
+    const messages = snapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as Message,
+    );
+
+    const lastDoc =
+      snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+
     callback(messages, lastDoc);
   });
 };
@@ -188,106 +237,122 @@ export const subscribeToRecentMessages = (
 export const loadOlderMessages = async (
   chatId: string,
   lastVisible: QueryDocumentSnapshot,
-  limitCount: number
+  limitCount: number,
 ): Promise<Message[]> => {
   try {
     const q = query(
-      collection(db, 'chats', chatId, 'messages'),
-      orderBy('createdAt', 'desc'),
+      collection(db, "chats", chatId, "messages"),
+      orderBy("createdAt", "desc"),
       startAfter(lastVisible),
-      limit(limitCount)
+      limit(limitCount),
     );
 
     const snapshot = await getDocs(q);
-    
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Message));
+
+    return snapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as Message,
+    );
   } catch (error) {
-    console.error('Error loading older messages:', error);
+    console.error("Error loading older messages:", error);
     throw error;
   }
 };
 
 export const subscribeToUserChats = (
-  userId: string, 
+  userId: string,
   limitCount: number,
   callback: (chats: Chat[], lastDoc: QueryDocumentSnapshot | null) => void,
-  errorCallback?: (error: any) => void
+  errorCallback?: (error: any) => void,
 ) => {
   // Query with limit for pagination
   const q = query(
-    collection(db, 'chats'),
-    where('participants', 'array-contains', userId),
-    limit(limitCount)
+    collection(db, "chats"),
+    where("participants", "array-contains", userId),
+    limit(limitCount),
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const chats = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Chat))
-    // Sort locally instead of in query
-    .sort((a, b) => {
-      const aTime = a.updatedAt?.toMillis() || 0;
-      const bTime = b.updatedAt?.toMillis() || 0;
-      return bTime - aTime;
-    });
-    
-    const lastDoc = snapshot.docs.length > 0 
-      ? snapshot.docs[snapshot.docs.length - 1] 
-      : null;
-    
-    callback(chats, lastDoc);
-  }, (error) => {
-    console.error("Error subscribing to user chats:", error);
-    if (errorCallback) {
-      errorCallback(error);
-    }
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const chats = snapshot.docs
+        .map(
+          (doc) =>
+            ({
+              id: doc.id,
+              ...doc.data(),
+            }) as Chat,
+        )
+        // Sort locally instead of in query
+        .sort((a, b) => {
+          const aTime = a.updatedAt?.toMillis() || 0;
+          const bTime = b.updatedAt?.toMillis() || 0;
+          return bTime - aTime;
+        });
+
+      const lastDoc =
+        snapshot.docs.length > 0
+          ? snapshot.docs[snapshot.docs.length - 1]
+          : null;
+
+      callback(chats, lastDoc);
+    },
+    (error) => {
+      console.error("Error subscribing to user chats:", error);
+      if (errorCallback) {
+        errorCallback(error);
+      }
+    },
+  );
 };
 
 // Load older chats for pagination
 export const loadOlderChats = async (
   userId: string,
   lastVisible: QueryDocumentSnapshot,
-  limitCount: number
+  limitCount: number,
 ): Promise<Chat[]> => {
   try {
     const q = query(
-      collection(db, 'chats'),
-      where('participants', 'array-contains', userId),
+      collection(db, "chats"),
+      where("participants", "array-contains", userId),
       startAfter(lastVisible),
-      limit(limitCount)
+      limit(limitCount),
     );
 
     const snapshot = await getDocs(q);
-    
-    const chats = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Chat))
-    .sort((a, b) => {
-      const aTime = a.updatedAt?.toMillis() || 0;
-      const bTime = b.updatedAt?.toMillis() || 0;
-      return bTime - aTime;
-    });
+
+    const chats = snapshot.docs
+      .map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          }) as Chat,
+      )
+      .sort((a, b) => {
+        const aTime = a.updatedAt?.toMillis() || 0;
+        const bTime = b.updatedAt?.toMillis() || 0;
+        return bTime - aTime;
+      });
 
     return chats;
   } catch (error) {
-    console.error('Error loading older chats:', error);
+    console.error("Error loading older chats:", error);
     throw error;
   }
 };
 
 export const markChatAsRead = async (chatId: string, userId: string) => {
   try {
-    const chatRef = doc(db, 'chats', chatId);
+    const chatRef = doc(db, "chats", chatId);
     await updateDoc(chatRef, {
-      [`unreadCount.${userId}`]: 0
+      [`unreadCount.${userId}`]: 0,
     });
   } catch (error) {
-    console.error('Error marking chat as read:', error);
+    console.error("Error marking chat as read:", error);
   }
 };

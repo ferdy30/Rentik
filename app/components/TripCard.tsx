@@ -1,10 +1,26 @@
-﻿import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { canDeleteTrip, getStatusConfig, shouldShowReason } from '../constants/tripStatus';
-import { Reservation } from '../services/reservations';
-import { calculateDaysBetween, formatDate, formatTimeUntil, isPast } from '../utils/date';
+﻿import { Ionicons } from "@expo/vector-icons";
+import React, { useMemo, useState } from "react";
+import {
+    ActivityIndicator,
+    Animated,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import {
+    canDeleteTrip,
+    getStatusConfig,
+    shouldShowReason,
+} from "../constants/tripStatus";
+import { Reservation } from "../services/reservations";
+import {
+    calculateDaysBetween,
+    formatDate,
+    formatTimeUntil,
+    isPast,
+} from "../utils/date";
 
 interface TripCardProps {
   reservation: Reservation;
@@ -12,16 +28,16 @@ interface TripCardProps {
   onDelete?: () => void;
   onArchive?: () => void;
   isDeleting?: boolean;
-  onQuickAction?: (action: 'chat' | 'navigate' | 'checkin') => void;
+  onQuickAction?: (action: "chat" | "navigate" | "checkin") => void;
 }
 
-function TripCard({ 
-  reservation, 
-  onPress, 
-  onDelete, 
-  onArchive, 
+function TripCard({
+  reservation,
+  onPress,
+  onDelete,
+  onArchive,
   isDeleting,
-  onQuickAction
+  onQuickAction,
 }: TripCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [scaleAnim] = useState(new Animated.Value(1));
@@ -32,26 +48,32 @@ function TripCard({
     const endDate = reservation.endDate.toDate();
     const now = new Date();
     const createdAt = reservation.createdAt?.toDate() || startDate;
-    
+
     const days = calculateDaysBetween(startDate, endDate);
     const isUpcoming = !isPast(startDate);
-    const hoursUntilStart = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-    const isStartingSoon = isUpcoming && hoursUntilStart <= 24 && hoursUntilStart > 0;
-    const isNew = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60) <= 24;
-    
-    const isActive = reservation.status === 'confirmed';
-    const isPending = reservation.status === 'pending';
-    const isCompleted = reservation.status === 'completed';
-    
-    const timeRemaining = isActive && isUpcoming ? formatTimeUntil(endDate) : null;
-    
+    const hoursUntilStart =
+      (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const isStartingSoon =
+      isUpcoming && hoursUntilStart <= 24 && hoursUntilStart > 0;
+    const isNew =
+      (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60) <= 24;
+
+    const isActive = reservation.status === "confirmed";
+    const isPending = reservation.status === "pending";
+    const isCompleted = reservation.status === "completed";
+
+    const timeRemaining =
+      isActive && isUpcoming ? formatTimeUntil(endDate) : null;
+
     // Calculate progress for active trips
-    const tripProgress = isActive ? (() => {
-      const total = endDate.getTime() - startDate.getTime();
-      const elapsed = now.getTime() - startDate.getTime();
-      return Math.min(Math.max((elapsed / total) * 100, 0), 100);
-    })() : 0;
-    
+    const tripProgress = isActive
+      ? (() => {
+          const total = endDate.getTime() - startDate.getTime();
+          const elapsed = now.getTime() - startDate.getTime();
+          return Math.min(Math.max((elapsed / total) * 100, 0), 100);
+        })()
+      : 0;
+
     return {
       days,
       isActive,
@@ -66,13 +88,19 @@ function TripCard({
       startDate,
       endDate,
     };
-  }, [reservation.startDate, reservation.endDate, reservation.status, reservation.createdAt]);
+  }, [
+    reservation.startDate,
+    reservation.endDate,
+    reservation.status,
+    reservation.createdAt,
+  ]);
 
   const statusInfo = getStatusConfig(reservation.status);
-  const vehicleName = reservation.vehicleSnapshot 
+  const vehicleName = reservation.vehicleSnapshot
     ? `${reservation.vehicleSnapshot.marca} ${reservation.vehicleSnapshot.modelo} ${reservation.vehicleSnapshot.anio}`
-    : 'Vehículo';
-  const showReason = shouldShowReason(reservation.status as any) && 
+    : "Vehículo";
+  const showReason =
+    shouldShowReason(reservation.status as any) &&
     (reservation.denialReason || reservation.cancellationReason);
   const showActions = canDeleteTrip(reservation.status as any);
   const vehicleImage = reservation.vehicleSnapshot?.imagen || null;
@@ -94,8 +122,8 @@ function TripCard({
 
   return (
     <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
-      <TouchableOpacity 
-        onPress={onPress} 
+      <TouchableOpacity
+        onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}
@@ -107,20 +135,29 @@ function TripCard({
               <Image
                 source={{ uri: vehicleImage }}
                 style={styles.heroImage}
-                contentFit="cover"
-                transition={200}
-                cachePolicy="memory-disk"
+                resizeMode="cover"
               />
               <View style={styles.imageGradient} />
             </>
           )}
-          
+
           {/* Overlays on image */}
           <View style={styles.imageOverlay}>
             {/* Status Badge */}
-            <View style={[styles.statusBadge, { backgroundColor: statusInfo.color }]}>
-              <Ionicons name={statusInfo.icon as any} size={14} color={statusInfo.textColor} />
-              <Text style={[styles.statusText, { color: statusInfo.textColor }]}>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: statusInfo.color },
+              ]}
+            >
+              <Ionicons
+                name={statusInfo.icon as any}
+                size={14}
+                color={statusInfo.textColor}
+              />
+              <Text
+                style={[styles.statusText, { color: statusInfo.textColor }]}
+              >
                 {statusInfo.label}
               </Text>
             </View>
@@ -136,7 +173,9 @@ function TripCard({
 
           {/* Price Highlight */}
           <View style={styles.priceOverlay}>
-            <Text style={styles.priceAmount}>${reservation.totalPrice.toFixed(0)}</Text>
+            <Text style={styles.priceAmount}>
+              ${reservation.totalPrice.toFixed(0)}
+            </Text>
             <Text style={styles.priceLabel}>total • {tripDetails.days}d</Text>
           </View>
         </View>
@@ -144,8 +183,10 @@ function TripCard({
         {/* Card Content */}
         <View style={styles.cardContent}>
           {/* Title */}
-          <Text style={styles.cardTitle} numberOfLines={1}>{vehicleName}</Text>
-            
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {vehicleName}
+          </Text>
+
           {/* Starting Soon Alert */}
           {tripDetails.isStartingSoon && (
             <View style={styles.alertBanner}>
@@ -161,31 +202,55 @@ function TripCard({
             <View style={styles.progressSection}>
               <View style={styles.progressHeader}>
                 <Text style={styles.progressLabel}>Progreso del viaje</Text>
-                <Text style={styles.progressPercentage}>{Math.floor(tripDetails.tripProgress)}%</Text>
+                <Text style={styles.progressPercentage}>
+                  {Math.floor(tripDetails.tripProgress)}%
+                </Text>
               </View>
               <View style={styles.progressBarContainer}>
-                <View style={[styles.progressBar, { width: `${tripDetails.tripProgress}%` }]} />
+                <View
+                  style={[
+                    styles.progressBar,
+                    { width: `${tripDetails.tripProgress}%` },
+                  ]}
+                />
               </View>
               {tripDetails.timeRemaining && (
                 <Text style={styles.timeRemainingText}>
-                  <Ionicons name="time-outline" size={12} color="#0B729D" /> {tripDetails.timeRemaining} restantes
+                  <Ionicons name="time-outline" size={12} color="#0B729D" />{" "}
+                  {tripDetails.timeRemaining} restantes
                 </Text>
               )}
             </View>
           )}
 
           {/* Timeline for Pending/Confirmed */}
-          {(tripDetails.isPending || (tripDetails.isActive && !tripDetails.isUpcoming)) && (
+          {(tripDetails.isPending ||
+            (tripDetails.isActive && !tripDetails.isUpcoming)) && (
             <View style={styles.timeline}>
               <View style={[styles.timelineStep, styles.timelineStepComplete]}>
                 <View style={styles.timelineDot} />
                 <Text style={styles.timelineText}>Solicitado</Text>
               </View>
               <View style={styles.timelineLine} />
-              <View style={[styles.timelineStep, tripDetails.isActive && styles.timelineStepComplete]}>
-                <View style={[styles.timelineDot, !tripDetails.isActive && styles.timelineDotInactive]} />
-                <Text style={[styles.timelineText, !tripDetails.isActive && styles.timelineTextInactive]}>
-                  {tripDetails.isActive ? 'En progreso' : 'Pendiente'}
+              <View
+                style={[
+                  styles.timelineStep,
+                  tripDetails.isActive && styles.timelineStepComplete,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.timelineDot,
+                    !tripDetails.isActive && styles.timelineDotInactive,
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.timelineText,
+                    !tripDetails.isActive && styles.timelineTextInactive,
+                  ]}
+                >
+                  {tripDetails.isActive ? "En progreso" : "Pendiente"}
                 </Text>
               </View>
               <View style={styles.timelineLine} />
@@ -195,7 +260,7 @@ function TripCard({
               </View>
             </View>
           )}
-      
+
           {/* Dates */}
           <View style={styles.infoRow}>
             <View style={styles.iconCircle}>
@@ -204,34 +269,48 @@ function TripCard({
             <View style={{ flex: 1 }}>
               <Text style={styles.infoLabel}>Fechas</Text>
               <Text style={styles.infoValue}>
-                {formatDate(tripDetails.startDate, 'short')} - {formatDate(tripDetails.endDate, 'short')}
+                {formatDate(tripDetails.startDate, "short")} -{" "}
+                {formatDate(tripDetails.endDate, "short")}
               </Text>
             </View>
           </View>
 
           {/* Location */}
           <View style={styles.infoRow}>
-            <View style={[styles.iconCircle, reservation.isDelivery && styles.iconCircleHighlight]}>
-              <Ionicons 
-                name={reservation.isDelivery ? "car-sport" : "location"} 
-                size={16} 
-                color={reservation.isDelivery ? "#FFF" : "#0B729D"} 
+            <View
+              style={[
+                styles.iconCircle,
+                reservation.isDelivery && styles.iconCircleHighlight,
+              ]}
+            >
+              <Ionicons
+                name={reservation.isDelivery ? "car-sport" : "location"}
+                size={16}
+                color={reservation.isDelivery ? "#FFF" : "#0B729D"}
               />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.infoLabel}>
-                {reservation.isDelivery ? 'Entrega a domicilio' : 'Punto de recogida'}
+                {reservation.isDelivery
+                  ? "Entrega a domicilio"
+                  : "Punto de recogida"}
               </Text>
-              <Text style={[styles.infoValue, reservation.isDelivery && styles.deliveryText]} numberOfLines={1}>
-                {reservation.isDelivery 
+              <Text
+                style={[
+                  styles.infoValue,
+                  reservation.isDelivery && styles.deliveryText,
+                ]}
+                numberOfLines={1}
+              >
+                {reservation.isDelivery
                   ? reservation.deliveryAddress
-                  : (reservation.pickupLocation || 'Por confirmar')}
+                  : reservation.pickupLocation || "Por confirmar"}
               </Text>
             </View>
           </View>
 
           {/* Expandable Price Breakdown */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.priceBreakdownToggle}
             onPress={() => setExpanded(!expanded)}
             activeOpacity={0.7}
@@ -245,38 +324,55 @@ function TripCard({
                 ${reservation.totalPrice.toFixed(2)}
               </Text>
             </View>
-            <Ionicons 
-              name={expanded ? "chevron-up" : "chevron-down"} 
-              size={20} 
-              color="#9CA3AF" 
+            <Ionicons
+              name={expanded ? "chevron-up" : "chevron-down"}
+              size={20}
+              color="#9CA3AF"
             />
           </TouchableOpacity>
 
           {expanded && reservation.priceBreakdown && (
             <View style={styles.priceBreakdownContent}>
               <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>Renta ({reservation.priceBreakdown.days}d × ${reservation.priceBreakdown.pricePerDay})</Text>
-                <Text style={styles.breakdownValue}>${(reservation.priceBreakdown.days * reservation.priceBreakdown.pricePerDay).toFixed(2)}</Text>
+                <Text style={styles.breakdownLabel}>
+                  Renta ({reservation.priceBreakdown.days}d × $
+                  {reservation.priceBreakdown.pricePerDay})
+                </Text>
+                <Text style={styles.breakdownValue}>
+                  $
+                  {(
+                    reservation.priceBreakdown.days *
+                    reservation.priceBreakdown.pricePerDay
+                  ).toFixed(2)}
+                </Text>
               </View>
               {reservation.priceBreakdown.extrasTotal > 0 && (
                 <View style={styles.breakdownRow}>
                   <Text style={styles.breakdownLabel}>Extras</Text>
-                  <Text style={styles.breakdownValue}>${reservation.priceBreakdown.extrasTotal.toFixed(2)}</Text>
+                  <Text style={styles.breakdownValue}>
+                    ${reservation.priceBreakdown.extrasTotal.toFixed(2)}
+                  </Text>
                 </View>
               )}
               {reservation.priceBreakdown.deliveryFee > 0 && (
                 <View style={styles.breakdownRow}>
                   <Text style={styles.breakdownLabel}>Delivery</Text>
-                  <Text style={styles.breakdownValue}>${reservation.priceBreakdown.deliveryFee.toFixed(2)}</Text>
+                  <Text style={styles.breakdownValue}>
+                    ${reservation.priceBreakdown.deliveryFee.toFixed(2)}
+                  </Text>
                 </View>
               )}
               <View style={styles.breakdownRow}>
                 <Text style={styles.breakdownLabel}>Servicio Rentik</Text>
-                <Text style={styles.breakdownValue}>${reservation.priceBreakdown.serviceFee.toFixed(2)}</Text>
+                <Text style={styles.breakdownValue}>
+                  ${reservation.priceBreakdown.serviceFee.toFixed(2)}
+                </Text>
               </View>
               <View style={[styles.breakdownRow, styles.breakdownTotal]}>
                 <Text style={styles.breakdownTotalLabel}>Total</Text>
-                <Text style={styles.breakdownTotalValue}>${reservation.priceBreakdown.total.toFixed(2)}</Text>
+                <Text style={styles.breakdownTotalValue}>
+                  ${reservation.priceBreakdown.total.toFixed(2)}
+                </Text>
               </View>
             </View>
           )}
@@ -288,7 +384,9 @@ function TripCard({
             <View style={styles.reasonHeader}>
               <Ionicons name="information-circle" size={16} color="#DC2626" />
               <Text style={styles.reasonTitle}>
-                {reservation.status === 'denied' ? 'Motivo del rechazo:' : 'Motivo de cancelación:'}
+                {reservation.status === "denied"
+                  ? "Motivo del rechazo:"
+                  : "Motivo de cancelación:"}
               </Text>
             </View>
             <Text style={styles.reasonText}>
@@ -310,12 +408,12 @@ function TripCard({
             <Ionicons name="eye" size={18} color="#FFF" />
             <Text style={styles.quickActionPrimaryText}>Ver más</Text>
           </TouchableOpacity>
-          
+
           {/* Check-in/Navigate for active trips */}
           {tripDetails.isActive && tripDetails.isStartingSoon && (
             <TouchableOpacity
               style={[styles.quickActionButton, styles.quickActionHighlight]}
-              onPress={() => onQuickAction('checkin')}
+              onPress={() => onQuickAction("checkin")}
               activeOpacity={0.7}
             >
               <Ionicons name="checkmark-circle" size={18} color="#FFF" />
@@ -326,7 +424,7 @@ function TripCard({
           {tripDetails.isActive && !tripDetails.isStartingSoon && (
             <TouchableOpacity
               style={styles.quickActionButton}
-              onPress={() => onQuickAction('chat')}
+              onPress={() => onQuickAction("chat")}
               activeOpacity={0.7}
             >
               <Ionicons name="chatbubble-outline" size={18} color="#0B729D" />
@@ -340,7 +438,9 @@ function TripCard({
       {tripDetails.isCompleted && (
         <View style={styles.reviewPrompt}>
           <Ionicons name="star-outline" size={20} color="#F59E0B" />
-          <Text style={styles.reviewPromptText}>¿Cómo estuvo tu experiencia?</Text>
+          <Text style={styles.reviewPromptText}>
+            ¿Cómo estuvo tu experiencia?
+          </Text>
           <TouchableOpacity style={styles.reviewButton} activeOpacity={0.7}>
             <Text style={styles.reviewButtonText}>Calificar</Text>
             <Ionicons name="arrow-forward" size={14} color="#0B729D" />
@@ -385,51 +485,51 @@ function TripCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 6,
     marginBottom: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   imageContainer: {
-    position: 'relative',
+    position: "relative",
     height: 180,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: "#F3F4F6",
   },
   heroImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   imageGradient: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    height: '60%',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    height: "60%",
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
   imageOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 12,
     left: 12,
     right: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
   priceOverlay: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 12,
     right: 12,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
@@ -437,13 +537,13 @@ const styles = StyleSheet.create({
   },
   priceAmount: {
     fontSize: 20,
-    fontWeight: '900',
-    color: '#111827',
+    fontWeight: "900",
+    color: "#111827",
   },
   priceLabel: {
     fontSize: 11,
-    color: '#6B7280',
-    fontWeight: '600',
+    color: "#6B7280",
+    fontWeight: "600",
     marginTop: -2,
   },
   cardContent: {
@@ -451,18 +551,18 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: "800",
+    color: "#111827",
     marginBottom: 12,
   },
   statusBadge: {
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
@@ -470,17 +570,17 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   newBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
-    backgroundColor: '#F59E0B',
+    backgroundColor: "#F59E0B",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
@@ -488,76 +588,76 @@ const styles = StyleSheet.create({
   },
   newBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
   },
   alertBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: "#FEE2E2",
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
     marginBottom: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#DC2626',
+    borderLeftColor: "#DC2626",
   },
   alertText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#991B1B',
+    fontWeight: "600",
+    color: "#991B1B",
     flex: 1,
   },
   progressSection: {
     marginBottom: 16,
     padding: 12,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: "#F0F9FF",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: "#BFDBFE",
   },
   progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
   progressLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#0B729D',
+    fontWeight: "600",
+    color: "#0B729D",
   },
   progressPercentage: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#0B729D',
+    fontWeight: "700",
+    color: "#0B729D",
   },
   progressBarContainer: {
     height: 6,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: "#DBEAFE",
     borderRadius: 3,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: 6,
   },
   progressBar: {
-    height: '100%',
-    backgroundColor: '#0B729D',
+    height: "100%",
+    backgroundColor: "#0B729D",
     borderRadius: 3,
   },
   timeRemainingText: {
     fontSize: 12,
-    color: '#0369A1',
-    fontWeight: '500',
+    color: "#0369A1",
+    fontWeight: "500",
   },
   timeline: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 16,
     paddingVertical: 12,
   },
   timelineStep: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: 4,
   },
   timelineStepComplete: {
@@ -567,33 +667,33 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#10B981',
+    backgroundColor: "#10B981",
   },
   timelineDotInactive: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: "#D1D5DB",
   },
   timelineLine: {
     flex: 1,
     height: 2,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: "#E5E7EB",
     marginHorizontal: 8,
   },
   timelineText: {
     fontSize: 10,
-    fontWeight: '600',
-    color: '#10B981',
+    fontWeight: "600",
+    color: "#10B981",
   },
   timelineTextInactive: {
     fontSize: 10,
-    fontWeight: '600',
-    color: '#9CA3AF',
+    fontWeight: "600",
+    color: "#9CA3AF",
   },
   infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 12,
     marginBottom: 12,
   },
@@ -601,41 +701,41 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F0F9FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#F0F9FF",
+    alignItems: "center",
+    justifyContent: "center",
   },
   iconCircleHighlight: {
-    backgroundColor: '#0B729D',
+    backgroundColor: "#0B729D",
   },
   infoLabel: {
     fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
+    color: "#6B7280",
+    fontWeight: "500",
     marginBottom: 2,
   },
   infoValue: {
     fontSize: 14,
-    color: '#111827',
-    fontWeight: '600',
+    color: "#111827",
+    fontWeight: "600",
   },
   deliveryText: {
-    color: '#0B729D',
+    color: "#0B729D",
   },
   priceBreakdownToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
     borderRadius: 12,
     marginTop: 4,
   },
   priceHighlight: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#0B729D',
+    fontWeight: "800",
+    color: "#0B729D",
   },
   priceBreakdownContent: {
     paddingHorizontal: 12,
@@ -644,131 +744,131 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   breakdownLabel: {
     fontSize: 13,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   breakdownValue: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: "600",
+    color: "#111827",
   },
   breakdownTotal: {
     paddingTop: 8,
     marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: "#E5E7EB",
   },
   breakdownTotalLabel: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
   },
   breakdownTotalValue: {
     fontSize: 16,
-    fontWeight: '800',
-    color: '#0B729D',
+    fontWeight: "800",
+    color: "#0B729D",
   },
   reasonContainer: {
     marginTop: 12,
     padding: 10,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: "#FEF2F2",
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#DC2626',
+    borderLeftColor: "#DC2626",
   },
   reasonHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     marginBottom: 4,
   },
   reasonTitle: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#991B1B',
+    fontWeight: "700",
+    color: "#991B1B",
   },
   reasonText: {
     fontSize: 13,
-    color: '#7F1D1D',
+    color: "#7F1D1D",
     lineHeight: 18,
   },
   quickActionsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: 16,
     paddingBottom: 16,
     gap: 10,
   },
   quickActionButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     gap: 6,
     borderWidth: 1.5,
-    borderColor: '#0B729D',
+    borderColor: "#0B729D",
   },
   quickActionPrimary: {
-    backgroundColor: '#0B729D',
+    backgroundColor: "#0B729D",
     borderWidth: 0,
   },
   quickActionHighlight: {
-    backgroundColor: '#10B981',
+    backgroundColor: "#10B981",
     borderWidth: 0,
   },
   quickActionText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#0B729D',
+    fontWeight: "700",
+    color: "#0B729D",
   },
   quickActionPrimaryText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
   },
   quickActionHighlightText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
   },
   reviewPrompt: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: "#FFFBEB",
     borderTopWidth: 1,
-    borderTopColor: '#FEF3C7',
+    borderTopColor: "#FEF3C7",
   },
   reviewPromptText: {
     flex: 1,
     fontSize: 14,
-    fontWeight: '600',
-    color: '#92400E',
+    fontWeight: "600",
+    color: "#92400E",
   },
   reviewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#0B729D',
+    borderColor: "#0B729D",
   },
   reviewButtonText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#0B729D',
+    fontWeight: "700",
+    color: "#0B729D",
   },
   actionsContainer: {
     marginHorizontal: 16,
@@ -776,41 +876,41 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#FAFAFA',
-    flexDirection: 'row',
+    borderTopColor: "#FAFAFA",
+    flexDirection: "row",
     gap: 8,
   },
   archiveButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: "#FAFAFA",
     borderRadius: 8,
     gap: 6,
   },
   archiveButtonText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#757575',
+    fontWeight: "600",
+    color: "#757575",
   },
   deleteButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: "#FEE2E2",
     borderRadius: 8,
     gap: 6,
   },
   deleteButtonText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#DC2626',
+    fontWeight: "600",
+    color: "#DC2626",
   },
 });
 

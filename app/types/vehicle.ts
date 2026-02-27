@@ -50,6 +50,7 @@ export interface Vehicle {
 
   // Precio y Ubicación
   precio: number;
+  precioPorDia?: number; // Alias para compatibilidad (usar precio)
   descripcion: string;
   ubicacion: string;
   coordinates?: {
@@ -88,4 +89,8 @@ export interface Vehicle {
   trips: number;
   status: 'active' | 'inactive' | 'rented';
   disponible?: boolean; // Legacy
+  
+  // Campos computados/dinámicos (agregados en runtime)
+  badges?: string[]; // ['Más rentado', 'Económico', etc.] - calculado dinámicamente
+  distanceText?: string; // '2.5 km' - calculado con ubicación del usuario
 }

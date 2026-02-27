@@ -5,14 +5,19 @@
  */
 
 export const typography = {
-  // Familia de fuentes
+  // Familia de fuentes con fallbacks
   fonts: {
-    regular: 'Poppins-Regular',
-    medium: 'Poppins-Medium',
-    semiBold: 'Poppins-SemiBold',
-    bold: 'Poppins-Bold',
-    extraBold: 'Poppins-ExtraBold',
-    black: 'Poppins-Black',
+    regular:
+      'Poppins-Regular, System, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    medium:
+      'Poppins-Medium, System, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    semiBold:
+      'Poppins-SemiBold, System, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    bold: 'Poppins-Bold, System, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    extraBold:
+      'Poppins-ExtraBold, System, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    black:
+      'Poppins-Black, System, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
 
   // Tamaños de texto
@@ -50,12 +55,12 @@ export const typography = {
 
   // Pesos (weights)
   weights: {
-    regular: '400' as const,
-    medium: '500' as const,
-    semiBold: '600' as const,
-    bold: '700' as const,
-    extraBold: '800' as const,
-    black: '900' as const,
+    regular: "400" as const,
+    medium: "500" as const,
+    semiBold: "600" as const,
+    bold: "700" as const,
+    extraBold: "800" as const,
+    black: "900" as const,
   },
 
   // Letter spacing (espaciado entre letras)
@@ -231,23 +236,26 @@ export const textStyles = {
  * Para conversión automática
  */
 export const weightToFont = {
-  '100': typography.fonts.regular, // Thin -> Regular (Poppins no tiene Thin usado)
-  '200': typography.fonts.regular, // ExtraLight -> Regular
-  '300': typography.fonts.regular, // Light -> Regular
-  '400': typography.fonts.regular, // Regular
-  '500': typography.fonts.medium,  // Medium
-  '600': typography.fonts.semiBold, // SemiBold
-  '700': typography.fonts.bold,    // Bold
-  '800': typography.fonts.extraBold, // ExtraBold
-  '900': typography.fonts.black,   // Black
-  'normal': typography.fonts.regular,
-  'bold': typography.fonts.bold,
+  "100": typography.fonts.regular, // Thin -> Regular (Poppins no tiene Thin usado)
+  "200": typography.fonts.regular, // ExtraLight -> Regular
+  "300": typography.fonts.regular, // Light -> Regular
+  "400": typography.fonts.regular, // Regular
+  "500": typography.fonts.medium, // Medium
+  "600": typography.fonts.semiBold, // SemiBold
+  "700": typography.fonts.bold, // Bold
+  "800": typography.fonts.extraBold, // ExtraBold
+  "900": typography.fonts.black, // Black
+  normal: typography.fonts.regular,
+  bold: typography.fonts.bold,
 } as const;
 
 /**
  * 🎯 Helper para aplicar tipografía
  * Uso: getFontFamily('600') => 'Poppins-SemiBold'
  */
-export const getFontFamily = (weight: string = '400'): string => {
-  return weightToFont[weight as keyof typeof weightToFont] || typography.fonts.regular;
+export const getFontFamily = (weight: string = "400"): string => {
+  return (
+    weightToFont[weight as keyof typeof weightToFont] ||
+    typography.fonts.regular
+  );
 };
