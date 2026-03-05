@@ -38,12 +38,14 @@ export default function AppNavigation() {
     isArrendador(userData?.role) &&
     !stripeOkEnough
   );
-  const roleKnown = user ? (userData && (userData.role === 'arrendador' || userData.role === 'arrendatario')) : false; 
+  const roleKnown = user ? (userData && (userData.role === 'arrendador' || userData.role === 'arrendatario' || userData.role === 'ambos')) : false; 
   const isIncompleteProfile = Boolean(user && userData && userData.profileComplete === false);
   const initialRouteName = user
     ? (isIncompleteProfile
         ? 'RegistroStep1'
-        : (shouldCompletePayment ? 'PaymentSetup' : getInitialRouteByRoleAndProfile(userData?.role, profileComplete))) 
+        : (!roleKnown
+            ? 'Splash'
+            : (shouldCompletePayment ? 'PaymentSetup' : getInitialRouteByRoleAndProfile(userData?.role, profileComplete))))
     : 'Splash';
 
   // Key único para forzar remount del stack cuando cambia el estado de autenticación crítico

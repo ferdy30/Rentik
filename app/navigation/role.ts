@@ -6,6 +6,10 @@ export function getHomeRouteByRole(role: AppRole): 'ArrendadorStack' | 'HomeArre
   return role === 'arrendador' ? 'ArrendadorStack' : 'HomeArrendatario';
 }
 
+export function isAmbos(role: AppRole): boolean {
+  return role === 'ambos';
+}
+
 export function getInitialRouteByRoleAndProfile(
   role: AppRole,
   profileComplete: boolean
@@ -15,5 +19,5 @@ export function getInitialRouteByRoleAndProfile(
 }
 
 export function isArrendador(role: AppRole): boolean {
-  return role === 'arrendador';
+  return role === 'arrendador' || role === 'ambos';
 }
